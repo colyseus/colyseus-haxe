@@ -1,0 +1,16 @@
+{
+  "name": "colyseus",
+  "url" : "https://github.com/gamestdio/colyseus-hx/",
+  "license": "MIT",
+  "tags": ["multiplayer", "networking", "websockets", "netcode"],
+  "description": "Multiplayer Game Client for Haxe",
+  "version": "0.9.0",
+  "classPath": "src/",
+  "releasenote": "Initial release, everything is working correctly.",
+  "contributors": ["Endel Dreyer"],
+  "dependencies": {
+    "msgpack-haxe": ">= 1.15.1",
+    "haxe-ws": ">= 1.0.5",
+    "fossil-delta": ">= 0.1.0"
+  }
+}
