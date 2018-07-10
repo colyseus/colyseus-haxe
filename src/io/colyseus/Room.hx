@@ -1,15 +1,16 @@
 package io.colyseus;
 
-import io.gamestd.FossilDelta;
 import haxe.io.Bytes;
 import org.msgpack.MsgPack;
 
-class Room extends StateContainer {
-    public id: String;
-    public sessionId: String;
+import io.gamestd.FossilDelta;
 
-    public name: String;
-    public options: Dynamic;
+class Room extends StateContainer {
+    public var id: String;
+    public var sessionId: String;
+
+    public var name: String;
+    public var options: Dynamic;
 
     // callbacks
     public dynamic function onJoin(): Void {}
@@ -18,8 +19,8 @@ class Room extends StateContainer {
     public dynamic function onError(message: String): Void {}
     public dynamic function onLeave(): Void {}
 
-    public connection: Connection;
-    private _previousState: Bytes;
+    public var connection: Connection;
+    private var _previousState: Bytes;
 
     public function new (name: String, options: Dynamic = null) {
         super({});
@@ -29,29 +30,29 @@ class Room extends StateContainer {
         this.options = options;
     }
 
-    public connect(connection: Connection) {
+    public function connect(connection: Connection) {
         this.connection = connection;
-        this.connection.reconnectEnabled = false;
+        this.connection.reconnectionEnabled = false;
 
         this.connection.onMessage = function (bytes) {
             this.onMessageCallback(bytes);
         }
 
-        this.connection.onClose = function (e) {
+        this.connection.onClose = function () {
             this.removeAllListeners();
             this.onLeave();
         }
 
         this.connection.onError = function (e) {
-            console.warn("Possible causes: room's onAuth() failed or maxClients has been reached.");
-            this.onError.dispatch(e);
+            trace("Possible causes: room's onAuth() failed or maxClients has been reached.");
+            this.onError(e);
         };
     }
 
-    public leave(): void {
+    public function leave() {
         this.removeAllListeners();
 
-        if (this.connection) {
+        if (this.connection != null) {
             this.connection.close();
 
         } else {
@@ -59,11 +60,11 @@ class Room extends StateContainer {
         }
     }
 
-    public send(data): void {
+    public function send(data) {
         this.connection.send([ Protocol.ROOM_DATA, this.id, data ]);
     }
 
-    public removeAllListeners() {
+    public function removeAllListeners() {
         super.removeAllListeners();
         // this.onJoin.removeAll();
         // this.onStateChange.removeAll();
@@ -72,37 +73,37 @@ class Room extends StateContainer {
         // this.onLeave.removeAll();
     }
 
-    private onMessageCallback(data: Bytes) {
+    private function onMessageCallback(data: Bytes) {
         var message = MsgPack.decode( data );
         var code = message[0];
 
-        if (code === Protocol.JOIN_ROOM) {
-            this.sessionId = message[1];
-            this.onJoin.dispatch();
+        if (code == Protocol.JOIN_ROOM) {
+            this.sessionId = cast message[1];
+            this.onJoin();
 
-        } else if (code === Protocol.JOIN_ERROR) {
+        } else if (code == Protocol.JOIN_ERROR) {
             trace("Error: " + message[1]);
-            this.onError(message[1]);
+            this.onError(cast message[1]);
 
-        } else if (code === Protocol.ROOM_STATE) {
+        } else if (code == Protocol.ROOM_STATE) {
             var state = message[1];
             var remoteCurrentTime = message[2];
             var remoteElapsedTime = message[3];
 
-            this.setState(state, remoteCurrentTime, remoteElapsedTime);
+            this.setState(cast state, remoteCurrentTime, remoteElapsedTime);
 
-        } else if (code === Protocol.ROOM_STATE_PATCH) {
+        } else if (code == Protocol.ROOM_STATE_PATCH) {
             this.patch( message[1] );
 
-        } else if (code === Protocol.ROOM_DATA) {
+        } else if (code == Protocol.ROOM_DATA) {
             this.onMessage(message[1]);
 
-        } else if (code === Protocol.LEAVE_ROOM) {
+        } else if (code == Protocol.LEAVE_ROOM) {
             this.leave();
         }
     }
 
-    private setState( encodedState: Buffer, remoteCurrentTime?: number, remoteElapsedTime?: number ): void {
+    private function setState( encodedState: Bytes, remoteCurrentTime: Int = 0, remoteElapsedTime: Int = 0) {
         var state = MsgPack.decode(encodedState);
         this.set(state);
 
@@ -111,7 +112,7 @@ class Room extends StateContainer {
         this.onStateChange(state);
     }
 
-    private patch( binaryPatch ) {
+    private function patch( binaryPatch ) {
         // apply patch
         this._previousState = FossilDelta.apply( this._previousState, binaryPatch);
 

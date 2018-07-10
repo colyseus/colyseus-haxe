@@ -1,84 +1,93 @@
 package io.colyseus;
 
 import haxe.io.Bytes;
+import org.msgpack.MsgPack;
 
 interface RoomAvailable {
-    roomId: String;
-    clients: Int;
-    maxClients: Int;
-    metadata: Dynamic;
+    public var roomId: String;
+    public var clients: Int;
+    public var maxClients: Int;
+    public var metadata: Dynamic;
 }
 
 class Client {
-    public id: String;
+    public var id: String = "";
 
     // callbacks
     public dynamic function onOpen():Void {}
-    public dynamic function onMessage():Void {}
+    public dynamic function onMessage(data: Dynamic):Void {}
     public dynamic function onClose():Void {}
-    public dynamic function onError():Void {}
+    public dynamic function onError(e: String):Void {}
 
-    private connection: Connection;
+    private var connection: Connection;
 
-    private rooms: Map<String, Room> = [];
-    private connectingRooms: Map<String, Room> = {};
-    private requestId = 0;
+    private var rooms: Map<String, Room> = new Map();
+    private var connectingRooms: Map<Int, Room> = new Map();
+    private var requestId = 0;
 
-    private hostname: String;
-    private roomsAvailableRequests: {[requestId: number]: (value?: RoomAvailable[]) => void} = {};
+    private var hostname: String;
+
+    // private var roomsAvailableRequests: Map<String, RoomAvailable[] -> Void> = new Map();
+    // {[requestId: number]: (value?: RoomAvailable[]) => void}
 
     public function new (url: String) {
         this.hostname = url;
-        getItem('colyseusid', (colyseusid) => this.connect(colyseusid));
+
+        // getItem('colyseusid', (colyseusid) => this.connect(colyseusid));
+        this.connect(this.id);
     }
 
-    public join(roomName: String, options: Dynamic = {}): Room {
-        options.requestId = ++this.requestId;
+    public function join(roomName: String, ?options: Map<String, Dynamic>): Room {
+        if (options == null) {
+            options = new Map();
+        }
+
+        options.set("requestId", ++this.requestId);
 
         var room = new Room(roomName, options);
 
         // remove references on leaving
         room.onLeave = function () {
             this.rooms.remove(room.id);
-            this.connectingRooms.remove(options.requestId);
-        });
+            this.connectingRooms.remove(options.get("requestId"));
+        };
 
-        this.connectingRooms.set(options.requestId, room);
+        this.connectingRooms.set(options.get("requestId"), room);
 
         this.connection.send([Protocol.JOIN_ROOM, roomName, options]);
 
         return room;
     }
 
-    public rejoin<T>(roomName: string, sessionId: string) {
-        return this.join(roomName, { sessionId });
+    public function rejoin(roomName: String, sessionId: String) {
+        return this.join(roomName, [ "sessionId" => sessionId ]);
     }
 
-    public getAvailableRooms(roomName: String, callback: (rooms: RoomAvailable[], err?: string) => void) {
-        // reject this promise after 10 seconds.
-        const requestId = ++this.requestId;
-        const removeRequest = () => delete this.roomsAvailableRequests[requestId];
-        const rejectionTimeout = setTimeout(() => {
-            removeRequest();
-            callback([], 'timeout');
-        }, 10000);
+    // public function getAvailableRooms(roomName: String, callback: (rooms: RoomAvailable[], err?: string) => void) {
+    //     // reject this promise after 10 seconds.
+    //     const requestId = ++this.requestId;
+    //     const removeRequest = () => delete this.roomsAvailableRequests[requestId];
+    //     const rejectionTimeout = setTimeout(() => {
+    //         removeRequest();
+    //         callback([], 'timeout');
+    //     }, 10000);
 
-        // send the request to the server.
-        this.connection.send([Protocol.ROOM_LIST, requestId, roomName]);
+    //     // send the request to the server.
+    //     this.connection.send([Protocol.ROOM_LIST, requestId, roomName]);
 
-        this.roomsAvailableRequests[requestId] = (roomsAvailable) => {
-            removeRequest();
-            clearTimeout(rejectionTimeout);
-            callback(roomsAvailable);
-        };
-    }
+    //     this.roomsAvailableRequests[requestId] = (roomsAvailable) => {
+    //         removeRequest();
+    //         clearTimeout(rejectionTimeout);
+    //         callback(roomsAvailable);
+    //     };
+    // }
 
-    public close() {
+    public function close() {
         this.connection.close();
     }
 
-    private connect(colyseusid: string) {
-        this.id = colyseusid || '';
+    private function connect(colyseusid: String) {
+        this.id = colyseusid;
 
         this.connection = this.createConnection();
 
@@ -86,18 +95,26 @@ class Client {
             this.onMessageCallback(data);
         }
 
-        this.connection.onClose = (e) => this.onClose.dispatch(e);
-        this.connection.onError = (e) => this.onError.dispatch(e);
+        this.connection.onClose = function () {
+            this.onClose();
+        };
+
+        this.connection.onError = function (e) {
+            this.onError(e);
+        };
 
         // check for id on cookie
-        this.connection.onopen = () => {
-            if (this.id) {
-                this.onOpen.dispatch();
+        this.connection.onOpen = function () {
+            if (this.id != "") {
+                this.onOpen();
             }
         };
     }
 
-    private createConnection(path: string = '', options: any = {}) {
+    private function createConnection(path: String = '', ?options: Map<String, Dynamic>) {
+        if (options == null) {
+            options = new Map();
+        }
         // append colyseusid to connection string.
         var params: Array<String> = ["colyseusid=" + this.id];
 
@@ -111,48 +128,48 @@ class Client {
     /**
      * @override
      */
-    private onMessageCallback(data: Bytes) {
+    private function onMessageCallback(data: Bytes) {
         var message = MsgPack.decode(data);
-        var code = message[0];
+        var code: Int = message[0];
 
-        if (code === Protocol.USER_ID) {
-            setItem('colyseusid', message[1]);
+        if (code == Protocol.USER_ID) {
+            // setItem('colyseusid', message[1]);
 
-            this.id = message[1];
+            this.id = cast message[1];
 
             this.onOpen();
 
-        } else if (code === Protocol.JOIN_ROOM) {
-            var requestId = message[2];
-            var room = this.connectingRooms[ requestId ];
+        } else if (code == Protocol.JOIN_ROOM) {
+            var requestId: Int = message[2];
+            var room = this.connectingRooms.get(requestId);
 
-            if (!room) {
-                console.warn('colyseus.js: client left room before receiving session id.');
+            if (room == null) {
+                trace('colyseus.js: client left room before receiving session id.');
                 return;
             }
 
-            room.id = message[1];
+            room.id = cast message[1];
             this.rooms.set(room.id, room);
 
             room.connect(this.createConnection(room.id, room.options));
             this.connectingRooms.remove(requestId);
 
-        } else if (code === Protocol.JOIN_ERROR) {
+        } else if (code == Protocol.JOIN_ERROR) {
             trace('colyseus.js: server error:' + message[2]);
 
             // general error
-            this.onError(message[2]);
+            this.onError(cast message[2]);
 
-        } else if (code === Protocol.ROOM_LIST) {
-            if (this.roomsAvailableRequests[message[1]]) {
-                this.roomsAvailableRequests[message[1]](message[2]);
+        } else if (code == Protocol.ROOM_LIST) {
+            // if (this.roomsAvailableRequests[message[1]]) {
+            //     this.roomsAvailableRequests[message[1]](message[2]);
 
-            } else {
-                console.warn('receiving ROOM_LIST after timeout:', message[2]);
-            }
+            // } else {
+            //     trace('receiving ROOM_LIST after timeout:' + message[2]);
+            // }
 
         } else {
-            this.onMessage.dispatch(message);
+            this.onMessage(message);
         }
 
     }
