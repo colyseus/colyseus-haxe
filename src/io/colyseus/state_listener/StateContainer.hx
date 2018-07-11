@@ -1,24 +1,22 @@
 package io.colyseus.state_listener;
 
-import { compare, PatchObject } from "./compare";
-
-export interface Listener {
-    callback: Function,
-    rules: RegExp[]
-    rawRules: string[]
+interface Listener {
+    public var callback: Function;
+    public var rules: Array<RegExp>;
+    public var rawRules: Array<String>;
 }
 
-export interface DataChange extends PatchObject {
-    path: any;
-    rawPath: string[];
+interface DataChange extends PatchObject {
+    public var path: Dynamic;
+    public var rawPath: Array<String>;
 }
 
-export class StateContainer<T=any> {
-    public state: T;
-    private listeners: Listener[] = [];
-    private defaultListener: Listener;
+class StateContainer {
+    public var state: Dynamic;
+    private var listeners: Array<Listener>[] = [];
+    private var defaultListener: Listener;
 
-    private matcherPlaceholders: {[id: string]: RegExp} = {
+    private var matcherPlaceholders: {[id: string]: RegExp} = {
         ":id": /^([a-zA-Z0-9\-_]+)$/,
         ":number": /^([0-9]+)$/,
         ":string": /^(\w+)$/,
@@ -26,24 +24,24 @@ export class StateContainer<T=any> {
         ":*": /(.*)/,
     }
 
-    constructor (state: T) {
+    public function new (state: Dynamic) {
         this.state = state;
         this.reset();
     }
 
-    public set (newState: T): PatchObject[] {
-        let patches = compare(this.state, newState);
+    public function set (newState: T): PatchObject[] {
+        var patches = compare(this.state, newState);
         this.checkPatches(patches, this.listeners, this.defaultListener);
         this.state = newState;
         return patches;
     }
 
-    public registerPlaceholder (placeholder: string, matcher: RegExp) {
+    public function registerPlaceholder (placeholder: string, matcher: RegExp) {
         this.matcherPlaceholders[ placeholder ] = matcher;
     }
 
-    public listen (segments: string | Function, callback?: Function, immediate?: boolean): Listener {
-        let rules: string[];
+    public function listen (segments: string | Function, callback?: Function, immediate?: boolean): Listener {
+        var rules: string[];
 
         if (typeof(segments)==="function") {
             rules = [];
@@ -57,7 +55,7 @@ export class StateContainer<T=any> {
             console.warn(".listen() accepts only one parameter.");
         }
 
-        const listener: Listener = {
+        var listener: Listener = {
             callback: callback,
             rawRules: rules,
             rules: rules.map(segment => {
@@ -87,7 +85,7 @@ export class StateContainer<T=any> {
         return listener;
     }
 
-    public removeListener (listener: Listener) {
+    public function removeListener (listener: Listener) {
         for (var i = this.listeners.length-1; i >= 0; i--) {
             if (this.listeners[i] === listener) {
                 this.listeners.splice(i, 1);
@@ -95,16 +93,16 @@ export class StateContainer<T=any> {
         }
     }
 
-    public removeAllListeners () {
+    public function removeAllListeners () {
         this.reset();
     }
 
-    private checkPatches(patches: (PatchObject & { matched: boolean })[], listeners: Listener[], defaultListener?: Listener) {
-        for (let j = 0, len = listeners.length; j < len; j++) {
-            const listener = listeners[j];
+    private function checkPatches(patches: (PatchObject & { matched: boolean })[], listeners: Listener[], defaultListener?: Listener) {
+        for (var j = 0, len = listeners.length; j < len; j++) {
+            var listener = listeners[j];
 
-            for (let i = patches.length - 1; i >= 0; i--) {
-                const pathVariables = listener && this.getPathVariables(patches[i], listener);
+            for (var i = patches.length - 1; i >= 0; i--) {
+                var pathVariables = listener && this.getPathVariables(patches[i], listener);
 
                 if (pathVariables) {
                     listener.callback({
@@ -121,7 +119,7 @@ export class StateContainer<T=any> {
 
         // trigger default listener callback with each unmatched patch
         if (defaultListener) {
-            for (let i = patches.length - 1; i >= 0; i--) {
+            for (var i = patches.length - 1; i >= 0; i--) {
                 if (!patches[i].matched) {
                     defaultListener.callback(patches[i]);
                 }
@@ -129,16 +127,16 @@ export class StateContainer<T=any> {
         }
     }
 
-    private getPathVariables (patch: PatchObject, listener: Listener): any {
+    private function getPathVariables (patch: PatchObject, listener: Listener): any {
         // skip if rules count differ from patch
         if (patch.path.length !== listener.rules.length) {
             return false;
         }
 
-        let path: any = {};
+        var path: any = {};
 
         for (var i = 0, len = listener.rules.length; i < len; i++) {
-            let matches = patch.path[i].match(listener.rules[i]);
+            var matches = patch.path[i].match(listener.rules[i]);
 
             if (!matches || matches.length === 0 || matches.length > 2) {
                 return false;
@@ -151,7 +149,7 @@ export class StateContainer<T=any> {
         return path;
     }
 
-    private reset () {
+    private function reset () {
         this.listeners = [];
     }
 

@@ -1,89 +1,89 @@
 package io.colyseus.state_listener;
 
-export interface PatchObject {
-    path: string[];
-    operation: "add" | "remove" | "replace";
-    value?: any;
+interface PatchObject {
+    public var path: Array<String>;
+    public var operation: String;// "add" | "remove" | "replace";
+    public var value: Dynamic;
 }
 
-export function compare(tree1: any, tree2: any): any[] {
-    let patches: PatchObject[] = [];
-    generate(tree1, tree2, patches, []);
-    return patches;
-}
+class Compare {
 
-function concat(arr: string[], value: string) {
-    let newArr = arr.slice();
-    newArr.push(value);
-    return newArr;
-}
-
-function objectKeys (obj: any) {
-    if (Array.isArray(obj)) {
-        let keys = new Array(obj.length);
-
-        for (let k = 0; k < keys.length; k++) {
-            keys[k] = "" + k;
-        }
-
-        return keys;
+    public static function compare() {
+        var patches: Array<PatchObject> = [];
+        this.generate(tree1, tree2, patches, []);
+        return patches;
     }
 
-    if (Object.keys) {
-        return Object.keys(obj);
+    private static function concat(arr: Array<String>, value: String) {
+        var newArr = arr.slice();
+        newArr.push(value);
+        return newArr;
     }
 
-    let keys = [];
-    for (let i in obj) {
-        if (obj.hasOwnProperty(i)) {
-            keys.push(i);
-        }
-    }
-    return keys;
-};
+    private static function objectKeys (obj: Dynamic): Array<String> {
+        if (Std.is(obj, Array)) {
+            var keys = new Array();
+            var length: Int = (cast obj.length) - 1;
 
-// Dirty check if obj is different from mirror, generate patches and update mirror
-function generate(mirror: any, obj: any, patches: PatchObject[], path: string[]) {
-    let newKeys = objectKeys(obj);
-    let oldKeys = objectKeys(mirror);
-    let changed = false;
-    let deleted = false;
-
-    for (let t = oldKeys.length - 1; t >= 0; t--) {
-        let key = oldKeys[t];
-        let oldVal = mirror[key];
-        if (obj.hasOwnProperty(key) && !(obj[key] === undefined && oldVal !== undefined && Array.isArray(obj) === false)) {
-            let newVal = obj[key];
-            if (typeof oldVal == "object" && oldVal != null && typeof newVal == "object" && newVal != null) {
-                generate(oldVal, newVal, patches, concat(path, key));
+            for (i in 0..length) {
+                keys.push("" + i);
             }
-            else {
-                if (oldVal !== newVal) {
-                    changed = true;
-                    patches.push({operation: "replace", path: concat(path, key), value: newVal});
+
+            return keys;
+        }
+
+        if (Std.is(obj, Map)) {
+            return obj.keys();
+        }
+
+        return Reflect.fields(obj);
+    };
+
+    // Dirty check if obj is different from mirror, generate patches and update mirror
+    private static function generate(mirror: Dynamic, obj: Dynamic, patches: Array<PatchObject>, path: Array<String>) {
+        var newKeys = this.objectKeys(obj);
+        var oldKeys = this.objectKeys(mirror);
+        var changed = false;
+        var deleted = false;
+
+        for (var t = oldKeys.length - 1; t >= 0; t--) {
+            var key = oldKeys[t];
+            var oldVal = mirror[key];
+            if (obj.hasOwnProperty(key) && !(obj[key] === undefined && oldVal !== undefined && Array.isArray(obj) === false)) {
+                var newVal = obj[key];
+                if (typeof oldVal == "object" && oldVal != null && typeof newVal == "object" && newVal != null) {
+                    generate(oldVal, newVal, patches, concat(path, key));
+                }
+                else {
+                    if (oldVal !== newVal) {
+                        changed = true;
+                        patches.push({operation: "replace", path: concat(path, key), value: newVal});
+                    }
                 }
             }
-        }
-        else {
-            patches.push({operation: "remove", path: concat(path, key)});
-            deleted = true; // property has been deleted
-        }
-    }
-
-    if (!deleted && newKeys.length == oldKeys.length) {
-        return;
-    }
-
-    for (let t = newKeys.length - 1; t >= 0; t--) {
-        let key = newKeys[t];
-        if (!mirror.hasOwnProperty(key) && obj[key] !== undefined) {
-            let newVal = obj[key];
-            let addPath = concat(path, key);
-            // compare deeper additions
-            if (typeof newVal == "object" && newVal != null) {
-                generate({}, newVal, patches, addPath);
+            else {
+                patches.push({operation: "remove", path: concat(path, key)});
+                deleted = true; // property has been deleted
             }
-            patches.push({ operation: "add", path: addPath, value: newVal });
+        }
+
+        if (!deleted && newKeys.length == oldKeys.length) {
+            return;
+        }
+
+        for (var t = newKeys.length - 1; t >= 0; t--) {
+            var key = newKeys[t];
+            if (!mirror.hasOwnProperty(key) && obj[key] !== undefined) {
+                var newVal = obj[key];
+                var addPath = concat(path, key);
+                // compare deeper additions
+                if (typeof newVal == "object" && newVal != null) {
+                    generate({}, newVal, patches, addPath);
+                }
+                patches.push({ operation: "add", path: addPath, value: newVal });
+            }
         }
     }
+
 }
+
