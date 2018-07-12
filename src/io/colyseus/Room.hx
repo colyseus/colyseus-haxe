@@ -1,4 +1,5 @@
 package io.colyseus;
+import io.colyseus.state_listener.StateContainer;
 
 import haxe.io.Bytes;
 import org.msgpack.MsgPack;

@@ -46,16 +46,18 @@ class Compare {
         var changed = false;
         var deleted = false;
 
-        for (var t = oldKeys.length - 1; t >= 0; t--) {
+        var t = oldKeys.length;
+        while (--t >= 0) {
             var key = oldKeys[t];
             var oldVal = mirror[key];
-            if (obj.hasOwnProperty(key) && !(obj[key] === undefined && oldVal !== undefined && Array.isArray(obj) === false)) {
+
+            if (obj.hasOwnProperty(key) && !(obj[key] == undefined && oldVal != undefined && Array.isArray(obj) == false)) {
                 var newVal = obj[key];
                 if (typeof oldVal == "object" && oldVal != null && typeof newVal == "object" && newVal != null) {
                     generate(oldVal, newVal, patches, concat(path, key));
                 }
                 else {
-                    if (oldVal !== newVal) {
+                    if (oldVal != newVal) {
                         changed = true;
                         patches.push({operation: "replace", path: concat(path, key), value: newVal});
                     }
@@ -71,9 +73,10 @@ class Compare {
             return;
         }
 
-        for (var t = newKeys.length - 1; t >= 0; t--) {
-            var key = newKeys[t];
-            if (!mirror.hasOwnProperty(key) && obj[key] !== undefined) {
+        var t = oldKeys.length;
+        while (--t >= 0) {
+            var key: String = newKeys[t];
+            if (!mirror.hasOwnProperty(key) && obj[key] != undefined) {
                 var newVal = obj[key];
                 var addPath = concat(path, key);
                 // compare deeper additions

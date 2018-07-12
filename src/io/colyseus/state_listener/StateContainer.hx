@@ -1,49 +1,55 @@
 package io.colyseus.state_listener;
 
 interface Listener {
-    public var callback: Function;
-    public var rules: Array<RegExp>;
-    public var rawRules: Array<String>;
+    public var callback: Dynamic; // Function
+    public var rules: List<EReg>;
+    public var rawRules: List<String>;
+}
+
+interface PatchObject {
+    public var path: Dynamic; // Array<String>
+    public var operation: String;// "add" | "remove" | "replace";
+    public var value: Dynamic;
 }
 
 interface DataChange extends PatchObject {
-    public var path: Dynamic;
-    public var rawPath: Array<String>;
+    public var rawPath: List<String>;
 }
 
 class StateContainer {
     public var state: Dynamic;
-    private var listeners: Array<Listener>[] = [];
+    private var listeners: Array<Listener> = [];
     private var defaultListener: Listener;
 
-    private var matcherPlaceholders: {[id: string]: RegExp} = {
-        ":id": /^([a-zA-Z0-9\-_]+)$/,
-        ":number": /^([0-9]+)$/,
-        ":string": /^(\w+)$/,
-        ":axis": /^([xyz])$/,
-        ":*": /(.*)/,
-    }
+    private var matcherPlaceholders: Map<String, EReg> = [
+        ":id" => ~/^([a-zA-Z0-9\-_]+)$/,
+        ":number" => ~/^([0-9]+)$/,
+        ":string" => ~/^(\w+)$/,
+        ":axis" => ~/^([xyz])$/,
+        ":*" => ~/(.*)/,
+    ];
 
     public function new (state: Dynamic) {
         this.state = state;
         this.reset();
     }
 
-    public function set (newState: T): PatchObject[] {
-        var patches = compare(this.state, newState);
+    public function set (newState: Dynamic): Array<PatchObject> {
+        var patches = Compare.compare(this.state, newState);
         this.checkPatches(patches, this.listeners, this.defaultListener);
         this.state = newState;
         return patches;
     }
 
-    public function registerPlaceholder (placeholder: string, matcher: RegExp) {
+    public function registerPlaceholder (placeholder: String, matcher: EReg) {
         this.matcherPlaceholders[ placeholder ] = matcher;
     }
 
-    public function listen (segments: string | Function, callback?: Function, immediate?: boolean): Listener {
-        var rules: string[];
+    public function listen (segments: Dynamic/*String | Function*/, ?callback: DataChange->Void, ?immediate: Bool): Listener {
+        var rules: Array<String>;
 
-        if (typeof(segments)==="function") {
+
+        if (Reflect.isFunction(segments)) {
             rules = [];
             callback = segments;
 
@@ -51,26 +57,28 @@ class StateContainer {
             rules = segments.split("/");
         }
 
-        if (callback.length > 1) {
-            console.warn(".listen() accepts only one parameter.");
-        }
-
         var listener: Listener = {
             callback: callback,
             rawRules: rules,
-            rules: rules.map(segment => {
-                if (typeof(segment)==="string") {
+            rules: Lambda.map(rules, function(segment) {
+                if (Std.is(segment, String)) {
                     // replace placeholder matchers
-                    return (segment.indexOf(":") === 0)
-                        ? this.matcherPlaceholders[segment] || this.matcherPlaceholders[":*"]
-                        : new RegExp(`^${ segment }$`);
+                    if (segment.indexOf(":") == 0) {
+                        var matcher = this.matcherPlaceholders.get(segment);
+                        if (matcher == null) {
+                            matcher = this.matcherPlaceholders.get(":*");
+                        }
+                        return matcher;
+                    } else {
+                        return new EReg("^" + segment + "$", "");
+                    }
                 } else {
-                    return segment;
+                    return cast(segment, EReg);
                 }
             })
         };
 
-        if (rules.length === 0) {
+        if (rules.length == 0) {
             this.defaultListener = listener;
 
         } else {
@@ -86,8 +94,9 @@ class StateContainer {
     }
 
     public function removeListener (listener: Listener) {
-        for (var i = this.listeners.length-1; i >= 0; i--) {
-            if (this.listeners[i] === listener) {
+        var i = this.listeners.length;
+        while (--i >= 0) {
+            if (this.listeners[i] == listener) {
                 this.listeners.splice(i, 1);
             }
         }
@@ -97,51 +106,47 @@ class StateContainer {
         this.reset();
     }
 
-    private function checkPatches(patches: (PatchObject & { matched: boolean })[], listeners: Listener[], defaultListener?: Listener) {
-        for (var j = 0, len = listeners.length; j < len; j++) {
-            var listener = listeners[j];
+    private function checkPatches(patches: Array<PatchObject>, listeners: Array<Listener>, ?defaultListener: Listener) {
+        var i = patches.length;
 
-            for (var i = patches.length - 1; i >= 0; i--) {
+        while (--i >= 0) {
+            var matched = false;
+
+            for (listener in listeners) {
                 var pathVariables = listener && this.getPathVariables(patches[i], listener);
-
-                if (pathVariables) {
+                if (pathVariables != null) {
                     listener.callback({
                         path: pathVariables,
                         rawPath: patches[i].path,
                         operation: patches[i].operation,
                         value: patches[i].value
                     });
-
-                    patches[i].matched = true;
+                    matched = true;
                 }
             }
-        }
 
-        // trigger default listener callback with each unmatched patch
-        if (defaultListener) {
-            for (var i = patches.length - 1; i >= 0; i--) {
-                if (!patches[i].matched) {
-                    defaultListener.callback(patches[i]);
-                }
+            // check for fallback listener
+            if (!matched && defaultListener != null) {
+                this.defaultListener.callback(patches[i]);
             }
         }
     }
 
-    private function getPathVariables (patch: PatchObject, listener: Listener): any {
+    private function getPathVariables (patch: PatchObject, listener: Listener): Dynamic {
         // skip if rules count differ from patch
-        if (patch.path.length !== listener.rules.length) {
+        if (patch.path.length != listener.rules.length) {
             return false;
         }
 
-        var path: any = {};
+        var path: Dynamic = {};
 
-        for (var i = 0, len = listener.rules.length; i < len; i++) {
+        for (i in 0..listener.rules.length) {
             var matches = patch.path[i].match(listener.rules[i]);
 
-            if (!matches || matches.length === 0 || matches.length > 2) {
+            if (!matches || matches.length == 0 || matches.length > 2) {
                 return false;
 
-            } else if (listener.rawRules[i].substr(0, 1) === ":") {
+            } else if (listener.rawRules[i].substr(0, 1) == ":") {
                 path[ listener.rawRules[i].substr(1) ] = matches[1];
             }
         }
