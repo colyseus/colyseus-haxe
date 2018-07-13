@@ -1,13 +1,15 @@
 import io.colyseus.Client;
 
 class ClientTestCase extends haxe.unit.TestCase {
+    var client: Client;
+    var endpoint = "ws://localhost:2657";
 
     override public function setup() {
-        // value = "foo";
+        // client = new Client(endpoint);
     }
 
-    public function testBasic() {
-        assertEquals(1, 1);
-    }
+    // public function testInitialize() {
+    //     assertEquals(client.endpoint, endpoint);
+    // }
 
 }

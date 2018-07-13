@@ -12,6 +12,7 @@ interface RoomAvailable {
 
 class Client {
     public var id: String = "";
+    public var endpoint: String;
 
     // callbacks
     public dynamic function onOpen():Void {}
@@ -25,13 +26,11 @@ class Client {
     private var connectingRooms: Map<Int, Room> = new Map();
     private var requestId = 0;
 
-    private var hostname: String;
-
     // private var roomsAvailableRequests: Map<String, RoomAvailable[] -> Void> = new Map();
     // {[requestId: number]: (value?: RoomAvailable[]) => void}
 
     public function new (url: String) {
-        this.hostname = url;
+        this.endpoint = url;
 
         // getItem('colyseusid', (colyseusid) => this.connect(colyseusid));
         this.connect(this.id);
@@ -122,7 +121,7 @@ class Client {
             params.push(name + "=" + options[name]);
         }
 
-        return new Connection(this.hostname + "/" + path + "?" + params.join('&'));
+        return new Connection(this.endpoint + "/" + path + "?" + params.join('&'));
     }
 
     /**

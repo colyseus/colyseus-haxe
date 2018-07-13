@@ -65,7 +65,7 @@ class Room extends StateContainer {
         this.connection.send([ Protocol.ROOM_DATA, this.id, data ]);
     }
 
-    public function removeAllListeners() {
+    public override function removeAllListeners() {
         super.removeAllListeners();
         // this.onJoin.removeAll();
         // this.onStateChange.removeAll();
@@ -94,7 +94,7 @@ class Room extends StateContainer {
             this.setState(cast state, remoteCurrentTime, remoteElapsedTime);
 
         } else if (code == Protocol.ROOM_STATE_PATCH) {
-            this.patch( message[1] );
+            this.patch( cast message[1] );
 
         } else if (code == Protocol.ROOM_DATA) {
             this.onMessage(message[1]);
@@ -104,7 +104,7 @@ class Room extends StateContainer {
         }
     }
 
-    private function setState( encodedState: Bytes, remoteCurrentTime: Int = 0, remoteElapsedTime: Int = 0) {
+    public function setState( encodedState: Bytes, remoteCurrentTime: Int = 0, remoteElapsedTime: Int = 0) {
         var state = MsgPack.decode(encodedState);
         this.set(state);
 
@@ -113,9 +113,11 @@ class Room extends StateContainer {
         this.onStateChange(state);
     }
 
-    private function patch( binaryPatch ) {
+    private function patch( binaryPatch: Bytes ) {
+        // TODO:
+
         // apply patch
-        this._previousState = FossilDelta.apply( this._previousState, binaryPatch);
+        // this._previousState = FossilDelta.Apply(this._previousState, binaryPatch);
 
         // trigger state callbacks
         this.set( MsgPack.decode( this._previousState ) );

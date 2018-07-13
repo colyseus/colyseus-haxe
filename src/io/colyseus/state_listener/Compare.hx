@@ -1,21 +1,21 @@
 package io.colyseus.state_listener;
 
-interface PatchObject {
-    public var path: Array<String>;
-    public var operation: String;// "add" | "remove" | "replace";
-    public var value: Dynamic;
+typedef PatchObject = {
+    path: Array<String>,
+    operation: String,// "add" | "remove" | "replace";
+    ?value: Dynamic
 }
 
 class Compare {
 
-    public static function compare() {
+    public static function compare(tree1: Dynamic, tree2: Dynamic) {
         var patches: Array<PatchObject> = [];
-        this.generate(tree1, tree2, patches, []);
+        generate(tree1, tree2, patches, []);
         return patches;
     }
 
     private static function concat(arr: Array<String>, value: String) {
-        var newArr = arr.slice();
+        var newArr = arr.copy();
         newArr.push(value);
         return newArr;
     }
@@ -23,9 +23,9 @@ class Compare {
     private static function objectKeys (obj: Dynamic): Array<String> {
         if (Std.is(obj, Array)) {
             var keys = new Array();
-            var length: Int = (cast obj.length) - 1;
+            var length: Int = ((cast (obj, Array<Dynamic>)).length) - 1;
 
-            for (i in 0..length) {
+            for (i in 0...length) {
                 keys.push("" + i);
             }
 
@@ -49,11 +49,23 @@ class Compare {
         var t = oldKeys.length;
         while (--t >= 0) {
             var key = oldKeys[t];
-            var oldVal = mirror[key];
+            var oldVal = Reflect.getProperty(mirror, key);
+            var newVal = Reflect.getProperty(mirror, key);
 
-            if (obj.hasOwnProperty(key) && !(obj[key] == undefined && oldVal != undefined && Array.isArray(obj) == false)) {
-                var newVal = obj[key];
-                if (typeof oldVal == "object" && oldVal != null && typeof newVal == "object" && newVal != null) {
+            // if (obj.hasOwnProperty(key) && !(obj[key] == undefined && oldVal != undefined && Array.isArray(obj) == false)) {
+            if (
+                Reflect.hasField(obj, key) &&
+                newVal != null &&
+                !(
+                    !Reflect.hasField(obj, key) && Reflect.hasField(mirror, key)
+                )
+            ) {
+                if (
+                    Reflect.isObject(oldVal) &&
+                    oldVal != null &&
+                    Reflect.isObject(newVal) &&
+                    newVal != null
+                ) {
                     generate(oldVal, newVal, patches, concat(path, key));
                 }
                 else {
@@ -76,13 +88,15 @@ class Compare {
         var t = oldKeys.length;
         while (--t >= 0) {
             var key: String = newKeys[t];
-            if (!mirror.hasOwnProperty(key) && obj[key] != undefined) {
-                var newVal = obj[key];
+            var newVal = Reflect.getProperty(obj, key);
+            if (newVal != null) {
                 var addPath = concat(path, key);
+
                 // compare deeper additions
-                if (typeof newVal == "object" && newVal != null) {
+                if (Reflect.isObject(newVal) && newVal != null) {
                     generate({}, newVal, patches, addPath);
                 }
+
                 patches.push({ operation: "add", path: addPath, value: newVal });
             }
         }

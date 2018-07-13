@@ -1,19 +1,18 @@
 package io.colyseus.state_listener;
 
-interface Listener {
-    public var callback: Dynamic; // Function
-    public var rules: List<EReg>;
-    public var rawRules: List<String>;
+import io.colyseus.state_listener.Compare;
+
+typedef Listener = {
+    callback: DataChange->Void,
+    rules: List<EReg>,
+    rawRules: Array<String>
 }
 
-interface PatchObject {
-    public var path: Dynamic; // Array<String>
-    public var operation: String;// "add" | "remove" | "replace";
-    public var value: Dynamic;
-}
-
-interface DataChange extends PatchObject {
-    public var rawPath: List<String>;
+typedef DataChange = {
+    path: Dynamic,
+    operation: String,
+    value: Dynamic,
+    ?rawPath: Array<String>
 }
 
 class StateContainer {
@@ -46,21 +45,20 @@ class StateContainer {
     }
 
     public function listen (segments: Dynamic/*String | Function*/, ?callback: DataChange->Void, ?immediate: Bool): Listener {
-        var rules: Array<String>;
-
+        var rawRules: Array<String>;
 
         if (Reflect.isFunction(segments)) {
-            rules = [];
+            rawRules = [];
             callback = segments;
 
         } else {
-            rules = segments.split("/");
+            rawRules = segments.split("/");
         }
 
         var listener: Listener = {
             callback: callback,
-            rawRules: rules,
-            rules: Lambda.map(rules, function(segment) {
+            rawRules: rawRules,
+            rules: Lambda.map(rawRules, function(segment) {
                 if (Std.is(segment, String)) {
                     // replace placeholder matchers
                     if (segment.indexOf(":") == 0) {
@@ -78,7 +76,7 @@ class StateContainer {
             })
         };
 
-        if (rules.length == 0) {
+        if (rawRules.length == 0) {
             this.defaultListener = listener;
 
         } else {
@@ -87,7 +85,7 @@ class StateContainer {
 
         // immediatelly try to trigger this listener.
         if (immediate) {
-            this.checkPatches(compare({}, this.state), [listener]);
+            this.checkPatches(Compare.compare({}, this.state), [listener]);
         }
 
         return listener;
@@ -113,7 +111,9 @@ class StateContainer {
             var matched = false;
 
             for (listener in listeners) {
-                var pathVariables = listener && this.getPathVariables(patches[i], listener);
+                if (listener == null) continue;
+
+                var pathVariables = this.getPathVariables(patches[i], listener);
                 if (pathVariables != null) {
                     listener.callback({
                         path: pathVariables,
@@ -127,7 +127,11 @@ class StateContainer {
 
             // check for fallback listener
             if (!matched && defaultListener != null) {
-                this.defaultListener.callback(patches[i]);
+                this.defaultListener.callback({
+                    path: patches[i].path,
+                    operation: patches[i].operation,
+                    value: patches[i].value
+                });
             }
         }
     }
@@ -138,21 +142,36 @@ class StateContainer {
             return false;
         }
 
+        var i = 0;
         var path: Dynamic = {};
 
-        for (i in 0..listener.rules.length) {
-            var matches = patch.path[i].match(listener.rules[i]);
+        for (rule in listener.rules) {
+            var matches = this.getMatches(rule, patch.path[i]);
 
-            if (!matches || matches.length == 0 || matches.length > 2) {
+            if (matches.length == 0 || matches.length > 2) {
                 return false;
 
             } else if (listener.rawRules[i].substr(0, 1) == ":") {
-                path[ listener.rawRules[i].substr(1) ] = matches[1];
+                Reflect.setProperty(path, listener.rawRules[i].substr(1), matches[1]);
             }
+
+            i++;
         }
 
         return path;
     }
+
+    private function getMatches(ereg:EReg, input:String, index:Int = 0):Array<String> {
+        var matches = [];
+
+        while (ereg.match(input)) {
+            matches.push(ereg.matched(index));
+            input = ereg.matchedRight();
+        }
+
+        return matches;
+    }
+
 
     private function reset () {
         this.listeners = [];
