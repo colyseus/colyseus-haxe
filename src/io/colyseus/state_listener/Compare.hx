@@ -41,8 +41,8 @@ class Compare {
 
     // Dirty check if obj is different from mirror, generate patches and update mirror
     private static function generate(mirror: Dynamic, obj: Dynamic, patches: Array<PatchObject>, path: Array<String>) {
-        var newKeys = this.objectKeys(obj);
-        var oldKeys = this.objectKeys(mirror);
+        var newKeys = objectKeys(obj);
+        var oldKeys = objectKeys(mirror);
         var changed = false;
         var deleted = false;
 
