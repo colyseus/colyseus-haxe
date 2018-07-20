@@ -25,9 +25,10 @@ class Room extends StateContainer {
 
     public function new (name: String, options: Dynamic = null) {
         super({});
-        this.id = null;
 
+        this.id = null;
         this.name = name;
+
         this.options = options;
     }
 

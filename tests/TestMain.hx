@@ -5,6 +5,7 @@ class TestMain {
     var r = new haxe.unit.TestRunner();
     r.add(new ClientTestCase());
     r.add(new RoomTestCase());
+    r.add(new StateContainerTestCase());
     r.run();
   }
 
