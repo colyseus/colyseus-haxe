@@ -53,15 +53,16 @@ class StateContainerTestCase extends haxe.unit.TestCase {
         newData.some_field = "hello!";
 
         var listenCalls = 0;
-        container.listen("some_string", function(change) {
+        container.listen("some_field", function(change) {
             listenCalls++;
             assertEquals("add", change.operation);
             assertEquals("hello!", change.value);
+            assertEquals("[]", Std.string(Reflect.fields(change.path)));
+            assertEquals("[some_field]", Std.string(change.rawPath));
         });
 
         container.set(newData);
         assertEquals(1, listenCalls);
-
     }
 
     public function testListenReplaceNull() {
@@ -78,5 +79,47 @@ class StateContainerTestCase extends haxe.unit.TestCase {
         container.set(newData);
         assertEquals(1, listenCalls);
     }
+
+    public function testListenAddNull() {
+        var newData = getRawData();
+        newData.nil_new = null;
+
+        var listenCalls = 0;
+        container.listen("nil_new", function(change) {
+            listenCalls++;
+            assertEquals("add", change.operation);
+            assertEquals(null, change.value);
+        });
+
+        container.set(newData);
+        assertEquals(1, listenCalls);
+    }
+
+    public function testListenAddRemove() {
+        var newData = getRawData();
+
+        Reflect.deleteField(newData.players, "key1");
+        newData.players.key3 = { value : "new"};
+
+        var listenCalls = 0;
+        container.listen("players/:id", function(change) {
+            listenCalls++;
+
+            if (change.operation == "add") {
+                assertEquals("key3", change.path.id);
+                assertEquals(Std.string({value: "new"}), Std.string(change.value));
+
+            } else if (change.operation == "remove") {
+                assertEquals("key1", change.path.id);
+            }
+        });
+
+        var patches = container.set(newData);
+        trace("PATCHES => " + Std.string(patches));
+
+        assertEquals(2, listenCalls);
+    }
+
+
 
 }

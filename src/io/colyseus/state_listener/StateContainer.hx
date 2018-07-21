@@ -25,7 +25,7 @@ class StateContainer {
         ":number" => ~/^([0-9]+)$/,
         ":string" => ~/^(\w+)$/,
         ":axis" => ~/^([xyz])$/,
-        ":*" => ~/(.*)/,
+        ":*" => ~/^(.*)$/,
     ];
 
     public function new (state: Dynamic) {
@@ -44,7 +44,7 @@ class StateContainer {
         this.matcherPlaceholders[ placeholder ] = matcher;
     }
 
-    public function listen (segments: Dynamic/*String | Function*/, ?callback: DataChange->Void, ?immediate: Bool): Listener {
+    public function listen (segments: Dynamic, ?callback: DataChange->Void, ?immediate: Bool): Listener {
         var rawRules: Array<String>;
 
         if (Reflect.isFunction(segments)) {
@@ -68,7 +68,7 @@ class StateContainer {
                         }
                         return matcher;
                     } else {
-                        return new EReg("^" + segment + "$", "");
+                        return new EReg('^' + segment + '$', "m");
                     }
                 } else {
                     return cast(segment, EReg);
@@ -114,7 +114,7 @@ class StateContainer {
                 if (listener == null) continue;
 
                 var pathVariables = this.getPathVariables(patches[i], listener);
-                if (pathVariables != null) {
+                if (pathVariables != false) {
                     listener.callback({
                         path: pathVariables,
                         rawPath: patches[i].path,
@@ -152,9 +152,8 @@ class StateContainer {
                 return false;
 
             } else if (listener.rawRules[i].substr(0, 1) == ":") {
-                Reflect.setProperty(path, listener.rawRules[i].substr(1), matches[1]);
+                Reflect.setProperty(path, listener.rawRules[i].substr(1), matches[0]);
             }
-
             i++;
         }
 
