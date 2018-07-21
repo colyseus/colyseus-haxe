@@ -117,12 +117,12 @@ class Compare {
     }
 
     private static function getField(obj: Dynamic, field: Dynamic) {
-        return Std.is(field, Int) ? obj[cast(field,Int)] : Reflect.field(obj, field);
+        return Std.is(obj, Array) ? obj[field] : Reflect.field(obj, field);
     }
 
-    private static function hasField (obj: Dynamic, field: String) {
+    private static function hasField (obj: Dynamic, field: Dynamic) {
         if (Std.is(obj, Array)) {
-            return obj[cast(field, Int)] != null;
+            return obj[field] != null;
 
         } else if (Std.string(obj) == "{}") {
             return false;
