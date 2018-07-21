@@ -114,7 +114,7 @@ class StateContainer {
                 if (listener == null) continue;
 
                 var pathVariables = this.getPathVariables(patches[i], listener);
-                if (pathVariables != false) {
+                if (pathVariables != null) {
                     listener.callback({
                         path: pathVariables,
                         rawPath: patches[i].path,
@@ -139,7 +139,7 @@ class StateContainer {
     private function getPathVariables (patch: PatchObject, listener: Listener): Dynamic {
         // skip if rules count differ from patch
         if (patch.path.length != listener.rules.length) {
-            return false;
+            return null;
         }
 
         var i = 0;
@@ -149,7 +149,7 @@ class StateContainer {
             var matches = this.getMatches(rule, patch.path[i]);
 
             if (matches.length == 0 || matches.length > 2) {
-                return false;
+                return null;
 
             } else if (listener.rawRules[i].substr(0, 1) == ":") {
                 Reflect.setProperty(path, listener.rawRules[i].substr(1), matches[0]);

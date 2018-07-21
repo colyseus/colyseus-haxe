@@ -132,15 +132,19 @@ class Compare {
     }
 
     private static function hasField (obj: Dynamic, field: String) {
-        var isArray = Std.is(obj, Array);
         trace("obj => " + Std.string(obj));
         trace("field => " + Std.string(field));
-        trace('is array? ' + Std.string(isArray));
         trace('is object? ' + Std.string(Reflect.isObject(obj)));
 
-        return (isArray)
-            ? obj[cast(field, Int)] != null
-            : Reflect.hasField(obj, field);
+        if (Std.is(obj, Array)) {
+            return obj[cast(field, Int)] != null;
+
+        } else if (Std.string(obj) == "{}") {
+            return false;
+
+        } else {
+            return Reflect.hasField(obj, field);
+        }
     }
 
 }

@@ -44,8 +44,8 @@ class StateContainerTestCase extends haxe.unit.TestCase {
             s: "string",
             u: null
         };
-        container.set(newState);
-        assertEquals(container.state, newState);
+        var c = new StateContainer(newState);
+        assertEquals(c.state, newState);
     }
 
     public function testListenAddString() {
