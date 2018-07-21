@@ -76,7 +76,11 @@ class Room extends StateContainer {
     }
 
     private function onMessageCallback(data: Bytes) {
+        trace("BYTES => " + Std.string(data));
+
         var message = MsgPack.decode( data );
+        trace("MESSAGE => " + Std.string(message));
+
         var code = message[0];
 
         if (code == Protocol.JOIN_ROOM) {

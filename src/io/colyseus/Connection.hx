@@ -25,11 +25,13 @@ class Connection {
         this.ws.onopen = function() {
             this.onOpen();
 
-            // if (this._enqueuedCalls.length > 0) {
-            //     for (const [method, args] of this._enqueuedCalls) {
-            //         this[method].apply(this, args);
-            //     }
-            // }
+            for (i in 0...this._enqueuedCalls.length) {
+                var enqueuedCall = this._enqueuedCalls[i];
+                Reflect.callMethod(this, Reflect.field(this, enqueuedCall[0]), cast enqueuedCall[1]);
+            }
+
+            // reset enqueued calls
+            this._enqueuedCalls = [];
         }
 
         this.ws.onmessageBytes = function(bytes) {
@@ -50,8 +52,6 @@ class Connection {
             return this.ws.sendBytes( MsgPack.encode(data) );
 
         } else {
-            trace('colyseus-hx: trying to send data while not open');
-
             // WebSocket not connected.
             // Enqueue data to be sent when readyState == OPEN
             this._enqueuedCalls.push(['send', [data]]);

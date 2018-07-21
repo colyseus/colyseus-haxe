@@ -121,6 +121,8 @@ class Client {
             params.push(name + "=" + options[name]);
         }
 
+        trace("NEW CONNECTION => " + Std.string(this.endpoint + "/" + path + "?" + params.join('&')));
+
         return new Connection(this.endpoint + "/" + path + "?" + params.join('&'));
     }
 
@@ -132,9 +134,7 @@ class Client {
         var code: Int = message[0];
 
         if (code == Protocol.USER_ID) {
-            // setItem('colyseusid', message[1]);
-
-            this.id = cast message[1];
+            this.id = cast(message[1], String);
 
             this.onOpen();
 
@@ -147,7 +147,7 @@ class Client {
                 return;
             }
 
-            room.id = cast message[1];
+            room.id = cast(message[1], String);
             this.rooms.set(room.id, room);
 
             room.connect(this.createConnection(room.id, room.options));
