@@ -27,7 +27,7 @@ class Connection {
 
             for (i in 0...this._enqueuedCalls.length) {
                 var enqueuedCall = this._enqueuedCalls[i];
-                Reflect.callMethod(this, Reflect.field(this, enqueuedCall[0]), cast enqueuedCall[1]);
+                Reflect.callMethod(this, Reflect.field(this, enqueuedCall[0]), [enqueuedCall[1]]);
             }
 
             // reset enqueued calls
@@ -54,7 +54,7 @@ class Connection {
         } else {
             // WebSocket not connected.
             // Enqueue data to be sent when readyState == OPEN
-            this._enqueuedCalls.push(['send', [data]]);
+            this._enqueuedCalls.push(['send', data]);
         }
     }
 
