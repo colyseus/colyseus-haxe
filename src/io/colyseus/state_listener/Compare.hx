@@ -16,7 +16,7 @@ class Compare {
 
     private static function concat(arr: Array<String>, value: String) {
         var newArr = arr.copy();
-        newArr.push(value);
+        newArr.push("" + value); // cast array indexes to string
         return newArr;
     }
 
@@ -45,21 +45,11 @@ class Compare {
         var oldKeys = objectKeys(mirror);
         var deleted = false;
 
-        trace("");
-
-        trace("oldKeys => " + Std.string(oldKeys));
-        trace("newKeys => " + Std.string(newKeys));
-
         for (t in 0...oldKeys.length) {
             var key = oldKeys[t];
 
-            var oldVal = Std.is(key, Int) ? mirror[cast(key,Int)] : Reflect.field(mirror, key);
-            var newVal = Std.is(key, Int) ? obj[cast(key, Int)] : Reflect.field(obj, key);
-
-            trace("t => " + t);
-            trace("key => " + key);
-            trace("newVal => " + Std.string(newVal));
-            trace("oldVal => " + Std.string(oldVal));
+            var oldVal = getField(mirror, key);
+            var newVal = getField(obj, key);
 
             // skip if value is the same
             if (oldVal == newVal) {
@@ -82,18 +72,15 @@ class Compare {
                         (Reflect.isObject(obj) && Reflect.isObject(mirror))
                     )
                 ) {
-                    trace("Need to compare deeper...");
                     generate(oldVal, newVal, patches, concat(path, key));
                 }
                 else {
                     if (oldVal != newVal) {
-                        trace("It's a replace! " + concat(path, key) + " ("+ Std.string(newVal) +")");
                         patches.push({operation: "replace", path: concat(path, key), value: newVal});
                     }
                 }
             }
             else {
-                trace("It's a removal! " + Std.string(concat(path, key)));
                 patches.push({operation: "remove", path: concat(path, key)});
                 deleted = true; // property has been deleted
             }
@@ -108,7 +95,7 @@ class Compare {
             var key: String = newKeys[t];
 
             if (!hasField(mirror, key) && hasField(obj, key)) {
-                var newVal = Reflect.field(obj, key);
+                var newVal = getField(obj, key);
                 var addPath = concat(path, key);
 
                 if (
@@ -116,13 +103,11 @@ class Compare {
                     Reflect.isObject(newVal) &&
                     newVal != null
                 ) {
-                    trace("GENERATE COMPLEX ADD");
                     // compare deeper additions
                     generate({}, newVal, patches, addPath);
                 }
 
                 patches.push({ operation: "add", path: addPath, value: newVal });
-                trace("add patch => " + Std.string({ operation: "add", path: addPath, value: newVal }));
             }
         }
     }
@@ -131,11 +116,11 @@ class Compare {
         return (Std.is(value, String) || Std.is(value, Int) || Std.is(value, Float) || Std.is(value, Bool));
     }
 
-    private static function hasField (obj: Dynamic, field: String) {
-        trace("obj => " + Std.string(obj));
-        trace("field => " + Std.string(field));
-        trace('is object? ' + Std.string(Reflect.isObject(obj)));
+    private static function getField(obj: Dynamic, field: Dynamic) {
+        return Std.is(field, Int) ? obj[cast(field,Int)] : Reflect.field(obj, field);
+    }
 
+    private static function hasField (obj: Dynamic, field: String) {
         if (Std.is(obj, Array)) {
             return obj[cast(field, Int)] != null;
 

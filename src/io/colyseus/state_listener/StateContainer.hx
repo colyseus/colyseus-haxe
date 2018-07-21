@@ -25,7 +25,7 @@ class StateContainer {
         ":number" => ~/^([0-9]+)$/,
         ":string" => ~/^(\w+)$/,
         ":axis" => ~/^([xyz])$/,
-        ":*" => ~/^(.*)$/,
+        ":*" => ~/^(.+)$/,
     ];
 
     public function new (state: Dynamic) {
@@ -63,9 +63,11 @@ class StateContainer {
                     // replace placeholder matchers
                     if (segment.indexOf(":") == 0) {
                         var matcher = this.matcherPlaceholders.get(segment);
+
                         if (matcher == null) {
                             matcher = this.matcherPlaceholders.get(":*");
                         }
+
                         return matcher;
                     } else {
                         return new EReg('^' + segment + '$', "m");

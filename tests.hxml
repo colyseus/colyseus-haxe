@@ -18,14 +18,14 @@
 -lib haxe-ws
 -neko tests/bin/neko_test.n
 
-# --next
+--next
 
-# # CPP
-# -main TestMain
-# -cp src
-# -cp tests
-# -lib fossil-delta
-# -lib msgpack-haxe
-# -lib haxe-ws
-# -D HXCPP_M64
-# -cpp tests/bin/cpp_test
+# CPP
+-main TestMain
+-cp src
+-cp tests
+-lib fossil-delta
+-lib msgpack-haxe
+-lib haxe-ws
+-D HXCPP_M64
+-cpp tests/bin/cpp_test
