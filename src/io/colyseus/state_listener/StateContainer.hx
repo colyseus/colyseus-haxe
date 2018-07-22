@@ -34,7 +34,7 @@ class StateContainer {
     }
 
     public function set (newState: Dynamic): Array<PatchObject> {
-        var patches = Compare.compare(this.state, newState);
+        var patches = Compare.getPatchList(this.state, newState);
         this.checkPatches(patches, this.listeners, this.defaultListener);
         this.state = newState;
         return patches;
@@ -87,7 +87,7 @@ class StateContainer {
 
         // immediatelly try to trigger this listener.
         if (immediate) {
-            this.checkPatches(Compare.compare({}, this.state), [listener]);
+            this.checkPatches(Compare.getPatchList({}, this.state), [listener]);
         }
 
         return listener;

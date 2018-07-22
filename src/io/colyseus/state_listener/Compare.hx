@@ -8,7 +8,7 @@ typedef PatchObject = {
 
 class Compare {
 
-    public static function compare(tree1: Dynamic, tree2: Dynamic) {
+    public static function getPatchList(tree1: Dynamic, tree2: Dynamic) {
         var patches: Array<PatchObject> = [];
         generate(tree1, tree2, patches, []);
         return patches;
