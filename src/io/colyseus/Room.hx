@@ -112,10 +112,10 @@ class Room extends StateContainer {
     }
 
     public function setState( encodedState: Bytes, remoteCurrentTime: Int = 0, remoteElapsedTime: Int = 0) {
+        this._previousState = encodedState;
+
         var state = MsgPack.decode(encodedState);
         this.set(state);
-
-        this._previousState = encodedState;
 
         this.onStateChange(state);
     }
