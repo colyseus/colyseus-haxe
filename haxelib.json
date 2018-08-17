@@ -7,9 +7,9 @@
   "version": "0.9.0",
   "classPath": "src/",
   "releasenote": "Initial release, everything is working correctly.",
-  "contributors": ["Endel Dreyer"],
+  "contributors": ["endel"],
   "dependencies": {
-    "msgpack-haxe": ">= 1.15.1",
-    "haxe-ws": ">= 1.0.5"
+    "msgpack-haxe": "1.15.1",
+    "haxe-ws": "1.0.5"
   }
 }
