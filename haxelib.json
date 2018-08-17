@@ -10,7 +10,6 @@
   "contributors": ["Endel Dreyer"],
   "dependencies": {
     "msgpack-haxe": ">= 1.15.1",
-    "haxe-ws": ">= 1.0.5",
-    "fossil-delta": ">= 0.1.0"
+    "haxe-ws": ">= 1.0.5"
   }
 }

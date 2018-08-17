@@ -99,7 +99,9 @@ class Room extends StateContainer {
             this.setState(cast state, remoteCurrentTime, remoteElapsedTime);
 
         } else if (code == Protocol.ROOM_STATE_PATCH) {
-            this.patch( cast message[1] );
+            var bytes: Dynamic = message[1];
+            Reflect.setField(bytes, 'byteLength', bytes.length);
+            this.patch(Bytes.ofData(bytes));
 
         } else if (code == Protocol.ROOM_DATA) {
             this.onMessage(message[1]);
@@ -122,7 +124,7 @@ class Room extends StateContainer {
         // TODO:
 
         // apply patch
-        // this._previousState = FossilDelta.Apply(this._previousState, binaryPatch);
+        this._previousState = FossilDelta.Apply(this._previousState, binaryPatch);
 
         // trigger state callbacks
         this.set( MsgPack.decode( this._previousState ) );
