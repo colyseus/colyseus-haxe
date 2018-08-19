@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project>
+
+	<meta title="Nyan Cat" package="org.openfl.samples.nyancat" version="1.0.0" company="OpenFL" />
+	<app main="Main" path="Export" file="NyanCat" />
+
+	<window width="400" height="400" fps="30" />
+
+	<source path="Source" />
+	<source path="../../src" />
+
+	<haxelib name="openfl" />
+	<haxelib name="haxe-ws" />
+
+	<library path="Assets/library.swf" preload="true" />
+
+</project>

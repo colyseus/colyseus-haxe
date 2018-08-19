@@ -104,6 +104,7 @@ class Client {
 
         // check for id on cookie
         this.connection.onOpen = function () {
+            trace("onOpen! how's the ID? " + this.id);
             if (this.id != "") {
                 this.onOpen();
             }
@@ -117,11 +118,9 @@ class Client {
         // append colyseusid to connection string.
         var params: Array<String> = ["colyseusid=" + this.id];
 
-        for (name in options) {
+        for (name in options.keys()) {
             params.push(name + "=" + options[name]);
         }
-
-        trace("NEW CONNECTION => " + Std.string(this.endpoint + "/" + path + "?" + params.join('&')));
 
         return new Connection(this.endpoint + "/" + path + "?" + params.join('&'));
     }
@@ -130,10 +129,15 @@ class Client {
      * @override
      */
     private function onMessageCallback(data: Bytes) {
+        trace("Client.hx: onMessageCallback => " + Std.string(data));
         var message = MsgPack.decode(data);
+        trace("Client.hx: onMessageCallback (decoded) => " + Std.string(message));
         var code: Int = message[0];
 
+        trace("onMessageCallback: code => " + code);
+
         if (code == Protocol.USER_ID) {
+            trace("USER ID? => " + message[1]);
             this.id = cast(message[1], String);
 
             this.onOpen();
@@ -147,8 +151,11 @@ class Client {
                 return;
             }
 
+            trace("message => " + Std.string(message));
             room.id = cast(message[1], String);
             this.rooms.set(room.id, room);
+
+            trace("ROOM ID => " + Std.string(room.id));
 
             room.connect(this.createConnection(room.id, room.options));
             this.connectingRooms.remove(requestId);
