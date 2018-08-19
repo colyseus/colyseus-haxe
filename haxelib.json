@@ -9,7 +9,6 @@
   "releasenote": "Initial release, everything is working correctly.",
   "contributors": ["endel"],
   "dependencies": {
-    "msgpack-haxe": "1.15.1",
     "haxe-ws": "1.0.5"
   }
 }
