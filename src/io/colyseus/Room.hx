@@ -2,6 +2,7 @@ package io.colyseus;
 import io.colyseus.state_listener.StateContainer;
 
 import haxe.io.Bytes;
+import haxe.io.BytesBuffer;
 import org.msgpack.MsgPack;
 
 import io.gamestd.FossilDelta;
@@ -62,7 +63,7 @@ class Room extends StateContainer {
         }
     }
 
-    public function send(data) {
+    public function send(data: Dynamic) {
         this.connection.send([ Protocol.ROOM_DATA, this.id, data ]);
     }
 
@@ -97,13 +98,14 @@ class Room extends StateContainer {
             this.setState(cast state, remoteCurrentTime, remoteElapsedTime);
 
         } else if (code == Protocol.ROOM_STATE_PATCH) {
-            var bytes: Dynamic = message[1];
-            trace("Let's assign byteLength! " + bytes.length);
-            Reflect.setField(bytes, 'byteLength', bytes.length);
-            trace("Convert to bytes...");
-            var bbbbbytes = Bytes.ofData(bytes);
-            trace("Let's patch!");
-            this.patch(bbbbbytes);
+            var bytes: Array<Int> = cast message[1];
+            var buffer = new BytesBuffer();
+
+            for (i in bytes) {
+                buffer.addByte(i);
+            }
+
+            this.patch(buffer.getBytes());
 
         } else if (code == Protocol.ROOM_DATA) {
             this.onMessage(message[1]);

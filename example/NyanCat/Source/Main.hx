@@ -1,7 +1,9 @@
 package;
 
-import openfl.display.Sprite;
 import openfl.Assets;
+import openfl.ui.Keyboard;
+import openfl.display.Sprite;
+import openfl.events.KeyboardEvent;
 
 import io.colyseus.Client;
 import io.colyseus.Room;
@@ -61,6 +63,35 @@ class Main extends Sprite {
 			addChild (cat);
 		});
 
+		this.room.listen("players/:id/:axis", function(change) {
+			if (change.path.axis == "x") {
+				this.cats[change.path.id].x = change.value;
+
+			} else if (change.path.axis == "y") {
+				this.cats[change.path.id].y = change.value;
+			}
+		});
+
+		stage.addEventListener(KeyboardEvent.KEY_DOWN, onKeyDown);
+		stage.addEventListener(KeyboardEvent.KEY_UP, onKeyUp);
+	}
+
+	private function onKeyDown(evt:KeyboardEvent):Void {
+		if (evt.keyCode == Keyboard.UP) {
+			this.room.send({ y: -1 });
+
+		} else if (evt.keyCode == Keyboard.DOWN) {
+			this.room.send({ y: 1 });
+
+		} else if (evt.keyCode == Keyboard.LEFT) {
+			this.room.send({ x: -1 });
+
+		} else if (evt.keyCode == Keyboard.RIGHT) {
+			this.room.send({ x: 1 });
+		}
+	}
+
+	private function onKeyUp(evt:KeyboardEvent):Void {
 	}
 
 }
