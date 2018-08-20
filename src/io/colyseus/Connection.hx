@@ -10,7 +10,7 @@ class Connection {
     public var reconnectionEnabled: Bool = false;
 
     private var ws: WebSocket;
-    private var _enqueuedCalls: Array<Dynamic> = [];
+    private var _enqueuedSend: Array<Dynamic> = [];
 
     // callbacks
     public dynamic function onOpen():Void {}
@@ -24,15 +24,14 @@ class Connection {
             trace("WS OPEN!!!!");
             this.onOpen();
 
-            trace("enqueued calls: " + this._enqueuedCalls.length);
+            trace("enqueued calls: " + this._enqueuedSend.length);
 
-            for (i in 0...this._enqueuedCalls.length) {
-                var enqueuedCall = this._enqueuedCalls[i];
-                Reflect.callMethod(this, Reflect.field(this, enqueuedCall[0]), [enqueuedCall[1]]);
+            for (i in 0...this._enqueuedSend.length) {
+                this.send(this._enqueuedSend[i]);
             }
 
             // reset enqueued calls
-            this._enqueuedCalls = [];
+            this._enqueuedSend = [];
         }
 
         this.ws.onmessageBytes = function(bytes) {
@@ -52,6 +51,7 @@ class Connection {
 
         #if sys
         Runner.thread(function() {
+            trace("WebSocket thread started for " + url);
             while (true) {
                 this.ws.process();
             }
@@ -60,6 +60,8 @@ class Connection {
     }
 
     public function send(data: Dynamic) {
+        trace("Connection.send, Type.typeof => " + Type.typeof(data));
+
         if (this.ws.readyState == ReadyState.Open) {
             trace("SEND BYTES! => " + Std.string(MsgPack.encode(data)));
             return this.ws.sendBytes( MsgPack.encode(data) );
@@ -68,7 +70,7 @@ class Connection {
             trace("ENQUEUE send! => " + Std.string(MsgPack.encode(data)));
             // WebSocket not connected.
             // Enqueue data to be sent when readyState == OPEN
-            this._enqueuedCalls.push(['send', data]);
+            this._enqueuedSend.push(data);
         }
     }
 

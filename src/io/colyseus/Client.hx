@@ -104,7 +104,6 @@ class Client {
 
         // check for id on cookie
         this.connection.onOpen = function () {
-            trace("onOpen! how's the ID? " + this.id);
             if (this.id != "") {
                 this.onOpen();
             }
@@ -130,7 +129,7 @@ class Client {
      */
     private function onMessageCallback(data: Bytes) {
         trace("Client.hx: onMessageCallback => " + Std.string(data));
-        var message = MsgPack.decode(data);
+        var message: Dynamic = MsgPack.decode(data);
         trace("Client.hx: onMessageCallback (decoded) => " + Std.string(message));
         var code: Int = message[0];
 

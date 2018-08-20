@@ -80,7 +80,7 @@ class Room extends StateContainer {
 
     private function onMessageCallback(data: Bytes) {
         trace("Room.hx: onMessageCallback => " + Std.string(data));
-        var message = MsgPack.decode(data);
+        var message: Dynamic = MsgPack.decode(data);
         trace("Room.hx: onMessageCallback (decoded) => " + Std.string(message));
         var code = message[0];
 
@@ -100,7 +100,7 @@ class Room extends StateContainer {
             this.setState(cast state, remoteCurrentTime, remoteElapsedTime);
 
         } else if (code == Protocol.ROOM_STATE_PATCH) {
-            var bytes: Array<Int> = cast message[1];
+            var bytes: Array<Dynamic> = cast message[1];
             var buffer = new BytesBuffer();
 
             for (i in bytes) {
