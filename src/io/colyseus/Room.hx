@@ -64,7 +64,9 @@ class Room extends StateContainer {
     }
 
     public function send(data: Dynamic) {
-        this.connection.send([ Protocol.ROOM_DATA, this.id, data ]);
+        if (this.connection != null) {
+            this.connection.send([ Protocol.ROOM_DATA, this.id, data ]);
+        }
     }
 
     public override function removeAllListeners() {

@@ -18,7 +18,8 @@ class Main extends Sprite {
 	public function new () {
 		super ();
 
-		this.client = new Client("ws://localhost:2567");
+		// this.client = new Client("ws://localhost:2567");
+		this.client = new Client("ws://colyseus-examples.herokuapp.com");
 		this.room = this.client.join("state_handler");
 
 		this.client.onOpen = function() {
@@ -58,11 +59,16 @@ class Main extends Sprite {
 		}
 
 		this.room.listen("players/:id", function(change) {
-			var cat = Assets.getMovieClip ("library:NyanCatAnimation");
-			this.cats[change.path.id] = cat;
-			cat.x = change.value.x;
-			cat.y = change.value.y;
-			addChild (cat);
+			if (change.operation == "add") {
+				var cat = Assets.getMovieClip ("library:NyanCatAnimation");
+				this.cats[change.path.id] = cat;
+				cat.x = change.value.x;
+				cat.y = change.value.y;
+				addChild (cat);
+
+			} else if (change.operation == "remove") {
+				removeChild(this.cats[change.path.id]);
+			}
 		}, true);
 
 		this.room.listen("players/:id/:axis", function(change) {

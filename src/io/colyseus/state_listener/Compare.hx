@@ -45,6 +45,9 @@ class Compare {
         var oldKeys = objectKeys(mirror);
         var deleted = false;
 
+        trace("newKeys: => " + Std.string(newKeys));
+        trace("oldKeys: => " + Std.string(oldKeys));
+
         for (t in 0...oldKeys.length) {
             var key = oldKeys[t];
 
@@ -117,6 +120,7 @@ class Compare {
     }
 
     private static function getField(obj: Dynamic, field: Dynamic) {
+        trace("GET FIELD: " + field);
         return Std.is(obj, Array)
             ? obj[field]
             : (Reflect.hasField(obj, field)
