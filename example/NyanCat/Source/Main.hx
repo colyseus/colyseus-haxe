@@ -60,10 +60,17 @@ class Main extends Sprite {
 		this.room.listen("players/:id", function(change) {
 			var cat = Assets.getMovieClip ("library:NyanCatAnimation");
 			this.cats[change.path.id] = cat;
+			cat.x = change.value.x;
+			cat.y = change.value.y;
 			addChild (cat);
-		});
+		}, true);
 
 		this.room.listen("players/:id/:axis", function(change) {
+			if (this.cats.get(change.path.id) == null) {
+				trace("CAT DONT EXIST: " + change.path.id);
+				return;
+			}
+
 			if (change.path.axis == "x") {
 				this.cats[change.path.id].x = change.value;
 
