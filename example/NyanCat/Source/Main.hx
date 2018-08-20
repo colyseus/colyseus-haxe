@@ -18,8 +18,8 @@ class Main extends Sprite {
 	public function new () {
 		super ();
 
-		this.client = new Client("ws://localhost:2567");
-		// this.client = new Client("ws://colyseus-examples.herokuapp.com");
+		// this.client = new Client("ws://localhost:2567");
+		this.client = new Client("ws://colyseus-examples.herokuapp.com");
 		this.room = this.client.join("state_handler");
 
 		this.client.onOpen = function() {

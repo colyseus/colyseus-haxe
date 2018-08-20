@@ -128,15 +128,10 @@ class Client {
      * @override
      */
     private function onMessageCallback(data: Bytes) {
-        trace("Client.hx: onMessageCallback => " + Std.string(data));
         var message: Dynamic = MsgPack.decode(data);
-        trace("Client.hx: onMessageCallback (decoded) => " + Std.string(message));
         var code: Int = message[0];
 
-        trace("onMessageCallback: code => " + code);
-
         if (code == Protocol.USER_ID) {
-            trace("USER ID? => " + message[1]);
             this.id = cast(message[1], String);
 
             this.onOpen();
@@ -150,11 +145,8 @@ class Client {
                 return;
             }
 
-            trace("message => " + Std.string(message));
             room.id = cast(message[1], String);
             this.rooms.set(room.id, room);
-
-            trace("ROOM ID => " + Std.string(room.id));
 
             room.connect(this.createConnection(room.id, room.options));
             this.connectingRooms.remove(requestId);

@@ -79,9 +79,7 @@ class Room extends StateContainer {
     }
 
     private function onMessageCallback(data: Bytes) {
-        trace("Room.hx: onMessageCallback => " + Std.string(data));
         var message: Dynamic = MsgPack.decode(data);
-        trace("Room.hx: onMessageCallback (decoded) => " + Std.string(message));
         var code = message[0];
 
         if (code == Protocol.JOIN_ROOM) {
@@ -100,7 +98,7 @@ class Room extends StateContainer {
             this.setState(cast state, remoteCurrentTime, remoteElapsedTime);
 
         } else if (code == Protocol.ROOM_STATE_PATCH) {
-            var bytes: Array<Dynamic> = cast message[1];
+            var bytes: Array<Int> = cast message[1];
             var buffer = new BytesBuffer();
 
             for (i in bytes) {
@@ -127,14 +125,11 @@ class Room extends StateContainer {
     }
 
     private function patch( binaryPatch: Bytes ) {
-        trace("PATCH...");
         // apply patch
         this._previousState = FossilDelta.Apply(this._previousState, binaryPatch);
-        trace("Applied... Let's decode...");
 
         // trigger state callbacks
         this.set( MsgPack.decode( this._previousState ) );
-        trace("Decoded!");
 
         this.onStateChange(this.state);
     }
