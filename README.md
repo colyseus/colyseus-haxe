@@ -107,6 +107,14 @@ room.onLeave = function() {
 }
 ```
 
+## `ios` target caveats
+
+You may need to manually apply this patch in order to compile for iOS: HaxeFoundation/hxcpp@5f63d23
+
+> More info:
+> http://community.openfl.org/t/solved-system-not-available-on-ios-with-xcode-9-0/9683?source_topic_id=10046
+
+
 ## License
 
 MIT
