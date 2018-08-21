@@ -26,8 +26,7 @@ class Client {
     private var connectingRooms: Map<Int, Room> = new Map();
     private var requestId = 0;
 
-    // private var roomsAvailableRequests: Map<String, RoomAvailable[] -> Void> = new Map();
-    // {[requestId: number]: (value?: RoomAvailable[]) => void}
+    private var roomsAvailableRequests: Map<Int, Array<RoomAvailable> -> Void> = new Map();
 
     public function new (url: String) {
         this.endpoint = url;
@@ -62,24 +61,28 @@ class Client {
         return this.join(roomName, [ "sessionId" => sessionId ]);
     }
 
-    // public function getAvailableRooms(roomName: String, callback: (rooms: RoomAvailable[], err?: string) => void) {
-    //     // reject this promise after 10 seconds.
-    //     const requestId = ++this.requestId;
-    //     const removeRequest = () => delete this.roomsAvailableRequests[requestId];
-    //     const rejectionTimeout = setTimeout(() => {
-    //         removeRequest();
-    //         callback([], 'timeout');
-    //     }, 10000);
+    public function getAvailableRooms(roomName: String, callback: Array<RoomAvailable>->?String -> Void) {
+        // reject this promise after 10 seconds.
+        var requestId = ++this.requestId;
 
-    //     // send the request to the server.
-    //     this.connection.send([Protocol.ROOM_LIST, requestId, roomName]);
+        function removeRequest() {
+            return this.roomsAvailableRequests.remove(requestId);
+        };
 
-    //     this.roomsAvailableRequests[requestId] = (roomsAvailable) => {
-    //         removeRequest();
-    //         clearTimeout(rejectionTimeout);
-    //         callback(roomsAvailable);
-    //     };
-    // }
+        var rejectionTimeout = haxe.Timer.delay(function() {
+            removeRequest();
+            callback([], 'timeout');
+        }, 10000);
+
+        // send the request to the server.
+        this.connection.send([Protocol.ROOM_LIST, requestId, roomName]);
+
+        this.roomsAvailableRequests[requestId] = function(roomsAvailable) {
+            removeRequest();
+            rejectionTimeout.stop();
+            callback(roomsAvailable);
+        };
+    }
 
     public function close() {
         this.connection.close();
@@ -158,12 +161,21 @@ class Client {
             this.onError(cast message[2]);
 
         } else if (code == Protocol.ROOM_LIST) {
-            // if (this.roomsAvailableRequests[message[1]]) {
-            //     this.roomsAvailableRequests[message[1]](message[2]);
+            var requestId: Int = message[1];
 
-            // } else {
-            //     trace('receiving ROOM_LIST after timeout:' + message[2]);
-            // }
+            if (this.roomsAvailableRequests.exists(requestId)) {
+                var callback = this.roomsAvailableRequests.get(requestId);
+                var roomsAvailable: Array<RoomAvailable> = cast message[2];
+
+                trace("Protocol.ROOM_LIST message => " + Std.string(message[2]));
+                trace("ROOM ID => " + roomsAvailable[0].roomId);
+                callback(cast (message[2]));
+
+                this.roomsAvailableRequests.remove(requestId);
+
+            } else {
+                trace('receiving ROOM_LIST after timeout:' + message[2]);
+            }
 
         } else {
             this.onMessage(message);

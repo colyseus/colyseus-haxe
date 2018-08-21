@@ -22,6 +22,20 @@ class Main extends Sprite {
 		this.client = new Client("ws://colyseus-examples.herokuapp.com");
 		this.room = this.client.join("state_handler");
 
+		// list available rooms for connection
+        haxe.Timer.delay(function() {
+			this.client.getAvailableRooms("state_handler", function(rooms, ?err) {
+				if (err != null) trace("ERROR! " + err);
+				for (room in rooms) {
+					trace("RoomAvailable:");
+					trace("roomId: " + room.roomId);
+					trace("clients: " + room.clients);
+					trace("maxClients: " + room.maxClients);
+					trace("metadata: " + room.metadata);
+				}
+			});
+        }, 3000);
+
 		this.client.onOpen = function() {
 			trace("CLIENT OPEN, id => " + this.client.id);
 		};
