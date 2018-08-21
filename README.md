@@ -21,6 +21,17 @@
   <h3>
 </div>
 
+## Example
+
+The [`example`](example/NyanCat) project can be compiled to `html5`, `neko`,
+`cpp`, `ios`, etc.
+
+**Compiling it to `html5` ([live demo](http://gamestd.io/colyseus-hx/))**
+
+```
+lime build project.xml html5
+```
+
 ## Usage
 
 ### Connecting to server:
