@@ -77,11 +77,11 @@ class Client {
         // send the request to the server.
         this.connection.send([Protocol.ROOM_LIST, requestId, roomName]);
 
-        this.roomsAvailableRequests[requestId] = function(roomsAvailable) {
+        this.roomsAvailableRequests.set(requestId, function(roomsAvailable) {
             removeRequest();
             rejectionTimeout.stop();
             callback(roomsAvailable);
-        };
+        });
     }
 
     public function close() {
@@ -165,13 +165,7 @@ class Client {
 
             if (this.roomsAvailableRequests.exists(requestId)) {
                 var callback = this.roomsAvailableRequests.get(requestId);
-                var roomsAvailable: Array<RoomAvailable> = cast message[2];
-
-                trace("Protocol.ROOM_LIST message => " + Std.string(message[2]));
-                trace("ROOM ID => " + roomsAvailable[0].roomId);
-                callback(cast (message[2]));
-
-                this.roomsAvailableRequests.remove(requestId);
+                callback(cast message[2]);
 
             } else {
                 trace('receiving ROOM_LIST after timeout:' + message[2]);
