@@ -26,6 +26,9 @@
 The [`example`](example/NyanCat) project can be compiled to `html5`, `neko`,
 `cpp`, `ios`, etc.
 
+It uses the `state_handler` room from the [colyseus-examples](https://github.com/gamestdio/colyseus-examples) project, which you
+can find [here](https://github.com/gamestdio/colyseus-examples/blob/master/rooms/02-state-handler.ts).
+
 **Compiling it to `html5` ([live demo](http://gamestd.io/colyseus-hx/))**
 
 ```
