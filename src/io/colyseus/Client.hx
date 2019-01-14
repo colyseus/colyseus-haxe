@@ -10,6 +10,7 @@ interface RoomAvailable {
     public var metadata: Dynamic;
 }
 
+@:keep
 class Client {
     public var id: String = "";
     public var endpoint: String;

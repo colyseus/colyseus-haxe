@@ -1,0 +1,21 @@
+-cp src
+
+# exposed classes
+io.colyseus.Client
+io.colyseus.Room
+
+-lib hxcpp
+-lib haxe-ws
+
+# this is for Mac OS X:
+-D HXCPP_M64
+
+# this is required on Windows. the "d" stands for debug:
+# -D ABI=-MTd
+
+-dce full
+-cpp build/cpp
+
+-D static_link
+# -D dll_export # WINDOWS?
+-D actuate
