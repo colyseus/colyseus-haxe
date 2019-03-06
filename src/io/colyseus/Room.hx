@@ -1,13 +1,22 @@
 package io.colyseus;
-import io.colyseus.state_listener.StateContainer;
+
+import io.colyseus.serializer.Serializer;
+import io.colyseus.serializer.FossilDeltaSerializer;
 
 import haxe.io.Bytes;
 import haxe.io.BytesBuffer;
 import org.msgpack.MsgPack;
 
-import io.gamestd.FossilDelta;
+/** 
+ * TODO: importing a typedef is not supported on Haxe 3.4.7 
+ * this should be fixed on Haxe 4.0.0+ 
+ */
+//import io.colyseus.state_listener.Listener
+//import io.colyseus.state_listener.DataChange
+typedef Listener = { callback: DataChange->Void, rules: List<EReg>, rawRules: Array<String> }
+typedef DataChange = { path: Dynamic, operation: String, value: Dynamic, ?rawPath: Array<String> }
 
-class Room extends StateContainer {
+class Room {
     public var id: String;
     public var sessionId: String;
 
@@ -22,15 +31,19 @@ class Room extends StateContainer {
     public dynamic function onLeave(): Void {}
 
     public var connection: Connection;
-    private var _previousState: Bytes;
+
+    public var serializerId: String = null;
+    private var serializer: Serializer;
+
+    private var previousCode: Int = 0;
 
     public function new (name: String, options: Dynamic = null) {
-        super({});
-
         this.id = null;
         this.name = name;
-
         this.options = options;
+
+        // TODO: remove default serializer. it should arrive only after JOIN_ROOM.
+        this.serializer = new FossilDeltaSerializer();
     }
 
     public function connect(connection: Connection) {
@@ -42,7 +55,7 @@ class Room extends StateContainer {
         }
 
         this.connection.onClose = function () {
-            this.removeAllListeners();
+            this.teardown();
             this.onLeave();
         }
 
@@ -53,7 +66,7 @@ class Room extends StateContainer {
     }
 
     public function leave() {
-        this.removeAllListeners();
+        this.teardown();
 
         if (this.connection != null) {
             this.connection.close();
@@ -69,8 +82,13 @@ class Room extends StateContainer {
         }
     }
 
-    public override function removeAllListeners() {
-        super.removeAllListeners();
+    public var state (get, null): Dynamic;
+    function get_state () {
+        return this.serializer.getState();
+    }
+
+    public function teardown() {
+        this.serializer.teardown();
         // this.onJoin.removeAll();
         // this.onStateChange.removeAll();
         // this.onMessage.removeAll();
@@ -78,60 +96,77 @@ class Room extends StateContainer {
         // this.onLeave.removeAll();
     }
 
+    // fossil-delta serializer 
+    public function listen (segments: Dynamic, ?callback: DataChange->Void, ?immediate: Bool): Listener {
+        if (this.serializerId == "schema") {
+            trace("'" + this.serializerId + "' serializer doesn't support .listen() method.");
+            return null;
+        }
+
+        if (this.serializerId == null) {
+            trace("DEPRECATION WARNING: room.Listen() should be called after room.OnJoin has been called");
+        }
+
+        return cast(this.serializer, FossilDeltaSerializer).state.listen(segments, callback, immediate);
+    }
+    public function removeListener (listener: Listener) {
+        return cast(this.serializer, FossilDeltaSerializer).state.removeListener(listener);
+    }
+
     private function onMessageCallback(data: Bytes) {
-        var message: Dynamic = MsgPack.decode(data);
-        var code = message[0];
+        if (this.previousCode == 0) {
+            var code = data.get(0);
 
-        if (code == Protocol.JOIN_ROOM) {
-            this.sessionId = cast message[1];
-            this.onJoin();
+            if (code == Protocol.JOIN_ROOM) {
+                var offset: Int = 1;
 
-        } else if (code == Protocol.JOIN_ERROR) {
-            trace("Error: " + message[1]);
-            this.onError(cast message[1]);
+                this.sessionId = data.getString(offset + 1, data.get(offset));
+                offset += this.sessionId.length + 1;
 
-        } else if (code == Protocol.ROOM_STATE) {
-            var state = message[1];
-            var remoteCurrentTime = message[2];
-            var remoteElapsedTime = message[3];
+                this.serializerId = data.getString(2, data.get(1));
+                offset += this.serializerId.length + 1;
 
-            this.setState(cast state, remoteCurrentTime, remoteElapsedTime);
+                if (data.length > offset) {
+                    this.serializer.handshake(data, offset);
+                }
 
-        } else if (code == Protocol.ROOM_STATE_PATCH) {
-            var bytes: Array<Int> = cast message[1];
-            var buffer = new BytesBuffer();
+                this.onJoin();
 
-            for (i in bytes) {
-                buffer.addByte(i);
+            } else if (code == Protocol.JOIN_ERROR) {
+                var err = data.getString(2, data.get(1));
+                trace("Error: " + err);
+                this.onError(err);
+
+            } else if (code == Protocol.LEAVE_ROOM) {
+                this.leave();
+
+            } else {
+                this.previousCode = code;
             }
 
-            this.patch(buffer.getBytes());
+        } else {
+            if (this.previousCode == Protocol.ROOM_STATE) {
+                this.setState(data);
 
-        } else if (code == Protocol.ROOM_DATA) {
-            this.onMessage(message[1]);
+            } else if (this.previousCode == Protocol.ROOM_STATE_PATCH) {
+                this.patch(data);
 
-        } else if (code == Protocol.LEAVE_ROOM) {
-            this.leave();
+            } else if (this.previousCode == Protocol.ROOM_DATA) {
+                this.onMessage(MsgPack.decode(data));
+            }
+
+            this.previousCode = 0;
         }
     }
 
-    public function setState( encodedState: Bytes, remoteCurrentTime: Int = 0, remoteElapsedTime: Int = 0) {
-        this._previousState = encodedState;
-
-        var state = MsgPack.decode(encodedState);
-        this.set(state);
-
-        this.onStateChange(state);
+    public function setState(encodedState: Bytes) {
+        this.serializer.setState(encodedState);
+        this.onStateChange(this.serializer.getState());
     }
 
-    private function patch( binaryPatch: Bytes ) {
-        // apply patch
-        this._previousState = FossilDelta.Apply(this._previousState, binaryPatch);
-
-        // trigger state callbacks
-        this.set( MsgPack.decode( this._previousState ) );
-
-        this.onStateChange(this.state);
+    private function patch(binaryPatch: Bytes) {
+        this.serializer.patch(binaryPatch);
+        this.onStateChange(this.serializer.getState());
     }
 
 }

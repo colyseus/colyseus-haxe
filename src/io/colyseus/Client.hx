@@ -17,7 +17,6 @@ class Client {
 
     // callbacks
     public dynamic function onOpen():Void {}
-    public dynamic function onMessage(data: Dynamic):Void {}
     public dynamic function onClose():Void {}
     public dynamic function onError(e: String):Void {}
 
@@ -26,11 +25,13 @@ class Client {
     private var rooms: Map<String, Room> = new Map();
     private var connectingRooms: Map<Int, Room> = new Map();
     private var requestId = 0;
+    private var previousCode: Int = 0;
 
     private var roomsAvailableRequests: Map<Int, Array<RoomAvailable> -> Void> = new Map();
 
     public function new (url: String) {
         this.endpoint = url;
+        trace("ENDPOINT => " + url);
 
         // getItem('colyseusid', (colyseusid) => this.connect(colyseusid));
         this.connect(this.id);
@@ -53,7 +54,7 @@ class Client {
 
         this.connectingRooms.set(options.get("requestId"), room);
 
-        this.connection.send([Protocol.JOIN_ROOM, roomName, options]);
+        this.connection.send([Protocol.JOIN_REQUEST, roomName, options]);
 
         return room;
     }
@@ -95,19 +96,23 @@ class Client {
         this.connection = this.createConnection();
 
         this.connection.onMessage = function (data) {
+            trace("Connection onMessage!");
             this.onMessageCallback(data);
         }
 
         this.connection.onClose = function () {
+            trace("Connection close!");
             this.onClose();
         };
 
         this.connection.onError = function (e) {
+            trace("Connection error! " + e);
             this.onError(e);
         };
 
         // check for id on cookie
         this.connection.onOpen = function () {
+            trace("Connection open!");
             if (this.id != "") {
                 this.onOpen();
             }
@@ -132,48 +137,56 @@ class Client {
      * @override
      */
     private function onMessageCallback(data: Bytes) {
-        var message: Dynamic = MsgPack.decode(data);
-        var code: Int = message[0];
+        if (this.previousCode == 0) {
+            var code: Int = data.get(0);
+            trace("CODE => " + code);
 
-        if (code == Protocol.USER_ID) {
-            this.id = cast(message[1], String);
+            if (code == Protocol.USER_ID) {
+                this.id = data.getString(2, data.get(1));
 
-            this.onOpen();
+                this.onOpen();
 
-        } else if (code == Protocol.JOIN_ROOM) {
-            var requestId: Int = message[2];
-            var room = this.connectingRooms.get(requestId);
+            } else if (code == Protocol.JOIN_REQUEST) {
+                var requestId: Int = data.get(1);
+                var room = this.connectingRooms.get(requestId);
 
-            if (room == null) {
-                trace('colyseus.js: client left room before receiving session id.');
-                return;
-            }
+                if (room == null) {
+                    trace('colyseus.js: client left room before receiving session id.');
+                    return;
+                }
 
-            room.id = cast(message[1], String);
-            this.rooms.set(room.id, room);
+                room.id = data.getString(3, data.get(2));
+                this.rooms.set(room.id, room);
 
-            room.connect(this.createConnection(room.id, room.options));
-            this.connectingRooms.remove(requestId);
+                room.connect(this.createConnection(room.id, room.options));
+                this.connectingRooms.remove(requestId);
 
-        } else if (code == Protocol.JOIN_ERROR) {
-            trace('colyseus.js: server error:' + message[2]);
+            } else if (code == Protocol.JOIN_ERROR) {
+                var err = data.getString(2, data.get(1));
+                trace('colyseus.js: server error:' + err);
 
-            // general error
-            this.onError(cast message[2]);
+                // general error
+                this.onError(err);
 
-        } else if (code == Protocol.ROOM_LIST) {
-            var requestId: Int = message[1];
-
-            if (this.roomsAvailableRequests.exists(requestId)) {
-                var callback = this.roomsAvailableRequests.get(requestId);
-                callback(cast message[2]);
-
-            } else {
-                trace('receiving ROOM_LIST after timeout:' + message[2]);
+            } else if (code == Protocol.ROOM_LIST) {
+                this.previousCode = code;
             }
 
         } else {
-            this.onMessage(message);
+            if (this.previousCode == Protocol.ROOM_LIST) {
+                var message: Dynamic = MsgPack.decode(data);
+                var requestId: Int = message[0];
+
+                if (this.roomsAvailableRequests.exists(requestId)) {
+                    var callback = this.roomsAvailableRequests.get(requestId);
+                    callback(cast message[1]);
+
+                } else {
+                    trace('receiving ROOM_LIST after timeout:' + message[2]);
+                }
+
+            }
+            this.previousCode = 0;
         }
 
     }

@@ -18,6 +18,8 @@ class Connection {
     public dynamic function onClose():Void {}
     public dynamic function onError(message: String):Void {}
 
+    private static var isRunnerInitialized: Bool = false;
+
     public function new (url: String) {
         this.ws = WebSocket.create(url);
         this.ws.onopen = function() {
@@ -43,13 +45,26 @@ class Connection {
             this.onError(message);
         }
 
-        #if sys
+#if sys
+        if (!Connection.isRunnerInitialized) {
+            Runner.init();
+        }
+
         Runner.thread(function() {
+            // TODO: check when to kill this thread!
             while (true) {
+                trace("process ws!");
                 this.ws.process();
+
+                if (this.ws.readyState == ReadyState.Closed) {
+                    trace("Connection has been closed, stop the thread!");
+                    break;
+                }
+
+                Sys.sleep(.1);
             }
         });
-        #end
+#end
     }
 
     public function send(data: Dynamic) {

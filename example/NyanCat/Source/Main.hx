@@ -3,6 +3,7 @@ package;
 import openfl.Assets;
 import openfl.ui.Keyboard;
 import openfl.display.Sprite;
+import openfl.events.Event;
 import openfl.events.KeyboardEvent;
 
 import io.colyseus.Client;
@@ -18,8 +19,8 @@ class Main extends Sprite {
 	public function new () {
 		super ();
 
-		// this.client = new Client("ws://localhost:2567");
-		this.client = new Client("ws://colyseus-examples.herokuapp.com");
+		this.client = new Client("ws://0.0.0.0:2567");
+		// this.client = new Client("ws://colyseus-examples.herokuapp.com");
 		this.room = this.client.join("state_handler");
 
 		// list available rooms for connection
@@ -36,12 +37,11 @@ class Main extends Sprite {
 			});
         }, 3000);
 
+		/**
+		 * Client callbacks
+		 */
 		this.client.onOpen = function() {
 			trace("CLIENT OPEN, id => " + this.client.id);
-		};
-
-		this.client.onMessage = function(message) {
-			trace("CLIENT MESSAGE: " + Std.string(message));
 		};
 
 		this.client.onClose = function () {
@@ -52,6 +52,9 @@ class Main extends Sprite {
 			trace("CLIENT ERROR: " + message);
 		};
 
+		/**
+		 * Room callbacks
+		 */
 		this.room.onJoin = function() {
 			trace("JOINED ROOM");
 		};
@@ -101,6 +104,12 @@ class Main extends Sprite {
 
 		stage.addEventListener(KeyboardEvent.KEY_DOWN, onKeyDown);
 		stage.addEventListener(KeyboardEvent.KEY_UP, onKeyUp);
+
+		stage.addEventListener(Event.ENTER_FRAME, onUpdate);
+	}
+
+	private function onUpdate(e:Event):Void {
+		// Your update function...
 	}
 
 	private function onKeyDown(evt:KeyboardEvent):Void {

@@ -1,10 +1,11 @@
 package io.colyseus;
 
 class Protocol {
-    // User-related (0~10)
+    // User-related (0~9)
     public static var USER_ID = 1;
 
-    // Room-related (10~20)
+    // Room-related (9~19)
+    public static var JOIN_REQUEST = 9;
     public static var JOIN_ROOM = 10;
     public static var JOIN_ERROR = 11;
     public static var LEAVE_ROOM = 12;
