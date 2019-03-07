@@ -41,17 +41,9 @@ haxelib run lime build project.xml html5
 
 You can see the demo project [live here](http://colyseus.io/colyseus-hx/).
 
-## Contributing
-
-```
-haxelib install haxe-ws
-```
-
 ## Dependencies
 
-[colyseus-hx](https://github.com/colyseus/colyseus-hx) depends on:
-
-- [haxe-ws](https://github.com/soywiz/haxe-ws)
+[colyseus-hx](https://github.com/colyseus/colyseus-hx) depends on [haxe-ws](https://github.com/soywiz/haxe-ws)
 
 ## License
 
