@@ -65,11 +65,16 @@ class Room {
         };
     }
 
-    public function leave() {
+    public function leave(consented: Bool = true) {
         this.teardown();
 
         if (this.connection != null) {
-            this.connection.close();
+            if (consented) {
+                this.connection.send([ Protocol.LEAVE_ROOM ]);
+
+            } else {
+                this.connection.close();
+            }
 
         } else {
             this.onLeave();
