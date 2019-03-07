@@ -53,15 +53,14 @@ class Connection {
         Runner.thread(function() {
             // TODO: check when to kill this thread!
             while (true) {
-                trace("process ws!");
                 this.ws.process();
 
                 if (this.ws.readyState == ReadyState.Closed) {
-                    trace("Connection has been closed, stop the thread!");
+                    trace("WebSocket connection has been closed, stopping the thread!");
                     break;
                 }
 
-                Sys.sleep(.1);
+                Sys.sleep(.01);
             }
         });
 #end

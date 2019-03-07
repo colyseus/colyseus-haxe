@@ -31,7 +31,6 @@ class Client {
 
     public function new (url: String) {
         this.endpoint = url;
-        trace("ENDPOINT => " + url);
 
         // getItem('colyseusid', (colyseusid) => this.connect(colyseusid));
         this.connect(this.id);
@@ -96,23 +95,19 @@ class Client {
         this.connection = this.createConnection();
 
         this.connection.onMessage = function (data) {
-            trace("Connection onMessage!");
             this.onMessageCallback(data);
         }
 
         this.connection.onClose = function () {
-            trace("Connection close!");
             this.onClose();
         };
 
         this.connection.onError = function (e) {
-            trace("Connection error! " + e);
             this.onError(e);
         };
 
         // check for id on cookie
         this.connection.onOpen = function () {
-            trace("Connection open!");
             if (this.id != "") {
                 this.onOpen();
             }
@@ -139,7 +134,6 @@ class Client {
     private function onMessageCallback(data: Bytes) {
         if (this.previousCode == 0) {
             var code: Int = data.get(0);
-            trace("CODE => " + code);
 
             if (code == Protocol.USER_ID) {
                 this.id = data.getString(2, data.get(1));
