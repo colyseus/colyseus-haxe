@@ -46,9 +46,10 @@ class Connection {
         }
 
 #if sys
-        if (!Connection.isRunnerInitialized) {
-            Runner.init();
-        }
+        // if (!Connection.isRunnerInitialized) {
+        //     Connection.isRunnerInitialized = true;
+        //     Runner.init();
+        // }
 
         Runner.thread(function() {
             // TODO: check when to kill this thread!
