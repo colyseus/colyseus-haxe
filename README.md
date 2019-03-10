@@ -35,6 +35,7 @@ It uses the `state_handler` room from the [colyseus-examples](https://github.com
 git clone https://github.com/colyseus/colyseus-hx.git
 cd colyseus-hx/example/NyanCat
 haxelib install openfl
+haxelib install lime
 haxelib install haxe-ws
 haxelib run lime build project.xml html5
 ```

@@ -66,6 +66,7 @@ class Connection {
                 Sys.sleep(.01);
             }
         });
+        #end
     }
 
     public function send(data: Dynamic) {

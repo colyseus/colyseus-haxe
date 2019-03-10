@@ -8,13 +8,18 @@ import haxe.io.BytesBuffer;
 import org.msgpack.MsgPack;
 
 /** 
- * TODO: importing a typedef is not supported on Haxe 3.4.7 
- * this should be fixed on Haxe 4.0.0+ 
+ * TODO: import typedef's from `io.colyseus.serializer`?
  */
-//import io.colyseus.state_listener.Listener
-//import io.colyseus.state_listener.DataChange
-typedef Listener = { callback: DataChange->Void, rules: List<EReg>, rawRules: Array<String> }
+#if haxe4
+typedef Listener = {
+    callback: DataChange->Void,
+    rules: Array<Null<EReg>>,
+    rawRules: Array<String>
+}
 typedef DataChange = { path: Dynamic, operation: String, value: Dynamic, ?rawPath: Array<String> }
+#else
+typedef Listener = { callback: DataChange->Void, rules: List<EReg>, rawRules: Array<String> }
+#end
 
 class Room {
     public var id: String;
