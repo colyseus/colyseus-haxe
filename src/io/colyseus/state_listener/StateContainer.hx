@@ -4,7 +4,11 @@ import io.colyseus.state_listener.Compare;
 
 typedef Listener = {
     callback: DataChange->Void,
+#if haxe4
+    rules: Array<Null<EReg>>,
+#else
     rules: List<EReg>,
+#end
     rawRules: Array<String>
 }
 

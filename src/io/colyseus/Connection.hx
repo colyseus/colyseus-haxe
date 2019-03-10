@@ -6,6 +6,14 @@ import org.msgpack.MsgPack;
 import haxe.net.WebSocket;
 import haxe.net.WebSocket.ReadyState;
 
+#if neko
+    import neko.vm.Thread;
+#elseif hl
+    import hl.vm.Thread;
+#elseif cpp
+    import cpp.vm.Thread;
+#end
+
 class Connection {
     public var reconnectionEnabled: Bool = false;
 
@@ -45,14 +53,8 @@ class Connection {
             this.onError(message);
         }
 
-#if sys
-        // if (!Connection.isRunnerInitialized) {
-        //     Connection.isRunnerInitialized = true;
-        //     Runner.init();
-        // }
-
-        Runner.thread(function() {
-            // TODO: check when to kill this thread!
+        #if sys
+        Thread.create(function() {
             while (true) {
                 this.ws.process();
 
@@ -64,7 +66,6 @@ class Connection {
                 Sys.sleep(.01);
             }
         });
-#end
     }
 
     public function send(data: Dynamic) {
