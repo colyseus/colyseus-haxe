@@ -6,6 +6,14 @@ import org.msgpack.MsgPack;
 import haxe.net.WebSocket;
 import haxe.net.WebSocket.ReadyState;
 
+#if neko
+    import neko.vm.Thread;
+#elseif hl
+    import hl.vm.Thread;
+#elseif cpp
+    import cpp.vm.Thread;
+#end
+
 class Connection {
     public var reconnectionEnabled: Bool = false;
 
@@ -44,7 +52,7 @@ class Connection {
         }
 
         #if sys
-        Runner.thread(function() {
+        Thread.create(function() {
             while (true) {
                 this.ws.process();
             }
