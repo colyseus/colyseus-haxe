@@ -2,7 +2,7 @@ package io.colyseus.serializer;
 
 import haxe.io.Bytes;
 import org.msgpack.MsgPack;
-import io.gamestd.FossilDelta;
+import io.colyseus.serializer.fossil_delta.FossilDelta;
 import io.colyseus.state_listener.StateContainer;
 
 class FossilDeltaSerializer implements Serializer {

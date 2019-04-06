@@ -6,12 +6,16 @@ import org.msgpack.MsgPack;
 import haxe.net.WebSocket;
 import haxe.net.WebSocket.ReadyState;
 
-#if neko
-    import neko.vm.Thread;
-#elseif hl
-    import hl.vm.Thread;
-#elseif cpp
-    import cpp.vm.Thread;
+#if !haxe4
+    #if neko
+        import neko.vm.Thread;
+    #elseif hl
+        import hl.vm.Thread;
+    #elseif cpp
+        import cpp.vm.Thread;
+    #end
+#else
+    import sys.thread.Thread;
 #end
 
 class Connection {

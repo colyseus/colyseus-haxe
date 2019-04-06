@@ -1,4 +1,4 @@
-package io.gamestd;
+package io.colyseus.serializer.fossil_delta;
 import haxe.io.Bytes;
 
 class FossilDelta {

@@ -12,15 +12,15 @@ import io.colyseus.Room;
 class Main extends Sprite {
 
 	private var client: Client;
-	private var room: Room;
+	private var room: Room<Dynamic>;
 
 	private var cats: Map<String, Sprite> = new Map();
 
 	public function new () {
 		super ();
 
-		this.client = new Client("ws://0.0.0.0:2567");
-		// this.client = new Client("ws://colyseus-examples.herokuapp.com");
+		// this.client = new Client("ws://0.0.0.0:2567");
+		this.client = new Client("ws://colyseus-examples.herokuapp.com");
 		this.room = this.client.join("state_handler");
 
 		// list available rooms for connection

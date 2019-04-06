@@ -1,6 +1,8 @@
 package io.colyseus;
 
+import io.colyseus.Room.IRoom;
 import haxe.io.Bytes;
+import haxe.Constraints.Constructible;
 import org.msgpack.MsgPack;
 
 interface RoomAvailable {
@@ -22,8 +24,8 @@ class Client {
 
     private var connection: Connection;
 
-    private var rooms: Map<String, Room> = new Map();
-    private var connectingRooms: Map<Int, Room> = new Map();
+    private var rooms: Map<String, IRoom> = new Map();
+    private var connectingRooms: Map<Int, IRoom> = new Map();
     private var requestId = 0;
     private var previousCode: Int = 0;
 
@@ -36,14 +38,15 @@ class Client {
         this.connect(this.id);
     }
 
-    public function join(roomName: String, ?options: Map<String, Dynamic>): Room {
+    @:generic
+    public function join<T:Constructible<Void->Void>>(roomName: String, ?options: Map<String, Dynamic>): Room<T> {
         if (options == null) {
             options = new Map();
         }
 
         options.set("requestId", ++this.requestId);
 
-        var room = new Room(roomName, options);
+        var room = new Room<T>(roomName, options);
 
         // remove references on leaving
         room.onLeave = function () {
@@ -58,9 +61,19 @@ class Client {
         return room;
     }
 
-    public function rejoin(roomName: String, sessionId: String) {
+
+    // public function join(roomName: String, ?options: Map<String, Dynamic>): Room {
+    //     return this.join<Dynamic>(roomName, options);
+    // }
+
+    @:generic
+    public function rejoin<T:Constructible<Void->Void>>(roomName: String, sessionId: String): Room<T> {
         return this.join(roomName, [ "sessionId" => sessionId ]);
     }
+
+    // public function rejoin(roomName: String, sessionId: String) {
+    //     return this.join<Dynamic>(roomName, [ "sessionId" => sessionId ]);
+    // }
 
     public function getAvailableRooms(roomName: String, callback: Array<RoomAvailable>->?String -> Void) {
         // reject this promise after 10 seconds.

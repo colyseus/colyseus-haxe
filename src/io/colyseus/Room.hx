@@ -2,9 +2,12 @@ package io.colyseus;
 
 import io.colyseus.serializer.Serializer;
 import io.colyseus.serializer.FossilDeltaSerializer;
+import io.colyseus.serializer.SchemaSerializer;
 
 import haxe.io.Bytes;
 import haxe.io.BytesBuffer;
+import haxe.Constraints.Constructible;
+
 import org.msgpack.MsgPack;
 
 /** 
@@ -21,7 +24,21 @@ typedef DataChange = { path: Dynamic, operation: String, value: Dynamic, ?rawPat
 typedef Listener = { callback: DataChange->Void, rules: List<EReg>, rawRules: Array<String> }
 #end
 
-class Room {
+interface IRoom {
+    public var id: String;
+    public var options: Dynamic;
+
+    public dynamic function onJoin(): Void;
+    public dynamic function onStateChange(newState: Dynamic): Void;
+    public dynamic function onMessage(data: Dynamic): Void;
+    public dynamic function onError(message: String): Void;
+    public dynamic function onLeave(): Void;
+
+    public function connect(connection: Connection): Void;
+}
+
+@:generic
+class Room<T:Constructible<Void->Void>> implements IRoom {
     public var id: String;
     public var sessionId: String;
 
@@ -92,7 +109,7 @@ class Room {
         }
     }
 
-    public var state (get, null): Dynamic;
+    public var state (get, null): T;
     function get_state () {
         return this.serializer.getState();
     }
@@ -135,6 +152,10 @@ class Room {
 
                 this.serializerId = data.getString(2, data.get(1));
                 offset += this.serializerId.length + 1;
+
+                if (this.serializerId == "schema") {
+                    this.serializer = new SchemaSerializer<T>();
+                }
 
                 if (data.length > offset) {
                     this.serializer.handshake(data, offset);
