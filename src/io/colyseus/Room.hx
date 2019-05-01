@@ -18,6 +18,7 @@ typedef Listener = {
 }
 typedef DataChange = { path: Dynamic, operation: String, value: Dynamic, ?rawPath: Array<String> }
 #else
+typedef DataChange = { path: Dynamic, operation: String, value: Dynamic, ?rawPath: Array<String> }
 typedef Listener = { callback: DataChange->Void, rules: List<EReg>, rawRules: Array<String> }
 #end
 
