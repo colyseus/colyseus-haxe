@@ -14,7 +14,7 @@ import haxe.net.WebSocket.ReadyState;
     #elseif cpp
         import cpp.vm.Thread;
     #end
-#else
+#elseif sys
     import sys.thread.Thread;
 #end
 
@@ -62,10 +62,11 @@ class Connection {
             while (true) {
                 this.ws.process();
 
-                if (this.ws.readyState == ReadyState.Closed) {
-                    trace("WebSocket connection has been closed, stopping the thread!");
-                    break;
-                }
+                trace("readyState => " + this.ws.readyState);
+                // if (this.ws.readyState == ReadyState.Closed) {
+                //     trace("WebSocket connection has been closed, stopping the thread!");
+                //     break;
+                // }
 
                 Sys.sleep(.01);
             }
@@ -75,6 +76,8 @@ class Connection {
 
     public function send(data: Dynamic) {
         if (this.ws.readyState == ReadyState.Open) {
+            trace("SEND:");
+            trace(MsgPack.encode(data));
             return this.ws.sendBytes( MsgPack.encode(data) );
 
         } else {

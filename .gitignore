@@ -1,3 +1,4 @@
 /tests/bin
-/example/NyanCat/Export
+/example/openfl/Export
+/example/flixel/export
 .DS_Store

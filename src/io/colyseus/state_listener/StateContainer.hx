@@ -62,24 +62,45 @@ class StateContainer {
         var listener: Listener = {
             callback: callback,
             rawRules: rawRules,
+#if haxe4
+            rules: rawRules.map(function(segment) {
+              if (Std.is(segment, String)) {
+                  // replace placeholder matchers
+                  if (segment.indexOf(":") == 0) {
+                      var matcher = this.matcherPlaceholders.get(segment);
+
+                      if (matcher == null) {
+                          matcher = this.matcherPlaceholders.get(":*");
+                      }
+
+                      return matcher;
+                  } else {
+                      return new EReg('^' + segment + '$', "m");
+                  }
+              } else {
+                  return cast(segment, EReg);
+              }
+          })
+#else
             rules: Lambda.map(rawRules, function(segment) {
-                if (Std.is(segment, String)) {
-                    // replace placeholder matchers
-                    if (segment.indexOf(":") == 0) {
-                        var matcher = this.matcherPlaceholders.get(segment);
+              if (Std.is(segment, String)) {
+                  // replace placeholder matchers
+                  if (segment.indexOf(":") == 0) {
+                      var matcher = this.matcherPlaceholders.get(segment);
 
-                        if (matcher == null) {
-                            matcher = this.matcherPlaceholders.get(":*");
-                        }
+                      if (matcher == null) {
+                          matcher = this.matcherPlaceholders.get(":*");
+                      }
 
-                        return matcher;
-                    } else {
-                        return new EReg('^' + segment + '$', "m");
-                    }
-                } else {
-                    return cast(segment, EReg);
-                }
-            })
+                      return matcher;
+                  } else {
+                      return new EReg('^' + segment + '$', "m");
+                  }
+              } else {
+                  return cast(segment, EReg);
+              }
+          })
+#end
         };
 
         if (rawRules.length == 0) {

@@ -2,18 +2,17 @@ package io.colyseus.serializer;
 
 import io.colyseus.serializer.schema.Schema;
 import haxe.io.Bytes;
-import haxe.Constraints.Constructible;
 
 @:generic
-class SchemaSerializer<T:Constructible<Void->Void>> implements Serializer {
-    public var state: Dynamic;
+class SchemaSerializer<T> implements Serializer {
+    public var state: T;
 
-    public function new () {
-        this.state = new T();
+    public function new (cl: Class<T>) {
+        this.state = Type.createInstance(cl, []);
     }
 
     public function setState(data: Bytes) {
-        this.state.decode(data);
+        cast(this.state, Schema).decode(data);
     }
 
     public function getState(): T {
@@ -21,7 +20,7 @@ class SchemaSerializer<T:Constructible<Void->Void>> implements Serializer {
     }
 
     public function patch(data: Bytes) {
-        this.state.decode(data);
+        cast(this.state, Schema).decode(data);
     }
 
     public function teardown() {

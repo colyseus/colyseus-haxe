@@ -1,8 +1,9 @@
 package io.colyseus;
 
 import io.colyseus.Room.IRoom;
+import io.colyseus.Room.RoomFossilDelta;
+
 import haxe.io.Bytes;
-import haxe.Constraints.Constructible;
 import org.msgpack.MsgPack;
 
 interface RoomAvailable {
@@ -11,6 +12,8 @@ interface RoomAvailable {
     public var maxClients: Int;
     public var metadata: Dynamic;
 }
+
+class DummyState {}
 
 @:keep
 class Client {
@@ -26,7 +29,7 @@ class Client {
 
     private var rooms: Map<String, IRoom> = new Map();
     private var connectingRooms: Map<Int, IRoom> = new Map();
-    private var requestId = 0;
+    private var requestId: UInt = 0;
     private var previousCode: Int = 0;
 
     private var roomsAvailableRequests: Map<Int, Array<RoomAvailable> -> Void> = new Map();
@@ -39,14 +42,14 @@ class Client {
     }
 
     @:generic
-    public function join<T:Constructible<Void->Void>>(roomName: String, ?options: Map<String, Dynamic>): Room<T> {
+    public function join<T>(roomName: String, ?options: Map<String, Dynamic>, ?cls: Class<T>): Room<T> {
         if (options == null) {
-            options = new Map();
+            options = new Map<String, Dynamic>();
         }
 
         options.set("requestId", ++this.requestId);
 
-        var room = new Room<T>(roomName, options);
+        var room: Room<T> = new Room<T>(roomName, options, cls);
 
         // remove references on leaving
         room.onLeave = function () {
@@ -61,19 +64,36 @@ class Client {
         return room;
     }
 
-
-    // public function join(roomName: String, ?options: Map<String, Dynamic>): Room {
-    //     return this.join<Dynamic>(roomName, options);
-    // }
-
     @:generic
-    public function rejoin<T:Constructible<Void->Void>>(roomName: String, sessionId: String): Room<T> {
-        return this.join(roomName, [ "sessionId" => sessionId ]);
+    public function rejoin<T>(roomName: String, sessionId: String, cls: Class<T>): Room<T> {
+        return this.join(roomName, [ "sessionId" => sessionId ], cls);
     }
 
-    // public function rejoin(roomName: String, sessionId: String) {
-    //     return this.join<Dynamic>(roomName, [ "sessionId" => sessionId ]);
-    // }
+    /* TODO: remove this on 1.0.0 */
+    public function joinFossilDelta(roomName: String, ?options: Map<String, Dynamic>) {
+        if (options == null) {
+            options = new Map();
+        }
+        options.set("requestId", ++this.requestId);
+
+        var room = new RoomFossilDelta(roomName, options);
+
+        // remove references on leaving
+        room.onLeave = function () {
+            this.rooms.remove(room.id);
+            this.connectingRooms.remove(options.get("requestId"));
+        };
+
+        this.connectingRooms.set(options.get("requestId"), room);
+        this.connection.send([Protocol.JOIN_REQUEST, roomName, options]);
+
+        return room;
+    }
+
+    /* TODO: remove this on 1.0.0 */
+    public function rejoinFossilDelta(roomName: String, sessionId: String) {
+        return this.joinFossilDelta(roomName, [ "sessionId" => sessionId ]);
+    }
 
     public function getAvailableRooms(roomName: String, callback: Array<RoomAvailable>->?String -> Void) {
         // reject this promise after 10 seconds.

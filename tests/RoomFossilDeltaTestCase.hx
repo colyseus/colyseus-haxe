@@ -1,12 +1,11 @@
 import io.colyseus.Room;
-
 import org.msgpack.MsgPack;
 
-class RoomTestCase extends haxe.unit.TestCase {
-    var room: Room;
+class RoomFossilDeltaTestCase extends haxe.unit.TestCase {
+    var room: RoomFossilDelta;
 
     override public function setup() {
-        room = new Room("chat");
+        room = new RoomFossilDelta("chat");
     }
 
     public function testInitialize() {
@@ -23,7 +22,7 @@ class RoomTestCase extends haxe.unit.TestCase {
             assertEquals(Std.string(Reflect.fields(data)), '[messages]');
             assertEquals(Std.string(data.messages), '[]');
         }
-        room.setState(MsgPack.encode({ messages: [] }), 0, 0);
+        room.setState(MsgPack.encode({ messages: [] }));
     }
 
 }
