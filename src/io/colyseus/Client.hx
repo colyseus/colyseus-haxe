@@ -165,7 +165,13 @@ class Client {
                 room.id = data.getString(3, data.get(2));
                 this.rooms.set(room.id, room);
 
-                room.connect(this.createConnection(room.id, room.options));
+                var processPath = "";
+                var nextIndex = 3 + room.id.length;
+                if (data.length > nextIndex) {
+                    processPath = data.getString(nextIndex + 1, data.get(nextIndex)) + "/";
+                }
+
+                room.connect(this.createConnection(processPath + room.id, room.options));
                 this.connectingRooms.remove(requestId);
 
             } else if (code == Protocol.JOIN_ERROR) {
