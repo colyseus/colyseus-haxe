@@ -36,7 +36,7 @@ git clone https://github.com/colyseus/colyseus-hx.git
 cd colyseus-hx/example/NyanCat
 haxelib install openfl
 haxelib install lime
-haxelib install haxe-ws
+haxelib git haxe-ws https://github.com/colyseus/haxe-ws.git
 haxelib run lime build project.xml html5
 ```
 
@@ -44,7 +44,7 @@ You can see the demo project [live here](http://colyseus.io/colyseus-hx/).
 
 ## Dependencies
 
-[colyseus-hx](https://github.com/colyseus/colyseus-hx) depends on [haxe-ws](https://github.com/soywiz/haxe-ws)
+[colyseus-hx](https://github.com/colyseus/colyseus-hx) depends on [@colyseus/haxe-ws](https://github.com/colyseus/haxe-ws)
 
 ## License
 
