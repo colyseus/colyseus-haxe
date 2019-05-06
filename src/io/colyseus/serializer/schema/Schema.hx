@@ -361,6 +361,15 @@ class ArraySchema<T> {
     this.items[key] = value;
     return value;
   }
+
+  public function toString () {
+    var data = [];
+    for (item in this.items) {
+      data.push(""+item);
+    }
+    return "ArraySchema("+Lambda.count(this.items)+") { " + data.join(", ") + " } ";
+  }
+
 }
 
 @:generic
@@ -404,6 +413,14 @@ class MapSchema<T> {
   public inline function arrayWrite(key:String, value:T):T {
     this.items[key] = value;
     return value;
+  }
+
+  public function toString () {
+    var data = [];
+    for (key in this.items.keys()) {
+      data.push(key + " => " + this.items[key]);
+    }
+    return "MapSchema ("+ Lambda.count(this.items) +") { " + data.join(", ") + " }";
   }
 }
 
@@ -646,6 +663,16 @@ class Schema {
     if (changes.length > 0) {
       this.onChange(changes);
     }
+  }
+
+  public function toString () {
+    var data = [];
+
+    for (field in this._indexes) {
+      data.push(field + " => " + Reflect.getProperty(this, field));
+    }
+
+    return "{ " + data.join(", ") + " }";
   }
 }
 
