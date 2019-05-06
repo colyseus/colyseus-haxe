@@ -92,30 +92,35 @@ class Main extends Sprite {
 		}
 
 
-		// this.room.listen("players/:id", function(change) {
-		// 	if (change.operation == "add") {
-		// 		var cat = Assets.getMovieClip("library:NyanCatAnimation");
-		// 		this.cats[change.path.id] = cat;
-		// 		cat.x = change.value.x;
-		// 		cat.y = change.value.y;
-		// 		addChild(cat);
-		// 	} else if (change.operation == "remove") {
-		// 		removeChild(this.cats[change.path.id]);
-		// 	}
-		// }, true);
+    /*
+    //
+    // Using Fossil Delta serializer
+    //
+    this.room.listen("players/:id", function(change) {
+			if (change.operation == "add") {
+				var cat = Assets.getMovieClip("library:NyanCatAnimation");
+				this.cats[change.path.id] = cat;
+				cat.x = change.value.x;
+				cat.y = change.value.y;
+				addChild(cat);
+			} else if (change.operation == "remove") {
+				removeChild(this.cats[change.path.id]);
+			}
+		}, true);
 
-		// this.room.listen("players/:id/:axis", function(change) {
-		// 	if (this.cats.get(change.path.id) == null) {
-		// 		trace("CAT DONT EXIST: " + change.path.id);
-		// 		return;
-		// 	}
+		this.room.listen("players/:id/:axis", function(change) {
+			if (this.cats.get(change.path.id) == null) {
+				trace("CAT DONT EXIST: " + change.path.id);
+				return;
+			}
 
-		// 	if (change.path.axis == "x") {
-		// 		this.cats[change.path.id].x = change.value;
-		// 	} else if (change.path.axis == "y") {
-		// 		this.cats[change.path.id].y = change.value;
-		// 	}
-		// });
+			if (change.path.axis == "x") {
+				this.cats[change.path.id].x = change.value;
+			} else if (change.path.axis == "y") {
+				this.cats[change.path.id].y = change.value;
+			}
+		});
+    */
 
 		stage.addEventListener(KeyboardEvent.KEY_DOWN, onKeyDown);
 		stage.addEventListener(KeyboardEvent.KEY_UP, onKeyUp);

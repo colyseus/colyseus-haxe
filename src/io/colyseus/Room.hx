@@ -135,6 +135,8 @@ class Room<T> implements IRoom {
 
                 if (this.serializerId == "schema") {
                     this.serializer = new SchemaSerializer<T>(tmpStateClass);
+                } else {
+                    throw "use joinFossilDelta() if you're using Fossil Delta serializer.";
                 }
 
                 if (data.length > offset) {
