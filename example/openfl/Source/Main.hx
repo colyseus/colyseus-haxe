@@ -11,30 +11,30 @@ import io.colyseus.Room;
 class Main extends Sprite {
 	private var client:Client;
 	private var room:Room<State>;
+
 	private var cats:Map<String, Sprite> = new Map();
 
 	public function new() {
 		super();
 
+		// this.client = new Client("ws://192.168.0.5:2567");
 		this.client = new Client("ws://localhost:2567");
+		// this.client = new Client("wss://colyseus-examples.herokuapp.com");
 
-		// this.client = new Client("ws://colyseus-examples.herokuapp.com");
-		this.room = this.client.join("state_handler", [], State);
-
-		// // list available rooms for connection
-		// haxe.Timer.delay(function() {
-		// 	this.client.getAvailableRooms("state_handler", function(rooms, ?err) {
-		// 		if (err != null)
-		// 			trace("ERROR! " + err);
-		// 		for (room in rooms) {
-		// 			trace("RoomAvailable:");
-		// 			trace("roomId: " + room.roomId);
-		// 			trace("clients: " + room.clients);
-		// 			trace("maxClients: " + room.maxClients);
-		// 			trace("metadata: " + room.metadata);
-		// 		}
-		// 	});
-		// }, 3000);
+		// list available rooms for connection
+		haxe.Timer.delay(function() {
+			this.client.getAvailableRooms("state_handler", function(rooms, ?err) {
+				if (err != null)
+					trace("ERROR! " + err);
+				for (room in rooms) {
+					trace("RoomAvailable:");
+					trace("roomId: " + room.roomId);
+					trace("clients: " + room.clients);
+					trace("maxClients: " + room.maxClients);
+					trace("metadata: " + room.metadata);
+				}
+			});
+		}, 3000);
 
 		/**
 		 * Client callbacks
@@ -51,14 +51,28 @@ class Main extends Sprite {
 			trace("CLIENT ERROR: " + message);
 		};
 
+		this.room = this.client.join("state_handler", [], State);
+
 		/**
 		 * Room callbacks
 		 */
 		this.room.onJoin = function() {
-			trace("JOINED ROOM");
-      // this.room.state.players.onAdd = function(player, key) {
-      //   trace("PLAYER ADDED AT " + key);
-      // }
+      this.room.state.players.onAdd = function(player, key) {
+        var cat = Assets.getMovieClip("library:NyanCatAnimation");
+        this.cats[key] = cat;
+        cat.x = player.x;
+        cat.y = player.y;
+        addChild(cat);
+      }
+
+      this.room.state.players.onChange = function(player, key) {
+        this.cats[key].x = player.x;
+        this.cats[key].y = player.y;
+      }
+
+      this.room.state.players.onRemove = function(player, key) {
+        removeChild(this.cats[key]);
+      }
 		};
 
 		this.room.onStateChange = function(state) {

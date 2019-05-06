@@ -130,7 +130,7 @@ class Room<T> implements IRoom {
                 this.sessionId = data.getString(offset + 1, data.get(offset));
                 offset += this.sessionId.length + 1;
 
-                this.serializerId = data.getString(2, data.get(1));
+                this.serializerId = data.getString(offset + 1, data.get(offset));
                 offset += this.serializerId.length + 1;
 
                 if (this.serializerId == "schema") {
