@@ -523,7 +523,7 @@ class Schema {
             hasIndexChange = true;
           }
 
-          var isNew:Bool = (!hasIndexChange && !value.items[newIndex]) || (hasIndexChange && indexChangedFrom == -1);
+          var isNew:Bool = (!hasIndexChange && value.items[newIndex] == null) || (hasIndexChange && indexChangedFrom == -1);
 
           if (isSchemaType) {
             var item:Schema = null;
@@ -561,12 +561,12 @@ class Schema {
             valueRef.onChange(value.items[newIndex], newIndex);
           }
 
-          change.push(value[newIndex]);
+          change.push(value.items[newIndex]);
         }
 
       } else if (type == "map") {
         var isSchemaType = this._childSchemaTypes.exists(index);
-        type = (isSchemaType) ? this._childSchemaTypes[index] : this._childPrimitiveTypes[index];
+        type = (isSchemaType) ? this._childSchemaTypes.get(index) : this._childPrimitiveTypes.get(index);
 
         value = Reflect.getProperty(this, field);
         if (value == null) {
