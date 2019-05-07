@@ -467,7 +467,7 @@ class Schema {
           value = null;
 
         } else {
-          var constructor:Class<Schema> = this._childSchemaTypes[index];
+          var constructor:Class<Schema> = this._childSchemaTypes.get(index);
           value = Reflect.getProperty(this, field);
           if (value == null) {
             value = Type.createInstance(constructor, []);
@@ -480,7 +480,7 @@ class Schema {
       } else if (type == "array") {
         var isSchemaType = this._childSchemaTypes.exists(index);
 
-        type = (isSchemaType) ? this._childSchemaTypes[index] : this._childPrimitiveTypes[index];
+        type = (isSchemaType) ? this._childSchemaTypes.get(index) : this._childPrimitiveTypes.get(index);
         change = [];
 
         value = Reflect.getProperty(this, field);
@@ -523,7 +523,7 @@ class Schema {
             hasIndexChange = true;
           }
 
-          var isNew:Bool = (!hasIndexChange && !value[newIndex]) || (hasIndexChange && indexChangedFrom == -1);
+          var isNew:Bool = (!hasIndexChange && !value.items[newIndex]) || (hasIndexChange && indexChangedFrom == -1);
 
           if (isSchemaType) {
             var item:Schema = null;
