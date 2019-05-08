@@ -34,7 +34,7 @@ interface IRoom {
     public var onMessage(get,null):Signal<Any>;
     public var onError(get,null):Signal<String>;
     public var onLeave(get,null):Signal<Noise>;
-    function clearSignals():Void;
+    private function clearSignals():Void;
 
     public function connect(connection: Connection): Void;
 }
