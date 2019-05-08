@@ -328,6 +328,7 @@ class DataChange {
   }
 }
 
+@:keep
 @:generic
 class ArraySchema<T> {
   public var items:Array<T> = [];
@@ -372,6 +373,7 @@ class ArraySchema<T> {
 
 }
 
+@:keep
 @:generic
 class MapSchema<T> {
   public var items:Map<String, T> = new Map<String, T>();
