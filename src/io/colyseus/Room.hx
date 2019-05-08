@@ -25,14 +25,6 @@ typedef DataChange = { path: Dynamic, operation: String, value: Dynamic, ?rawPat
 typedef Listener = { callback: DataChange->Void, rules: List<EReg>, rawRules: Array<String> }
 #end
 
-enum RoomSignal {
-	JOIN;
-	STATE_CHANGE(data:Any);
-	MESSAGE(data:Any);
-	ERROR(message:String);
-	LEAVE;
-}
-
 interface IRoom {
     public var id: String;
     public var options: Dynamic;
