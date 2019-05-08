@@ -29,14 +29,14 @@ interface IRoom {
     public var id: String;
     public var options: Dynamic;
 
-	public var onJoin(get,null):Signal<Noise>;
-	public var onStateChange(get,null):Signal<Any>;
-	public var onMessage(get,null):Signal<Any>;
-	public var onError(get,null):Signal<String>;
-	public var onLeave(get,null):Signal<Noise>;
+    public var onJoin(get,null):Signal<Noise>;
+    public var onStateChange(get,null):Signal<Any>;
+    public var onMessage(get,null):Signal<Any>;
+    public var onError(get,null):Signal<String>;
+    public var onLeave(get,null):Signal<Noise>;
+    function clearSignals():Void;
 
     public function connect(connection: Connection): Void;
-	public function dispose():Void;
 }
 
 @:tink class Room<T> implements IRoom {
@@ -46,11 +46,11 @@ interface IRoom {
     public var name: String;
     public var options: Dynamic;
 
-	@:signal var onJoin:Noise;
-	@:signal var onStateChange:Any;
-	@:signal var onMessage:Any;
-	@:signal var onError:String;
-	@:signal var onLeave:Noise;
+    @:signal var onJoin:Noise;
+    @:signal var onStateChange:Any;
+    @:signal var onMessage:Any;
+    @:signal var onError:String;
+    @:signal var onLeave:Noise;
 
     public var connection: Connection;
 
@@ -114,6 +114,7 @@ interface IRoom {
     }
 
     public function teardown() {
+		clearSignals();
         this.serializer.teardown();
     }
 
@@ -162,7 +163,7 @@ interface IRoom {
                 this.patch(data);
 
             } else if (this.previousCode == Protocol.ROOM_DATA) {
-				_onMessage.trigger(MsgPack.decode(data));
+                _onMessage.trigger(MsgPack.decode(data));
             }
 
             this.previousCode = 0;
@@ -171,21 +172,21 @@ interface IRoom {
 
     public function setState(encodedState: Bytes) {
         this.serializer.setState(encodedState);
-		_onStateChange.trigger(this.serializer.getState());
+        _onStateChange.trigger(this.serializer.getState());
     }
 
     private function patch(binaryPatch: Bytes) {
         this.serializer.patch(binaryPatch);
-		_onStateChange.trigger(this.serializer.getState());
+        _onStateChange.trigger(this.serializer.getState());
     }
 
-	public function dispose() {
-		_onLeave.clear();
-		_onStateChange.clear();
-		_onError.clear();
-		_onJoin.clear();
-		_onMessage.clear();
-	}
+    function clearSignals() {
+        _onLeave.clear();
+        _onStateChange.clear();
+        _onError.clear();
+        _onJoin.clear();
+        _onMessage.clear();
+    }
 }
 
 /** TODO: remove me on 1.0.0 **/
@@ -198,10 +199,10 @@ interface IRoom {
 
     // callbacks
     @:signal var onJoin:Noise;
-	@:signal var onStateChange:Any;
-	@:signal var onMessage:Any;
-	@:signal var onError:String;
-	@:signal var onLeave:Noise;
+    @:signal var onStateChange:Any;
+    @:signal var onMessage:Any;
+    @:signal var onError:String;
+    @:signal var onLeave:Noise;
 
     public var connection: Connection;
 
@@ -266,12 +267,8 @@ interface IRoom {
     }
 
     public function teardown() {
+        clearSignals();
         this.serializer.teardown();
-        // this.onJoin.removeAll();
-        // this.onStateChange.removeAll();
-        // this.onMessage.removeAll();
-        // this.onError.removeAll();
-        // this.onLeave.removeAll();
     }
 
     // fossil-delta serializer
@@ -351,11 +348,11 @@ interface IRoom {
         _onStateChange.trigger(this.serializer.getState());
     }
 
-	public function dispose() {
-		_onLeave.clear();
-		_onStateChange.clear();
-		_onError.clear();
-		_onJoin.clear();
-		_onMessage.clear();
-	}
+    function clearSignals() {
+        _onLeave.clear();
+        _onStateChange.clear();
+        _onError.clear();
+        _onJoin.clear();
+        _onMessage.clear();
+    }
 }

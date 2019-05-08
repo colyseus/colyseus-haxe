@@ -53,7 +53,6 @@ class Client {
 
         // remove references on leaving
         room.onLeave.nextTime().handle(function () {
-			room.dispose();
             this.rooms.remove(room.id);
             this.connectingRooms.remove(options.get("requestId"));
         });
@@ -81,7 +80,6 @@ class Client {
 
         // remove references on leaving
         room.onLeave.nextTime().handle(function () {
-			room.dispose();
             this.rooms.remove(room.id);
             this.connectingRooms.remove(options.get("requestId"));
         });
