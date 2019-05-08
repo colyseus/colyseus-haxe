@@ -52,10 +52,11 @@ class Client {
         var room: Room<T> = new Room<T>(roomName, options, cls);
 
         // remove references on leaving
-        room.onLeave = function () {
+        room.onLeave.nextTime().handle(function () {
+			room.dispose();
             this.rooms.remove(room.id);
             this.connectingRooms.remove(options.get("requestId"));
-        };
+        });
 
         this.connectingRooms.set(options.get("requestId"), room);
 
@@ -79,10 +80,11 @@ class Client {
         var room = new RoomFossilDelta(roomName, options);
 
         // remove references on leaving
-        room.onLeave = function () {
+        room.onLeave.nextTime().handle(function () {
+			room.dispose();
             this.rooms.remove(room.id);
             this.connectingRooms.remove(options.get("requestId"));
-        };
+        });
 
         this.connectingRooms.set(options.get("requestId"), room);
         this.connection.send([Protocol.JOIN_REQUEST, roomName, options]);

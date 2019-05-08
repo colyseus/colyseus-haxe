@@ -9,6 +9,8 @@
   "releasenote": "Initial release, everything is working correctly.",
   "contributors": ["endel"],
   "dependencies": {
-    "haxe-ws": "1.0.5"
+	"haxe-ws": "1.0.5",
+	"tink-core": "1.19.0",
+	"tink-lang": "0.6.1"
   }
 }

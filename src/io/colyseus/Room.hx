@@ -8,6 +8,8 @@ import haxe.io.Bytes;
 
 import org.msgpack.MsgPack;
 
+using tink.CoreApi;
+
 /**
  * TODO: import typedef's from `io.colyseus.serializer`?
  */
@@ -23,32 +25,40 @@ typedef DataChange = { path: Dynamic, operation: String, value: Dynamic, ?rawPat
 typedef Listener = { callback: DataChange->Void, rules: List<EReg>, rawRules: Array<String> }
 #end
 
+enum RoomSignal {
+	JOIN;
+	STATE_CHANGE(data:Any);
+	MESSAGE(data:Any);
+	ERROR(message:String);
+	LEAVE;
+}
+
 interface IRoom {
     public var id: String;
     public var options: Dynamic;
 
-    public dynamic function onJoin(): Void;
-    public dynamic function onStateChange(newState: Dynamic): Void;
-    public dynamic function onMessage(data: Dynamic): Void;
-    public dynamic function onError(message: String): Void;
-    public dynamic function onLeave(): Void;
+	public var onJoin(get,null):Signal<Noise>;
+	public var onStateChange(get,null):Signal<Any>;
+	public var onMessage(get,null):Signal<Any>;
+	public var onError(get,null):Signal<String>;
+	public var onLeave(get,null):Signal<Noise>;
 
     public function connect(connection: Connection): Void;
+	public function dispose():Void;
 }
 
-class Room<T> implements IRoom {
+@:tink class Room<T> implements IRoom {
     public var id: String;
     public var sessionId: String;
 
     public var name: String;
     public var options: Dynamic;
 
-    // callbacks
-    public dynamic function onJoin(): Void {}
-    public dynamic function onStateChange(newState: Dynamic): Void {}
-    public dynamic function onMessage(data: Dynamic): Void {}
-    public dynamic function onError(message: String): Void {}
-    public dynamic function onLeave(): Void {}
+	@:signal var onJoin:Noise;
+	@:signal var onStateChange:Any;
+	@:signal var onMessage:Any;
+	@:signal var onError:String;
+	@:signal var onLeave:Noise;
 
     public var connection: Connection;
 
@@ -75,12 +85,12 @@ class Room<T> implements IRoom {
 
         this.connection.onClose = function () {
             this.teardown();
-            this.onLeave();
+            _onLeave.trigger(Noise);
         }
 
         this.connection.onError = function (e) {
             trace("Possible causes: room's onAuth() failed or maxClients has been reached.");
-            this.onError(e);
+            _onError.trigger(e);
         };
     }
 
@@ -96,7 +106,7 @@ class Room<T> implements IRoom {
             }
 
         } else {
-            this.onLeave();
+            _onLeave.trigger(Noise);
         }
     }
 
@@ -113,11 +123,6 @@ class Room<T> implements IRoom {
 
     public function teardown() {
         this.serializer.teardown();
-        // this.onJoin.removeAll();
-        // this.onStateChange.removeAll();
-        // this.onMessage.removeAll();
-        // this.onError.removeAll();
-        // this.onLeave.removeAll();
     }
 
     private function onMessageCallback(data: Bytes) {
@@ -143,12 +148,12 @@ class Room<T> implements IRoom {
                     this.serializer.handshake(data, offset);
                 }
 
-                this.onJoin();
+                _onJoin.trigger(Noise);
 
             } else if (code == Protocol.JOIN_ERROR) {
                 var err = data.getString(2, data.get(1));
                 trace("Error: " + err);
-                this.onError(err);
+                _onError.trigger(err);
 
             } else if (code == Protocol.LEAVE_ROOM) {
                 this.leave();
@@ -165,7 +170,7 @@ class Room<T> implements IRoom {
                 this.patch(data);
 
             } else if (this.previousCode == Protocol.ROOM_DATA) {
-                this.onMessage(MsgPack.decode(data));
+				_onMessage.trigger(MsgPack.decode(data));
             }
 
             this.previousCode = 0;
@@ -174,17 +179,25 @@ class Room<T> implements IRoom {
 
     public function setState(encodedState: Bytes) {
         this.serializer.setState(encodedState);
-        this.onStateChange(this.serializer.getState());
+		_onStateChange.trigger(this.serializer.getState());
     }
 
     private function patch(binaryPatch: Bytes) {
         this.serializer.patch(binaryPatch);
-        this.onStateChange(this.serializer.getState());
+		_onStateChange.trigger(this.serializer.getState());
     }
+
+	public function dispose() {
+		_onLeave.clear();
+		_onStateChange.clear();
+		_onError.clear();
+		_onJoin.clear();
+		_onMessage.clear();
+	}
 }
 
 /** TODO: remove me on 1.0.0 **/
-class RoomFossilDelta implements IRoom {
+@:tink class RoomFossilDelta implements IRoom {
     public var id: String;
     public var sessionId: String;
 
@@ -192,11 +205,11 @@ class RoomFossilDelta implements IRoom {
     public var options: Dynamic;
 
     // callbacks
-    public dynamic function onJoin(): Void {}
-    public dynamic function onStateChange(newState: Dynamic): Void {}
-    public dynamic function onMessage(data: Dynamic): Void {}
-    public dynamic function onError(message: String): Void {}
-    public dynamic function onLeave(): Void {}
+    @:signal var onJoin:Noise;
+	@:signal var onStateChange:Any;
+	@:signal var onMessage:Any;
+	@:signal var onError:String;
+	@:signal var onLeave:Noise;
 
     public var connection: Connection;
 
@@ -224,12 +237,12 @@ class RoomFossilDelta implements IRoom {
 
         this.connection.onClose = function () {
             this.teardown();
-            this.onLeave();
+            _onLeave.trigger(Noise);
         }
 
         this.connection.onError = function (e) {
             trace("Possible causes: room's onAuth() failed or maxClients has been reached.");
-            this.onError(e);
+            _onError.trigger(e);
         };
     }
 
@@ -245,7 +258,7 @@ class RoomFossilDelta implements IRoom {
             }
 
         } else {
-            this.onLeave();
+            _onLeave.trigger(Noise);
         }
     }
 
@@ -307,12 +320,12 @@ class RoomFossilDelta implements IRoom {
                     this.serializer.handshake(data, offset);
                 }
 
-                this.onJoin();
+                _onJoin.trigger(Noise);
 
             } else if (code == Protocol.JOIN_ERROR) {
                 var err = data.getString(2, data.get(1));
                 trace("Error: " + err);
-                this.onError(err);
+                _onError.trigger(err);
 
             } else if (code == Protocol.LEAVE_ROOM) {
                 this.leave();
@@ -329,7 +342,7 @@ class RoomFossilDelta implements IRoom {
                 this.patch(data);
 
             } else if (this.previousCode == Protocol.ROOM_DATA) {
-                this.onMessage(MsgPack.decode(data));
+                _onMessage.trigger(MsgPack.decode(data));
             }
 
             this.previousCode = 0;
@@ -338,11 +351,19 @@ class RoomFossilDelta implements IRoom {
 
     public function setState(encodedState: Bytes) {
         this.serializer.setState(encodedState);
-        this.onStateChange(this.serializer.getState());
+        _onStateChange.trigger(this.serializer.getState());
     }
 
     private function patch(binaryPatch: Bytes) {
         this.serializer.patch(binaryPatch);
-        this.onStateChange(this.serializer.getState());
+        _onStateChange.trigger(this.serializer.getState());
     }
+
+	public function dispose() {
+		_onLeave.clear();
+		_onStateChange.clear();
+		_onError.clear();
+		_onJoin.clear();
+		_onMessage.clear();
+	}
 }
