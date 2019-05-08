@@ -6,6 +6,8 @@ import io.colyseus.Room.RoomFossilDelta;
 import haxe.io.Bytes;
 import org.msgpack.MsgPack;
 
+using tink.CoreApi;
+
 interface RoomAvailable {
     public var roomId: String;
     public var clients: Int;
@@ -16,14 +18,14 @@ interface RoomAvailable {
 class DummyState {}
 
 @:keep
-class Client {
+@:tink class Client {
     public var id: String = "";
     public var endpoint: String;
 
     // callbacks
-    public dynamic function onOpen():Void {}
-    public dynamic function onClose():Void {}
-    public dynamic function onError(e: String):Void {}
+    @:signal var onOpen:Noise;
+    @:signal var onClose:Noise;
+    @:signal var onError:String;
 
     private var connection: Connection;
 
@@ -122,6 +124,12 @@ class Client {
         this.connection.close();
     }
 
+    public function clearSignals() {
+        _onOpen.clear();
+        _onError.clear();
+        _onClose.clear();
+    }
+
     private function connect(colyseusid: String) {
         this.id = colyseusid;
 
@@ -132,17 +140,17 @@ class Client {
         }
 
         this.connection.onClose = function () {
-            this.onClose();
+            _onClose.trigger(Noise);
         };
 
         this.connection.onError = function (e) {
-            this.onError(e);
+            _onError.trigger(e);
         };
 
         // check for id on cookie
         this.connection.onOpen = function () {
             if (this.id != "") {
-                this.onOpen();
+                _onOpen.trigger(Noise);
             }
         };
     }
@@ -171,7 +179,7 @@ class Client {
             if (code == Protocol.USER_ID) {
                 this.id = data.getString(2, data.get(1));
 
-                this.onOpen();
+                _onOpen.trigger(Noise);
 
             } else if (code == Protocol.JOIN_REQUEST) {
                 var requestId: Int = data.get(1);
@@ -199,7 +207,7 @@ class Client {
                 trace('colyseus.js: server error:' + err);
 
                 // general error
-                this.onError(err);
+                _onError.trigger(err);
 
             } else if (code == Protocol.ROOM_LIST) {
                 this.previousCode = code;
