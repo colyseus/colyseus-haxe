@@ -316,16 +316,10 @@ class Decoder {
   }
 }
 
-class DataChange {
-  public var field:String;
-  public var value:Dynamic;
-  public var previousValue:Dynamic;
-
-  public function new(field:String, value:Dynamic, previousValue:Dynamic) {
-    this.field = field;
-    this.value = value;
-    this.previousValue = previousValue;
-  }
+typedef DataChange = {
+  var field(default,never):String;
+  var value(default,never):Any;
+  var previousValue(default,never):Any;
 }
 
 @:keep
@@ -656,7 +650,11 @@ class Schema {
       }
 
       if (hasChange) {
-        changes.push(new DataChange(field, (change == null) ? value : change, Reflect.getProperty(this, field)));
+        changes.push({
+            field: field, 
+            value: (change == null) ? value : change,
+            previousValue: Reflect.getProperty(this, field)
+        });
       }
 
       Reflect.setField(this, field, cast value);
