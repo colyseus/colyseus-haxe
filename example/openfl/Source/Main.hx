@@ -58,6 +58,7 @@ class Main extends Sprite {
 		 */
 		this.room.onJoin = function() {
       this.room.state.players.onAdd = function(player, key) {
+        trace("PLAYER ADDED AT: ", key);
         var cat = Assets.getMovieClip("library:NyanCatAnimation");
         this.cats[key] = cat;
         cat.x = player.x;
@@ -66,11 +67,13 @@ class Main extends Sprite {
       }
 
       this.room.state.players.onChange = function(player, key) {
+        trace("PLAYER CHANGED AT: ", key);
         this.cats[key].x = player.x;
         this.cats[key].y = player.y;
       }
 
       this.room.state.players.onRemove = function(player, key) {
+        trace("PLAYER REMOVED AT: ", key);
         removeChild(this.cats[key]);
       }
 		};
