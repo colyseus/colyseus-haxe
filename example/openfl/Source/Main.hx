@@ -39,15 +39,15 @@ class Main extends Sprite {
 		/**
 		 * Client callbacks
 		 */
-		this.client.onOpen = function() {
+		this.client.onOpen += function() {
 			trace("CLIENT OPEN, id => " + this.client.id);
 		};
 
-		this.client.onClose = function() {
+		this.client.onClose += function() {
 			trace("CLIENT CLOSE");
 		};
 
-		this.client.onError = function(message) {
+		this.client.onError += function(message) {
 			trace("CLIENT ERROR: " + message);
 		};
 
@@ -56,7 +56,7 @@ class Main extends Sprite {
 		/**
 		 * Room callbacks
 		 */
-		this.room.onJoin = function() {
+		this.room.onJoin += function() {
       this.room.state.players.onAdd = function(player, key) {
         trace("PLAYER ADDED AT: ", key);
         var cat = Assets.getMovieClip("library:NyanCatAnimation");
@@ -78,19 +78,19 @@ class Main extends Sprite {
       }
 		};
 
-		this.room.onStateChange = function(state) {
+		this.room.onStateChange += function(state) {
 			trace("STATE CHANGE: " + Std.string(state));
 		};
 
-		this.room.onMessage = function(message) {
+		this.room.onMessage += function(message) {
 			trace("ROOM MESSAGE: " + Std.string(message));
 		};
 
-		this.room.onError = function(message) {
+		this.room.onError += function(message) {
 			trace("ROOM ERROR: " + message);
 		};
 
-		this.room.onLeave = function() {
+		this.room.onLeave += function() {
 			trace("ROOM LEAVE");
 		}
 

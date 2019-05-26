@@ -2,6 +2,7 @@ package io.colyseus;
 
 import io.colyseus.Room.IRoom;
 import io.colyseus.Room.RoomFossilDelta;
+using io.colyseus.events.EventHandler;
 
 import haxe.io.Bytes;
 import org.msgpack.MsgPack;
@@ -21,9 +22,9 @@ class Client {
     public var endpoint: String;
 
     // callbacks
-    public dynamic function onOpen():Void {}
-    public dynamic function onClose():Void {}
-    public dynamic function onError(e: String):Void {}
+    public var onOpen = new EventHandler<Void->Void>();
+    public var onClose = new EventHandler<Void->Void>();
+    public var onError = new EventHandler<String->Void>();
 
     private var connection: Connection;
 
@@ -52,7 +53,7 @@ class Client {
         var room: Room<T> = new Room<T>(roomName, options, cls);
 
         // remove references on leaving
-        room.onLeave = function () {
+        room.onLeave += function () {
             this.rooms.remove(room.id);
             this.connectingRooms.remove(options.get("requestId"));
         };
@@ -79,7 +80,7 @@ class Client {
         var room = new RoomFossilDelta(roomName, options);
 
         // remove references on leaving
-        room.onLeave = function () {
+        room.onLeave += function () {
             this.rooms.remove(room.id);
             this.connectingRooms.remove(options.get("requestId"));
         };
@@ -132,17 +133,17 @@ class Client {
         }
 
         this.connection.onClose = function () {
-            this.onClose();
+            this.onClose.dispatch();
         };
 
         this.connection.onError = function (e) {
-            this.onError(e);
+            this.onError.dispatch(e);
         };
 
         // check for id on cookie
         this.connection.onOpen = function () {
             if (this.id != "") {
-                this.onOpen();
+                this.onOpen.dispatch();
             }
         };
     }
@@ -171,7 +172,7 @@ class Client {
             if (code == Protocol.USER_ID) {
                 this.id = data.getString(2, data.get(1));
 
-                this.onOpen();
+                this.onOpen.dispatch();
 
             } else if (code == Protocol.JOIN_REQUEST) {
                 var requestId: Int = data.get(1);
@@ -199,7 +200,7 @@ class Client {
                 trace('colyseus.js: server error:' + err);
 
                 // general error
-                this.onError(err);
+                this.onError.dispatch(err);
 
             } else if (code == Protocol.ROOM_LIST) {
                 this.previousCode = code;

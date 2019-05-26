@@ -4,6 +4,8 @@ import io.colyseus.serializer.Serializer;
 import io.colyseus.serializer.FossilDeltaSerializer;
 import io.colyseus.serializer.SchemaSerializer;
 
+using io.colyseus.events.EventHandler;
+
 import haxe.io.Bytes;
 
 import org.msgpack.MsgPack;
@@ -27,11 +29,11 @@ interface IRoom {
     public var id: String;
     public var options: Dynamic;
 
-    public dynamic function onJoin(): Void;
-    public dynamic function onStateChange(newState: Dynamic): Void;
-    public dynamic function onMessage(data: Dynamic): Void;
-    public dynamic function onError(message: String): Void;
-    public dynamic function onLeave(): Void;
+    public var onJoin: EventHandler<Void->Void>;
+    public var onStateChange: EventHandler<Dynamic->Void>;
+    public var onMessage: EventHandler<Dynamic->Void>;
+    public var onError: EventHandler<String->Void>;
+    public var onLeave: EventHandler<Void->Void>;
 
     public function connect(connection: Connection): Void;
 }
@@ -44,11 +46,11 @@ class Room<T> implements IRoom {
     public var options: Dynamic;
 
     // callbacks
-    public dynamic function onJoin(): Void {}
-    public dynamic function onStateChange(newState: Dynamic): Void {}
-    public dynamic function onMessage(data: Dynamic): Void {}
-    public dynamic function onError(message: String): Void {}
-    public dynamic function onLeave(): Void {}
+    public var onJoin = new EventHandler<Void->Void>();
+    public var onStateChange = new EventHandler<Dynamic->Void>();
+    public var onMessage = new EventHandler<Dynamic->Void>();
+    public var onError = new EventHandler<String->Void>();
+    public var onLeave = new EventHandler<Void->Void>();
 
     public var connection: Connection;
 
@@ -75,12 +77,12 @@ class Room<T> implements IRoom {
 
         this.connection.onClose = function () {
             this.teardown();
-            this.onLeave();
+            this.onLeave.dispatch();
         }
 
         this.connection.onError = function (e) {
             trace("Possible causes: room's onAuth() failed or maxClients has been reached.");
-            this.onError(e);
+            this.onError.dispatch(e);
         };
     }
 
@@ -96,7 +98,7 @@ class Room<T> implements IRoom {
             }
 
         } else {
-            this.onLeave();
+            this.onLeave.dispatch();
         }
     }
 
@@ -143,12 +145,12 @@ class Room<T> implements IRoom {
                     this.serializer.handshake(data, offset);
                 }
 
-                this.onJoin();
+                this.onJoin.dispatch();
 
             } else if (code == Protocol.JOIN_ERROR) {
                 var err = data.getString(2, data.get(1));
                 trace("Error: " + err);
-                this.onError(err);
+                this.onError.dispatch(err);
 
             } else if (code == Protocol.LEAVE_ROOM) {
                 this.leave();
@@ -165,7 +167,7 @@ class Room<T> implements IRoom {
                 this.patch(data);
 
             } else if (this.previousCode == Protocol.ROOM_DATA) {
-                this.onMessage(MsgPack.decode(data));
+                this.onMessage.dispatch(MsgPack.decode(data));
             }
 
             this.previousCode = 0;
@@ -174,12 +176,12 @@ class Room<T> implements IRoom {
 
     public function setState(encodedState: Bytes) {
         this.serializer.setState(encodedState);
-        this.onStateChange(this.serializer.getState());
+        this.onStateChange.dispatch(this.serializer.getState());
     }
 
     private function patch(binaryPatch: Bytes) {
         this.serializer.patch(binaryPatch);
-        this.onStateChange(this.serializer.getState());
+        this.onStateChange.dispatch(this.serializer.getState());
     }
 }
 
@@ -192,11 +194,11 @@ class RoomFossilDelta implements IRoom {
     public var options: Dynamic;
 
     // callbacks
-    public dynamic function onJoin(): Void {}
-    public dynamic function onStateChange(newState: Dynamic): Void {}
-    public dynamic function onMessage(data: Dynamic): Void {}
-    public dynamic function onError(message: String): Void {}
-    public dynamic function onLeave(): Void {}
+    public var onJoin = new EventHandler<Void->Void>();
+    public var onStateChange = new EventHandler<Dynamic->Void>();
+    public var onMessage = new EventHandler<Dynamic->Void>();
+    public var onError = new EventHandler<String->Void>();
+    public var onLeave = new EventHandler<Void->Void>();
 
     public var connection: Connection;
 
@@ -224,12 +226,12 @@ class RoomFossilDelta implements IRoom {
 
         this.connection.onClose = function () {
             this.teardown();
-            this.onLeave();
+            this.onLeave.dispatch();
         }
 
         this.connection.onError = function (e) {
             trace("Possible causes: room's onAuth() failed or maxClients has been reached.");
-            this.onError(e);
+            this.onError.dispatch(e);
         };
     }
 
@@ -245,7 +247,7 @@ class RoomFossilDelta implements IRoom {
             }
 
         } else {
-            this.onLeave();
+            this.onLeave.dispatch();
         }
     }
 
@@ -307,12 +309,12 @@ class RoomFossilDelta implements IRoom {
                     this.serializer.handshake(data, offset);
                 }
 
-                this.onJoin();
+                this.onJoin.dispatch();
 
             } else if (code == Protocol.JOIN_ERROR) {
                 var err = data.getString(2, data.get(1));
                 trace("Error: " + err);
-                this.onError(err);
+                this.onError.dispatch(err);
 
             } else if (code == Protocol.LEAVE_ROOM) {
                 this.leave();
@@ -329,7 +331,7 @@ class RoomFossilDelta implements IRoom {
                 this.patch(data);
 
             } else if (this.previousCode == Protocol.ROOM_DATA) {
-                this.onMessage(MsgPack.decode(data));
+                this.onMessage.dispatch(MsgPack.decode(data));
             }
 
             this.previousCode = 0;
@@ -338,11 +340,11 @@ class RoomFossilDelta implements IRoom {
 
     public function setState(encodedState: Bytes) {
         this.serializer.setState(encodedState);
-        this.onStateChange(this.serializer.getState());
+        this.onStateChange.dispatch(this.serializer.getState());
     }
 
     private function patch(binaryPatch: Bytes) {
         this.serializer.patch(binaryPatch);
-        this.onStateChange(this.serializer.getState());
+        this.onStateChange.dispatch(this.serializer.getState());
     }
 }
