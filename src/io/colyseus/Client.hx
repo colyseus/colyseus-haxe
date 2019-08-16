@@ -70,12 +70,6 @@ class Client {
         this.request("POST", "/matchmake/" + method + "/" + roomName, haxe.Json.stringify(options), function(err, response) {
             if (err != null) { return callback(err, null); }
 
-            trace(response);
-            trace(response.room);
-            trace(response.room.processId);
-            trace(response.room.roomId);
-            trace(response.sessionId);
-
             var room: Room<T> = new Room<T>(roomName, stateClass);
             room.id = response.room.roomId;
             room.sessionId = response.sessionId;
@@ -88,14 +82,10 @@ class Client {
                 callback(null, room);
             };
 
-            trace("will attack handlers");
             room.onError += onError;
             room.onJoin += onJoin;
 
-            trace("will create connection");
-
             room.connect(this.createConnection(response.room.processId + "/" + room.id, ["sessionId" => room.sessionId]));
-            trace("created connection!");
         });
     }
 
@@ -130,9 +120,6 @@ class Client {
         };
 
         req.onData = function(json) {
-            trace("RESPONSE:");
-            trace("STATUS: " + responseStatus);
-            trace(json);
             var response = haxe.Json.parse(json);
 
             if (response.error) {
@@ -144,8 +131,6 @@ class Client {
         };
 
         req.onError = function(err) {
-            trace("onError");
-            trace(err);
             callback(err, null);
         };
 

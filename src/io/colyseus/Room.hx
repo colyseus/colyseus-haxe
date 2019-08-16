@@ -90,8 +90,6 @@ class Room<T> {
     }
 
     private function onMessageCallback(data: Bytes) {
-        trace('onMessageCallback');
-
         if (this.previousCode == 0) {
             var code = data.get(0);
 
