@@ -10,17 +10,14 @@ class ClientTestCase extends haxe.unit.TestCase {
 
     public function testJoinRoom() {
         var client = new Client(endpoint);
-        client.onOpen = function () {
-            trace("OPEN!");
-        }
 
-        var room = client.join("chat", ["create" => true]);
-        room.onJoin = function() {
-            trace("JOINED!");
-        }
-        room.onStateChange = function (state) {
-            trace("NEW STATE => " + Std.string(state));
-        }
+        // var room = client.join("chat", ["create" => true]);
+        // room.onJoin = function() {
+        //     trace("JOINED!");
+        // }
+        // room.onStateChange = function (state) {
+        //     trace("NEW STATE => " + Std.string(state));
+        // }
 
         assertEquals(1, 1);
     }

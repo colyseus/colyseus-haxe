@@ -1,7 +1,7 @@
 package io.colyseus;
 
-import io.colyseus.Room.IRoom;
-import io.colyseus.Room.RoomFossilDelta;
+import haxe.Constraints.Function;
+
 using io.colyseus.events.EventHandler;
 
 import haxe.io.Bytes;
@@ -18,142 +18,94 @@ class DummyState {}
 
 @:keep
 class Client {
-    public var id: String = "";
     public var endpoint: String;
 
-    // callbacks
-    public var onOpen = new EventHandler<Void->Void>();
-    public var onClose = new EventHandler<Void->Void>();
-    public var onError = new EventHandler<String->Void>();
+    /**
+     * @colyseus/social is not fully implemented in the Haxe client
+     */
+    private var auth: Auth;
 
-    private var connection: Connection;
-
-    private var rooms: Map<String, IRoom> = new Map();
-    private var connectingRooms: Map<Int, IRoom> = new Map();
-    private var requestId: UInt = 0;
-    private var previousCode: Int = 0;
-
-    private var roomsAvailableRequests: Map<Int, Array<RoomAvailable> -> Void> = new Map();
-
-    public function new (url: String) {
-        this.endpoint = url;
-
-        // getItem('colyseusid', (colyseusid) => this.connect(colyseusid));
-        this.connect(this.id);
+    public function new (endpoint: String) {
+        this.endpoint = endpoint;
+        this.auth = new Auth(this.endpoint);
     }
 
     @:generic
-    public function join<T>(roomName: String, ?options: Map<String, Dynamic>, ?cls: Class<T>): Room<T> {
-        if (options == null) {
-            options = new Map<String, Dynamic>();
-        }
-
-        options.set("requestId", ++this.requestId);
-
-        var room: Room<T> = new Room<T>(roomName, options, cls);
-
-        // remove references on leaving
-        room.onLeave += function () {
-            this.rooms.remove(room.id);
-            this.connectingRooms.remove(options.get("requestId"));
-        };
-
-        this.connectingRooms.set(options.get("requestId"), room);
-
-        this.connection.send([Protocol.JOIN_REQUEST, roomName, options]);
-
-        return room;
+    public function joinOrCreate<T>(roomName: String, options: Map<String, Dynamic>, stateClass: Class<T>, callback: (String, Room<T>)->Void) {
+        this.createMatchMakeRequest('joinOrCreate', roomName, options, stateClass, callback);
     }
 
     @:generic
-    public function rejoin<T>(roomName: String, sessionId: String, cls: Class<T>): Room<T> {
-        return this.join(roomName, [ "sessionId" => sessionId ], cls);
+    public function create<T>(roomName: String, options: Map<String, Dynamic>, stateClass: Class<T>, callback: (String, Room<T>)->Void) {
+        this.createMatchMakeRequest('create', roomName, options, stateClass, callback);
     }
 
-    /* TODO: remove this on 1.0.0 */
-    public function joinFossilDelta(roomName: String, ?options: Map<String, Dynamic>) {
-        if (options == null) {
-            options = new Map();
-        }
-        options.set("requestId", ++this.requestId);
-
-        var room = new RoomFossilDelta(roomName, options);
-
-        // remove references on leaving
-        room.onLeave += function () {
-            this.rooms.remove(room.id);
-            this.connectingRooms.remove(options.get("requestId"));
-        };
-
-        this.connectingRooms.set(options.get("requestId"), room);
-        this.connection.send([Protocol.JOIN_REQUEST, roomName, options]);
-
-        return room;
+    @:generic
+    public function join<T>(roomName: String, options: Map<String, Dynamic>, stateClass: Class<T>, callback: (String, Room<T>)->Void) {
+        this.createMatchMakeRequest('join', roomName, options, stateClass, callback);
     }
 
-    /* TODO: remove this on 1.0.0 */
-    public function rejoinFossilDelta(roomName: String, sessionId: String) {
-        return this.joinFossilDelta(roomName, [ "sessionId" => sessionId ]);
+    @:generic
+    public function joinById<T>(roomId: String, options: Map<String, Dynamic>, stateClass: Class<T>, callback: (String, Room<T>)->Void) {
+        this.createMatchMakeRequest('joinById', roomId, options, stateClass, callback);
     }
 
-    public function getAvailableRooms(roomName: String, callback: Array<RoomAvailable>->?String -> Void) {
-        // reject this promise after 10 seconds.
-        var requestId = ++this.requestId;
+    @:generic
+    public function reconnect<T>(roomId: String, sessionId: String, stateClass: Class<T>, callback: (String, Room<T>)->Void) {
+        this.createMatchMakeRequest('joinById', roomId, [ "sessionId" => sessionId ], stateClass, callback);
+    }
 
-        function removeRequest() {
-            return this.roomsAvailableRequests.remove(requestId);
-        };
+    public function getAvailableRooms(roomName: String, callback: (String, Array<RoomAvailable>)->Void) {
+        this.request("GET", "/matchmake/" + roomName, null, callback);
+    }
 
-        var rejectionTimeout = haxe.Timer.delay(function() {
-            removeRequest();
-            callback([], 'timeout');
-        }, 10000);
+    @:generic
+    private function createMatchMakeRequest<T>(
+        method: String,
+        roomName: String,
+        options: Map<String, Dynamic>,
+        stateClass: Class<T>,
+        callback: (String, Room<T>)->Void
+    ) {
+        this.request("POST", "/matchmake/" + method + "/" + roomName, haxe.Json.stringify(options), function(err, response) {
+            if (err != null) { return callback(err, null); }
 
-        // send the request to the server.
-        this.connection.send([Protocol.ROOM_LIST, requestId, roomName]);
+            trace(response);
+            trace(response.room);
+            trace(response.room.processId);
+            trace(response.room.roomId);
+            trace(response.sessionId);
 
-        this.roomsAvailableRequests.set(requestId, function(roomsAvailable) {
-            removeRequest();
-            rejectionTimeout.stop();
-            callback(roomsAvailable);
+            var room: Room<T> = new Room<T>(roomName, stateClass);
+            room.id = response.room.roomId;
+            room.sessionId = response.sessionId;
+
+            var onError = function(message) {
+                callback(message, null);
+            };
+            var onJoin = function() {
+                room.onError -= onError;
+                callback(null, room);
+            };
+
+            trace("will attack handlers");
+            room.onError += onError;
+            room.onJoin += onJoin;
+
+            trace("will create connection");
+
+            room.connect(this.createConnection(response.room.processId + "/" + room.id, ["sessionId" => room.sessionId]));
+            trace("created connection!");
         });
     }
 
-    public function close() {
-        this.connection.close();
-    }
-
-    private function connect(colyseusid: String) {
-        this.id = colyseusid;
-
-        this.connection = this.createConnection();
-
-        this.connection.onMessage = function (data) {
-            this.onMessageCallback(data);
-        }
-
-        this.connection.onClose = function () {
-            this.onClose.dispatch();
-        };
-
-        this.connection.onError = function (e) {
-            this.onError.dispatch(e);
-        };
-
-        // check for id on cookie
-        this.connection.onOpen = function () {
-            if (this.id != "") {
-                this.onOpen.dispatch();
-            }
-        };
-    }
-
-    private function createConnection(path: String = '', ?options: Map<String, Dynamic>) {
-        if (options == null) {
-            options = new Map();
-        }
+    private function createConnection(path: String = '', options: Map<String, Dynamic>) {
         // append colyseusid to connection string.
-        var params: Array<String> = ["colyseusid=" + this.id];
+        var params: Array<String> = [];
+
+        if (this.auth.hasToken()) {
+            params.push("token=" + this.auth.token);
+        }
 
         for (name in options.keys()) {
             params.push(name + "=" + options[name]);
@@ -162,67 +114,42 @@ class Client {
         return new Connection(this.endpoint + "/" + path + "?" + params.join('&'));
     }
 
-    /**
-     * @override
-     */
-    private function onMessageCallback(data: Bytes) {
-        if (this.previousCode == 0) {
-            var code: Int = data.get(0);
+    private function request(method: String, segments: String, body: String, callback: (String,Dynamic)->Void) {
+        var req = new haxe.Http("http" + this.endpoint.substring(2) + segments);
 
-            if (code == Protocol.USER_ID) {
-                this.id = data.getString(2, data.get(1));
-
-                this.onOpen.dispatch();
-
-            } else if (code == Protocol.JOIN_REQUEST) {
-                var requestId: Int = data.get(1);
-                var room = this.connectingRooms.get(requestId);
-
-                if (room == null) {
-                    trace('colyseus.js: client left room before receiving session id.');
-                    return;
-                }
-
-                room.id = data.getString(3, data.get(2));
-                this.rooms.set(room.id, room);
-
-                var processPath = "";
-                var nextIndex = 3 + room.id.length;
-                if (data.length > nextIndex) {
-                    processPath = data.getString(nextIndex + 1, data.get(nextIndex)) + "/";
-                }
-
-                room.connect(this.createConnection(processPath + room.id, room.options));
-                this.connectingRooms.remove(requestId);
-
-            } else if (code == Protocol.JOIN_ERROR) {
-                var err = data.getString(2, data.get(1));
-                trace('colyseus.js: server error:' + err);
-
-                // general error
-                this.onError.dispatch(err);
-
-            } else if (code == Protocol.ROOM_LIST) {
-                this.previousCode = code;
-            }
-
-        } else {
-            if (this.previousCode == Protocol.ROOM_LIST) {
-                var message: Dynamic = MsgPack.decode(data);
-                var requestId: Int = message[0];
-
-                if (this.roomsAvailableRequests.exists(requestId)) {
-                    var callback = this.roomsAvailableRequests.get(requestId);
-                    callback(cast message[1]);
-
-                } else {
-                    trace('receiving ROOM_LIST after timeout:' + message[2]);
-                }
-
-            }
-            this.previousCode = 0;
+        if (body != null) {
+            req.setPostData(body);
+            req.setHeader("Content-Type", "application/json");
         }
 
+        req.setHeader("Accept", "application/json");
+
+        var responseStatus: Int;
+        req.onStatus = function(status) {
+            responseStatus = status;
+        };
+
+        req.onData = function(json) {
+            trace("RESPONSE:");
+            trace("STATUS: " + responseStatus);
+            trace(json);
+            var response = haxe.Json.parse(json);
+
+            if (response.error) {
+                callback(cast response.error, null);
+
+            } else {
+                callback(null, response);
+            }
+        };
+
+        req.onError = function(err) {
+            trace("onError");
+            trace(err);
+            callback(err, null);
+        };
+
+        req.request(method == "POST");
     }
 
 }

@@ -5,6 +5,7 @@ import openfl.ui.Keyboard;
 import openfl.display.Sprite;
 import openfl.events.Event;
 import openfl.events.KeyboardEvent;
+
 import io.colyseus.Client;
 import io.colyseus.Room;
 
@@ -23,7 +24,7 @@ class Main extends Sprite {
 
 		// list available rooms for connection
 		haxe.Timer.delay(function() {
-			this.client.getAvailableRooms("state_handler", function(rooms, ?err) {
+			this.client.getAvailableRooms("state_handler", function(err, rooms) {
 				if (err != null)
 					trace("ERROR! " + err);
 				for (room in rooms) {
@@ -36,94 +37,44 @@ class Main extends Sprite {
 			});
 		}, 3000);
 
-		/**
-		 * Client callbacks
-		 */
-		this.client.onOpen += function() {
-			trace("CLIENT OPEN, id => " + this.client.id);
-		};
+		this.client.joinOrCreate("state_handler", [], State, function(err, room) {
+            this.room = room;
+            this.room.state.players.onAdd = function(player, key) {
+                trace("PLAYER ADDED AT: ", key);
+                var cat = Assets.getMovieClip("library:NyanCatAnimation");
+                this.cats[key] = cat;
+                cat.x = player.x;
+                cat.y = player.y;
+                addChild(cat);
+            }
 
-		this.client.onClose += function() {
-			trace("CLIENT CLOSE");
-		};
+            this.room.state.players.onChange = function(player, key) {
+                trace("PLAYER CHANGED AT: ", key);
+                this.cats[key].x = player.x;
+                this.cats[key].y = player.y;
+            }
 
-		this.client.onError += function(message) {
-			trace("CLIENT ERROR: " + message);
-		};
+            this.room.state.players.onRemove = function(player, key) {
+                trace("PLAYER REMOVED AT: ", key);
+                removeChild(this.cats[key]);
+            }
 
-		this.room = this.client.join("state_handler", [], State);
+            this.room.onStateChange += function(state) {
+                trace("STATE CHANGE: " + Std.string(state));
+            };
 
-		/**
-		 * Room callbacks
-		 */
-		this.room.onJoin += function() {
-      this.room.state.players.onAdd = function(player, key) {
-        trace("PLAYER ADDED AT: ", key);
-        var cat = Assets.getMovieClip("library:NyanCatAnimation");
-        this.cats[key] = cat;
-        cat.x = player.x;
-        cat.y = player.y;
-        addChild(cat);
-      }
+            this.room.onMessage += function(message) {
+                trace("ROOM MESSAGE: " + Std.string(message));
+            };
 
-      this.room.state.players.onChange = function(player, key) {
-        trace("PLAYER CHANGED AT: ", key);
-        this.cats[key].x = player.x;
-        this.cats[key].y = player.y;
-      }
+            this.room.onError += function(message) {
+                trace("ROOM ERROR: " + message);
+            };
 
-      this.room.state.players.onRemove = function(player, key) {
-        trace("PLAYER REMOVED AT: ", key);
-        removeChild(this.cats[key]);
-      }
-		};
-
-		this.room.onStateChange += function(state) {
-			trace("STATE CHANGE: " + Std.string(state));
-		};
-
-		this.room.onMessage += function(message) {
-			trace("ROOM MESSAGE: " + Std.string(message));
-		};
-
-		this.room.onError += function(message) {
-			trace("ROOM ERROR: " + message);
-		};
-
-		this.room.onLeave += function() {
-			trace("ROOM LEAVE");
-		}
-
-
-    /*
-    //
-    // Using Fossil Delta serializer
-    //
-    this.room.listen("players/:id", function(change) {
-			if (change.operation == "add") {
-				var cat = Assets.getMovieClip("library:NyanCatAnimation");
-				this.cats[change.path.id] = cat;
-				cat.x = change.value.x;
-				cat.y = change.value.y;
-				addChild(cat);
-			} else if (change.operation == "remove") {
-				removeChild(this.cats[change.path.id]);
-			}
-		}, true);
-
-		this.room.listen("players/:id/:axis", function(change) {
-			if (this.cats.get(change.path.id) == null) {
-				trace("CAT DONT EXIST: " + change.path.id);
-				return;
-			}
-
-			if (change.path.axis == "x") {
-				this.cats[change.path.id].x = change.value;
-			} else if (change.path.axis == "y") {
-				this.cats[change.path.id].y = change.value;
-			}
-		});
-    */
+            this.room.onLeave += function() {
+                trace("ROOM LEAVE");
+            }
+        });
 
 		stage.addEventListener(KeyboardEvent.KEY_DOWN, onKeyDown);
 		stage.addEventListener(KeyboardEvent.KEY_UP, onKeyUp);
