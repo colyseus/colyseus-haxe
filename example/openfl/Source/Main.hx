@@ -25,8 +25,11 @@ class Main extends Sprite {
 		// list available rooms for connection
 		haxe.Timer.delay(function() {
 			this.client.getAvailableRooms("state_handler", function(err, rooms) {
-				if (err != null)
+				if (err != null) {
 					trace("ERROR! " + err);
+                    return;
+                }
+
 				for (room in rooms) {
 					trace("RoomAvailable:");
 					trace("roomId: " + room.roomId);
@@ -38,6 +41,11 @@ class Main extends Sprite {
 		}, 3000);
 
 		this.client.joinOrCreate("state_handler", [], State, function(err, room) {
+            if (err != null) {
+                trace("ERROR! " + err);
+                return;
+            }
+
             this.room = room;
             this.room.state.players.onAdd = function(player, key) {
                 trace("PLAYER ADDED AT: ", key);
