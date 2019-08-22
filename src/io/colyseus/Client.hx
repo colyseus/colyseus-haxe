@@ -67,6 +67,10 @@ class Client {
         stateClass: Class<T>,
         callback: (String, Room<T>)->Void
     ) {
+        if (this.auth.hasToken()) {
+            options.set("token", this.auth.token);
+        }
+
         this.request("POST", "/matchmake/" + method + "/" + roomName, haxe.Json.stringify(options), function(err, response) {
             if (err != null) { return callback(err, null); }
 
@@ -92,10 +96,6 @@ class Client {
     private function createConnection(path: String = '', options: Map<String, Dynamic>) {
         // append colyseusid to connection string.
         var params: Array<String> = [];
-
-        if (this.auth.hasToken()) {
-            params.push("token=" + this.auth.token);
-        }
 
         for (name in options.keys()) {
             params.push(name + "=" + options[name]);
