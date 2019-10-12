@@ -1,0 +1,29 @@
+language: haxe
+
+env:
+  matrix:
+    - TARGET=neko
+    - TARGET=js
+    - TARGET=cpp
+
+haxe:
+  - stable # latest stable version
+  - "4.0.0-rc.5" # latest release candidate
+  - development # the latest build of the development branch in http://build.haxe.org/
+
+before_script:
+  - mkdir ~/haxelib
+  - haxelib setup ~/haxelib
+  - haxelib git haxe-ws https://github.com/colyseus/haxe-ws.git
+  - haxelib install hx3compat
+  - sh -c "if [ '$TARGET' = 'cpp' ]; then sudo apt-get install gcc-multilib g++-multilib -y; fi"
+  - sh -c "if [ '$TARGET' = 'cpp' ]; then haxelib install hxcpp; fi"
+  - sh -c "if [ '$TARGET' = 'cs' ]; then sudo apt-get install mono-complete; fi"
+  - sh -c "if [ '$TARGET' = 'cs' ]; then haxelib install hxcs; fi"
+  - sh -c "if [ '$TARGET' = 'java' ]; then haxelib install hxjava; fi"
+  - sh -c "if [ '$TARGET' = 'node' ]; then haxelib install hxnodejs; fi"
+
+script:
+  - haxe hxml/test.${TARGET}.hxml
+
+

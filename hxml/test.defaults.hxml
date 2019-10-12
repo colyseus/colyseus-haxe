@@ -1,0 +1,6 @@
+-main TestMain
+-cp src
+-cp tests
+-lib haxe-ws
+# use deprecated haxe.unit.TestCase
+-lib hx3compat

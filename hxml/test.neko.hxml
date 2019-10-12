@@ -1,0 +1,4 @@
+hxml/test.defaults.hxml
+-neko tests/bin/neko_test.n
+# Need to actually execute the tests!
+-cmd neko tests/bin/neko_test.n

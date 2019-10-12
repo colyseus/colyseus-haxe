@@ -1,0 +1,5 @@
+hxml/test.defaults.hxml
+-D HXCPP_M64
+-cpp tests/bin/cpp_test
+# Need to actually execute the tests!
+-cmd tests/bin/cpp_test/TestMain
