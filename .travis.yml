@@ -17,8 +17,14 @@ before_script:
   - haxelib install hx3compat
   - sh -c "if [ '$TARGET' = 'cpp' ]; then sudo apt-get install gcc-multilib g++-multilib -y; fi"
   - sh -c "if [ '$TARGET' = 'cpp' ]; then haxelib install hxcpp; fi"
+
+  - sh -c "if [ '$TARGET' = 'js' ]; then sudo apt-get install curl; sudo apt-get install node; fi"
+  - sh -c "if [ '$TARGET' = 'js' ]; curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -; fi"
+  - sh -c "if [ '$TARGET' = 'js' ]; sudo apt-get install node; fi"
+
   - sh -c "if [ '$TARGET' = 'cs' ]; then sudo apt-get install mono-complete; fi"
   - sh -c "if [ '$TARGET' = 'cs' ]; then haxelib install hxcs; fi"
+
   - sh -c "if [ '$TARGET' = 'java' ]; then haxelib install hxjava; fi"
   - sh -c "if [ '$TARGET' = 'node' ]; then haxelib install hxnodejs; fi"
 
