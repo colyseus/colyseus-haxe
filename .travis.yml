@@ -23,7 +23,7 @@ before_script:
   - sh -c "if [ '$TARGET' = 'java' ]; then haxelib install hxjava; fi"
   - sh -c "if [ '$TARGET' = 'node' ]; then haxelib install hxnodejs; fi"
 
-script:
-  - haxe hxml/test.${TARGET}.hxml
+hxml:
+  - hxml/test.${TARGET}.hxml
 
 

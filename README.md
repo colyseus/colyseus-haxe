@@ -21,6 +21,10 @@
   </h3>
 </div>
 
+| Description | Status |
+| ------| -------|
+| Master Branch Build Status | [![Build Status](https://travis-ci.org/colyseus/colyseus-hx.svg?branch=master)](https://travis-ci.org/colyseus/colyseus-hx) |
+
 ## Running the demo project
 
 First, download and install [Haxe](https://haxe.org/download/).
