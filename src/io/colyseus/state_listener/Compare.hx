@@ -32,7 +32,8 @@ class Compare {
             return keys;
         }
 
-        if (Std.is(obj, Map)) {
+        /* if (Std.is(obj, Map)) { */
+        if (Std.is(obj, haxe.Constraints.IMap)) {
             return obj.keys();
         }
 
