@@ -302,7 +302,7 @@ class Decoder {
   public function uint64(bytes:Bytes, it:It) {
     var low = this.uint32(bytes, it);
     var high = this.uint32(bytes, it) * Math.pow(2, 32);
-    return high + low;
+    return haxe.Int64.make(cast high, cast low);
   }
 
   public function float32(bytes:Bytes, it:It) {
@@ -328,6 +328,11 @@ typedef DataChange = {
 @:generic
 class ArraySchema<T> {
   public var items:Array<T> = [];
+  public var length(get, null): Int;
+
+  function get_length() {
+      return this.items.length;
+  }
 
   public dynamic function onAdd(item:T, key:Int):Void {}
   public dynamic function onChange(item:T, key:Int):Void {}
@@ -348,17 +353,6 @@ class ArraySchema<T> {
     return this.items.iterator();
   }
 
-  @:arrayAccess
-  public inline function get(key:Int) {
-    return this.items[key];
-  }
-
-  @:arrayAccess
-  public inline function arrayWrite(key:Int, value:T):T {
-    this.items[key] = value;
-    return value;
-  }
-
   public function toString () {
     var data = [];
     for (item in this.items) {
@@ -366,6 +360,19 @@ class ArraySchema<T> {
     }
     return "ArraySchema("+Lambda.count(this.items)+") { " + data.join(", ") + " } ";
   }
+
+  /** TODO: This only works with Abstracts! */
+
+  /* @:arrayAccess */
+  /* public inline function get(key:Int) { */
+  /*   return this.items[key]; */
+  /* } */
+  /*  */
+  /* @:arrayAccess */
+  /* public inline function arrayWrite(key:Int, value:T):T { */
+  /*   this.items[key] = value; */
+  /*   return value; */
+  /* } */
 
 }
 
@@ -390,7 +397,7 @@ class OrderedMap<K, V> {
        map = _map;
     }
 
-    public function set(key, value) {
+    public function set(key: K, value: V) {
         if(!map.exists(key)) _keys.push(key);
         map[key] = value;
     }
@@ -402,9 +409,9 @@ class OrderedMap<K, V> {
     }
 
     public function iterator() return new OrderedMapIterator<K,V>(this);
-    public function remove(key) return map.remove(key) && _keys.remove(key);
-    public function exists(key) return map.exists(key);
-    public function get(key) return map.get(key);
+    public function remove(key: K) return map.remove(key) && _keys.remove(key);
+    public function exists(key: K) return map.exists(key);
+    public function get(key: K) return map.get(key);
     public inline function keys() return _keys.iterator();
 }
 
@@ -413,6 +420,11 @@ class OrderedMap<K, V> {
 @:generic
 class MapSchema<T> {
   public var items:OrderedMap<String, T> = new OrderedMap<String, T>(new Map<String, T>());
+  public var length(get, null): Int;
+
+  function get_length() {
+      return this.items._keys.length;
+  }
 
   public dynamic function onAdd(item:T, key:String):Void {}
   public dynamic function onChange(item:T, key:String):Void {}
@@ -423,17 +435,14 @@ class MapSchema<T> {
   public function clone():MapSchema<T> {
     var cloned = new MapSchema<T>();
 
-// #if haxe4
-//     cloned.items = this.items.copy();
-// #else
     for (key in this.items.keys()) {
       cloned.items.set(key, this.items.get(key));
     }
-// #end
 
     cloned.onAdd = this.onAdd;
     cloned.onChange = this.onChange;
     cloned.onRemove = this.onRemove;
+
     return cloned;
   }
 
@@ -484,6 +493,9 @@ class Schema {
 
     var totalBytes = bytes.length;
     while (it.offset < totalBytes) {
+      var isNil = SPEC.nilCheck(bytes, it);
+      if (isNil) { it.offset++; }
+
       var index = bytes.get(it.offset++);
 
       if (index == SPEC.END_OF_STRUCTURE) {
@@ -498,19 +510,21 @@ class Schema {
       var change:Dynamic = null; // for triggering onChange
       var hasChange = false;
 
-      if (type == "ref") {
-        if (SPEC.nilCheck(bytes, it)) {
-          it.offset++;
-          value = null;
+      if (field == null) {
+          continue;
 
-        } else {
-          var constructor:Class<Schema> = this._childSchemaTypes.get(index);
-          value = Reflect.getProperty(this, field);
-          if (value == null) {
-            value = Type.createInstance(constructor, []);
-          }
-          value.decode(bytes, it);
+      } else if (isNil) {
+          value = null;
+          hasChange = true;
+
+      } else if (type == "ref") {
+        var constructor:Class<Schema> = this._childSchemaTypes.get(index);
+
+        value = Reflect.getProperty(this, field);
+        if (value == null) {
+          value = Type.createInstance(constructor, []);
         }
+        value.decode(bytes, it);
 
         hasChange = true;
 
@@ -524,6 +538,7 @@ class Schema {
         if (value == null) {
           value = new ArraySchema<Dynamic>();
         }
+
         var valueRef = value.clone();
 
         var newLength:Int = decoder.number(bytes, it);
@@ -536,15 +551,18 @@ class Schema {
         var hasIndexChange = false;
 
         // ensure current array has the same length as encoded one
-        if (value.length > newLength) {
-          var removedItems:Array<Dynamic> = value.splice(newLength);
+        if (value.items.length > newLength) {
+          var items = cast(valueRef.items, Array<Dynamic>);
 
-          for (i in 0...removedItems.length) {
-            var itemRemoved = removedItems[i];
+          for (i in newLength...valueRef.items.length) {
+            var itemRemoved = items[i];
 
             if (isSchemaType) {
               itemRemoved.onRemove();
             }
+
+            // cast is necessary for JavaScript target
+            cast(value.items, Array<Dynamic>).remove(itemRemoved);
 
             valueRef.onRemove(itemRemoved, newLength + i);
           }
@@ -568,9 +586,9 @@ class Schema {
             if (isNew) {
               item = Type.createInstance(type, []);
             } else if (indexChangedFrom != -1) {
-              item = valueRef.items[indexChangedFrom];
+              item = cast(valueRef, ArraySchema<Schema>).items[indexChangedFrom];
             } else {
-              item = valueRef.items[newIndex];
+              item = cast(valueRef, ArraySchema<Dynamic>).items[newIndex];
             }
 
             if (item == null) {
@@ -578,22 +596,16 @@ class Schema {
               isNew = true;
             }
 
-            if (SPEC.nilCheck(bytes, it)) {
-              it.offset++;
-
-              valueRef.onRemove(item, newIndex);
-
-              continue;
-            }
-
             item.decode(bytes, it);
             value.items[newIndex] = item;
+
           } else {
             value.items[newIndex] = decoder.decodePrimitiveType(type, bytes, it);
           }
 
           if (isNew) {
-            valueRef.onAdd(value.items[newIndex], newIndex);
+              valueRef.onAdd(value.items[newIndex], newIndex);
+
           } else {
             valueRef.onChange(value.items[newIndex], newIndex);
           }
@@ -606,9 +618,7 @@ class Schema {
         type = (isSchemaType) ? this._childSchemaTypes.get(index) : this._childPrimitiveTypes.get(index);
 
         value = Reflect.getProperty(this, field);
-        if (value == null) {
-          value = new MapSchema<Dynamic>();
-        }
+        if (value == null) { value = new MapSchema<Dynamic>(); }
         var valueRef = value.clone();
 
         var length:Int = decoder.number(bytes, it);
@@ -631,6 +641,9 @@ class Schema {
             break;
           }
 
+          var isNilItem = SPEC.nilCheck(bytes, it);
+          if (isNilItem) { it.offset++; }
+
           // index change check
           var previousKey:String = "";
           if (SPEC.indexChangeCheck(bytes, it)) {
@@ -643,7 +656,7 @@ class Schema {
 
           var newKey = (hasMapIndex) ? previousKeys[decoder.number(bytes, it)] : decoder.string(bytes, it);
 
-          var item:Dynamic;
+          var item: Dynamic;
           var isNew = (!hasIndexChange && !valueRef.items.exists(newKey))
             || (hasIndexChange && previousKey == "" && hasMapIndex);
 
@@ -657,9 +670,7 @@ class Schema {
             item = valueRef.items.get(newKey);
           }
 
-          if (SPEC.nilCheck(bytes, it)) {
-            it.offset++;
-
+          if (isNilItem) {
             if (item && isSchemaType) {
               item.onRemove();
             }
@@ -670,7 +681,8 @@ class Schema {
             continue;
 
           } else if (!isSchemaType) {
-            value.items.set(newKey, decoder.decodePrimitiveType(type, bytes, it));
+            var decodedValue: Dynamic = decoder.decodePrimitiveType(type, bytes, it);
+            value.items.set(newKey, decodedValue);
 
           } else {
             item.decode(bytes, it);
