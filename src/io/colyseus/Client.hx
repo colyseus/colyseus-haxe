@@ -60,6 +60,27 @@ class Client {
     }
 
     @:generic
+    public function consumeSeatReservation<T>(response: Dynamic, stateClass: Class<T>, callback: (String, Room<T>)->Void) {
+        var room: Room<T> = new Room<T>(response.room.name, stateClass);
+
+        room.id = response.room.roomId;
+        room.sessionId = response.sessionId;
+
+        var onError = function(message) {
+            callback(message, null);
+        };
+        var onJoin = function() {
+            room.onError -= onError;
+            callback(null, room);
+        };
+
+        room.onError += onError;
+        room.onJoin += onJoin;
+
+        room.connect(this.createConnection(response.room.processId + "/" + room.id, ["sessionId" => room.sessionId]));
+    }
+
+    @:generic
     private function createMatchMakeRequest<T>(
         method: String,
         roomName: String,
@@ -72,24 +93,12 @@ class Client {
         }
 
         this.request("POST", "/matchmake/" + method + "/" + roomName, haxe.Json.stringify(options), function(err, response) {
-            if (err != null) { return callback(err, null); }
+            if (err != null) {
+                return callback(err, null);
 
-            var room: Room<T> = new Room<T>(roomName, stateClass);
-            room.id = response.room.roomId;
-            room.sessionId = response.sessionId;
-
-            var onError = function(message) {
-                callback(message, null);
-            };
-            var onJoin = function() {
-                room.onError -= onError;
-                callback(null, room);
-            };
-
-            room.onError += onError;
-            room.onJoin += onJoin;
-
-            room.connect(this.createConnection(response.room.processId + "/" + room.id, ["sessionId" => room.sessionId]));
+            } else {
+                this.consumeSeatReservation(response, stateClass, callback);
+            }
         });
     }
 
