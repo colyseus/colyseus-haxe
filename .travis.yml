@@ -7,8 +7,8 @@ env:
     - TARGET=cpp
 
 haxe:
-  - "4.0.0-rc.5" # latest release candidate
   - development # the latest build of the development branch in http://build.haxe.org/
+  - stable
 
 before_script:
   - mkdir ~/haxelib
