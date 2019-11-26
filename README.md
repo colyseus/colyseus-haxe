@@ -41,7 +41,7 @@ cd colyseus-hx/example/openfl
 haxelib install openfl
 haxelib install lime
 haxelib git haxe-ws https://github.com/colyseus/haxe-ws.git
-haxelib run lime build project.xml html5
+haxelib run lime test project.xml html5
 ```
 
 You can see the demo project [live here](http://colyseus.io/colyseus-hx/).
