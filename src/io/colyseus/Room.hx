@@ -26,7 +26,6 @@ class Room<T> {
     public var serializerId: String = null;
     private var serializer: Serializer;
 
-    private var previousCode: Int = 0;
     private var tmpStateClass: Class<T>;
 
     public function new (name: String, ?cls: Class<T>) {
@@ -90,51 +89,45 @@ class Room<T> {
     }
 
     private function onMessageCallback(data: Bytes) {
-        if (this.previousCode == 0) {
-            var code = data.get(0);
+        var code = data.get(0);
 
-            if (code == Protocol.JOIN_ROOM) {
-                var offset: Int = 1;
+        if (code == Protocol.JOIN_ROOM) {
+            var offset: Int = 1;
 
-                this.serializerId = data.getString(offset + 1, data.get(offset));
-                offset += this.serializerId.length + 1;
+            this.serializerId = data.getString(offset + 1, data.get(offset));
+            offset += this.serializerId.length + 1;
 
-                if (this.serializerId == "schema") {
-                    this.serializer = new SchemaSerializer<T>(tmpStateClass);
-                } else {
-                    throw "FossilDelta serializer has been deprecated! Use SchemaSerializer instead.";
-                }
-
-                if (data.length > offset) {
-                    this.serializer.handshake(data, offset);
-                }
-
-                this.onJoin.dispatch();
-
-            } else if (code == Protocol.JOIN_ERROR) {
-                var err = data.getString(2, data.get(1));
-                trace("Error: " + err);
-                this.onError.dispatch(err);
-
-            } else if (code == Protocol.LEAVE_ROOM) {
-                this.leave();
-
+            if (this.serializerId == "schema") {
+                this.serializer = new SchemaSerializer<T>(tmpStateClass);
             } else {
-                this.previousCode = code;
+                throw "FossilDelta serializer has been deprecated! Use SchemaSerializer instead.";
             }
 
-        } else {
-            if (this.previousCode == Protocol.ROOM_STATE) {
-                this.setState(data);
-
-            } else if (this.previousCode == Protocol.ROOM_STATE_PATCH) {
-                this.patch(data);
-
-            } else if (this.previousCode == Protocol.ROOM_DATA) {
-                this.onMessage.dispatch(MsgPack.decode(data));
+            if (data.length > offset) {
+                this.serializer.handshake(data, offset);
             }
 
-            this.previousCode = 0;
+            this.onJoin.dispatch();
+
+            // acknowledge JOIN_ROOM
+            this.connection.send([ Protocol.JOIN_ROOM ]);
+
+        } else if (code == Protocol.JOIN_ERROR) {
+            var err = data.getString(2, data.get(1));
+            trace("Error: " + err);
+            this.onError.dispatch(err);
+
+        } else if (code == Protocol.LEAVE_ROOM) {
+            this.leave();
+
+        } else if (code == Protocol.ROOM_STATE) {
+			this.setState(data.sub(1, data.length - 1));
+
+        } else if (code == Protocol.ROOM_STATE_PATCH) {
+            this.patch(data.sub(1, data.length - 1));
+
+        } else if (code == Protocol.ROOM_DATA) {
+            this.onMessage.dispatch(MsgPack.decode(data.sub(1, data.length - 1)));
         }
     }
 
