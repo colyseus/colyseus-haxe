@@ -2,3 +2,5 @@
 /example/openfl/Export
 /example/flixel/export
 .DS_Store
+.vscode
+.haxerc
