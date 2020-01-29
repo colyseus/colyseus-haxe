@@ -10,7 +10,7 @@
 	<source path="../../src" />
 
 	<haxelib name="openfl" />
-	<haxelib name="haxe-ws" />
+	<haxelib name="colyseus-websocket" />
 
 	<library path="Assets/library.swf" preload="true" />
 
