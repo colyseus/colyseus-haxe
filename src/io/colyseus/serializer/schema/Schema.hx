@@ -588,7 +588,7 @@ class Schema {
             } else if (indexChangedFrom != -1) {
               item = cast(valueRef, ArraySchema<Schema>).items[indexChangedFrom];
             } else {
-              item = cast(valueRef, ArraySchema<Dynamic>).items[newIndex];
+              item = (cast valueRef).items[newIndex];
             }
 
             if (item == null) {
