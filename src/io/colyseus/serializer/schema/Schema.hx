@@ -555,7 +555,7 @@ class Schema {
           var items = cast(valueRef.items, Array<Dynamic>);
 
           for (i in newLength...valueRef.items.length) {
-			var itemRemoved = items[i];
+            var itemRemoved = items[i];
 
             if (isSchemaType && itemRemoved.onRemove != null) {
               itemRemoved.onRemove();
