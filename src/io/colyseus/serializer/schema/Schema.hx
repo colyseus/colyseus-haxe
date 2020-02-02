@@ -556,7 +556,6 @@ class Schema {
 
           for (i in newLength...valueRef.items.length) {
 			var itemRemoved = items[i];
-			trace('=========',itemRemoved);
 
             if (isSchemaType && itemRemoved.onRemove != null) {
               itemRemoved.onRemove();
