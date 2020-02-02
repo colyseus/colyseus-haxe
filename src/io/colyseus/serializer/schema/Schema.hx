@@ -557,7 +557,7 @@ class Schema {
           for (i in newLength...valueRef.items.length) {
             var itemRemoved = items[i];
 
-            if (isSchemaType) {
+            if (isSchemaType && itemRemoved.onRemove != null) {
               itemRemoved.onRemove();
             }
 
@@ -586,9 +586,9 @@ class Schema {
             if (isNew) {
               item = Type.createInstance(type, []);
             } else if (indexChangedFrom != -1) {
-              item = cast(valueRef, ArraySchema<Schema>).items[indexChangedFrom];
+              item = (cast valueRef).items[indexChangedFrom];
             } else {
-              item = cast(valueRef, ArraySchema<Dynamic>).items[newIndex];
+              item = (cast valueRef).items[newIndex];
             }
 
             if (item == null) {
