@@ -385,6 +385,7 @@ class OrderedMapIterator<K,V> {
 }
 
 // class OrderedMap<K, V> implements IMap<K, V> {
+@:keep
 class OrderedMap<K, V> {
     var map:Map<K, V>;
 
