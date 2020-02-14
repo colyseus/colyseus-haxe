@@ -77,13 +77,21 @@ class Decorator {
     }
     classFields.set(localClass.name, index);
 
+    var constructorArgs = [];
+    if(constructor != null){
+      switch (constructor.kind) {
+        case FFun(f):
+          constructorArgs = f.args;
+        default:
+      }
+    }
     // add constructor to fields
     fields.push({
       name: "new",
       pos: haxe.macro.Context.currentPos(),
       access: [APublic],
       kind: FFun({
-        args: [],
+        args: constructorArgs,
         expr: macro $b{exprs},
         params: [],
         ret: null
