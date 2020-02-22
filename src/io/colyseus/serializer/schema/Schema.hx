@@ -516,7 +516,6 @@ class Schema {
       var type:Dynamic = this._types.get(index);
 
       var value:Dynamic = null;
-      var change:Dynamic = null; // for triggering onChange
       var hasChange = false;
 
       if (field == null) {
@@ -539,7 +538,6 @@ class Schema {
         var isSchemaType = this._childSchemaTypes.exists(index);
 
         type = (isSchemaType) ? this._childSchemaTypes.get(index) : this._childPrimitiveTypes.get(index);
-        change = [];
 
         var valueRef: Dynamic = Reflect.getProperty(this, field);
         if (valueRef == null) { valueRef = new ArraySchema<Dynamic>(); }
@@ -615,8 +613,6 @@ class Schema {
           } else {
             valueRef.onChange(value.items[newIndex], newIndex);
           }
-
-          change.push(value.items[newIndex]);
         }
 
       } else if (type == "map") {
@@ -712,7 +708,7 @@ class Schema {
       if (hasChange) {
         changes.push({
             field: field,
-            value: (change == null) ? value : change,
+            value: value,
             previousValue: Reflect.getProperty(this, field)
         });
       }
