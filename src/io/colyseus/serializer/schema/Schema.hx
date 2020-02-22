@@ -547,15 +547,15 @@ class Schema {
         var newLength:Int = decoder.number(bytes, it);
         var numChanges:Int = cast(Math.min(decoder.number(bytes, it), newLength), Int);
 
-        hasChange = (numChanges > 0);
+        var hasRemoval = (value.items.length > newLength);
+        hasChange = (numChanges > 0) || hasRemoval;
 
         // FIXME: this may not be reliable. possibly need to encode this variable during
         // serializagion
         var hasIndexChange = false;
 
         // ensure current array has the same length as encoded one
-        if (value.items.length > newLength) {
-          hasChange = true;
+        if (hasRemoval) {
           var items = cast(valueRef.items, Array<Dynamic>);
 
           for (i in newLength...valueRef.items.length) {
