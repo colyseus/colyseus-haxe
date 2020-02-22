@@ -78,6 +78,11 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
         /* state.arrayOfNumbers.OnAdd += (value, key) => Debug.Log("onAdd, arrayOfNumbers => " + key); */
         /* state.arrayOfStrings.OnAdd += (value, key) => Debug.Log("onAdd, arrayOfStrings => " + key); */
         /* state.arrayOfInt32.OnAdd += (value, key) => Debug.Log("onAdd, arrayOfInt32 => " + key); */
+
+        state.onChange = function(changes) {
+            trace("\nCHANGES! => " + changes);
+        };
+
         state.decode(getBytes(bytes));
 
         assertEquals(state.arrayOfSchemas.length, 2);

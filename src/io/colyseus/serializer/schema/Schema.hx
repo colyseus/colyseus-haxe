@@ -530,11 +530,9 @@ class Schema {
         var constructor:Class<Schema> = this._childSchemaTypes.get(index);
 
         value = Reflect.getProperty(this, field);
-        if (value == null) {
-          value = Type.createInstance(constructor, []);
-        }
-        value.decode(bytes, it);
+        if (value == null) { value = Type.createInstance(constructor, []); }
 
+        value.decode(bytes, it);
         hasChange = true;
 
       } else if (type == "array") {
@@ -543,12 +541,10 @@ class Schema {
         type = (isSchemaType) ? this._childSchemaTypes.get(index) : this._childPrimitiveTypes.get(index);
         change = [];
 
-        value = Reflect.getProperty(this, field);
-        if (value == null) {
-          value = new ArraySchema<Dynamic>();
-        }
+        var valueRef: Dynamic = Reflect.getProperty(this, field);
+        if (valueRef == null) { valueRef = new ArraySchema<Dynamic>(); }
 
-        var valueRef = value.clone();
+        value = valueRef.clone();
 
         var newLength:Int = decoder.number(bytes, it);
         var numChanges:Int = cast(Math.min(decoder.number(bytes, it), newLength), Int);
@@ -561,6 +557,7 @@ class Schema {
 
         // ensure current array has the same length as encoded one
         if (value.items.length > newLength) {
+          hasChange = true;
           var items = cast(valueRef.items, Array<Dynamic>);
 
           for (i in newLength...valueRef.items.length) {
@@ -626,9 +623,10 @@ class Schema {
         var isSchemaType = this._childSchemaTypes.exists(index);
         type = (isSchemaType) ? this._childSchemaTypes.get(index) : this._childPrimitiveTypes.get(index);
 
-        value = Reflect.getProperty(this, field);
-        if (value == null) { value = new MapSchema<Dynamic>(); }
-        var valueRef = value.clone();
+        var valueRef: Dynamic = Reflect.getProperty(this, field);
+        if (valueRef == null) { valueRef = new MapSchema<Dynamic>(); }
+
+        value = valueRef.clone();
 
         var length:Int = decoder.number(bytes, it);
         hasChange = (length > 0);
