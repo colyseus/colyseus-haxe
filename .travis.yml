@@ -13,6 +13,7 @@ haxe:
 before_script:
   - mkdir ~/haxelib
   - haxelib setup ~/haxelib
+  - haxelib install colyseus-websocket
   - haxelib install hx3compat
   - sh -c "if [ '$TARGET' = 'cpp' ]; then sudo apt-get install gcc-multilib g++-multilib -y; fi"
   - sh -c "if [ '$TARGET' = 'cpp' ]; then haxelib install hxcpp; fi"
