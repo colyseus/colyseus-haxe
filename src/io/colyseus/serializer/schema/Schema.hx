@@ -516,7 +516,6 @@ class Schema {
       var type:Dynamic = this._types.get(index);
 
       var value:Dynamic = null;
-      var change:Dynamic = null; // for triggering onChange
       var hasChange = false;
 
       if (field == null) {
@@ -530,37 +529,33 @@ class Schema {
         var constructor:Class<Schema> = this._childSchemaTypes.get(index);
 
         value = Reflect.getProperty(this, field);
-        if (value == null) {
-          value = Type.createInstance(constructor, []);
-        }
-        value.decode(bytes, it);
+        if (value == null) { value = Type.createInstance(constructor, []); }
 
+        value.decode(bytes, it);
         hasChange = true;
 
       } else if (type == "array") {
         var isSchemaType = this._childSchemaTypes.exists(index);
 
         type = (isSchemaType) ? this._childSchemaTypes.get(index) : this._childPrimitiveTypes.get(index);
-        change = [];
 
-        value = Reflect.getProperty(this, field);
-        if (value == null) {
-          value = new ArraySchema<Dynamic>();
-        }
+        var valueRef: Dynamic = Reflect.getProperty(this, field);
+        if (valueRef == null) { valueRef = new ArraySchema<Dynamic>(); }
 
-        var valueRef = value.clone();
+        value = valueRef.clone();
 
         var newLength:Int = decoder.number(bytes, it);
         var numChanges:Int = cast(Math.min(decoder.number(bytes, it), newLength), Int);
 
-        hasChange = (numChanges > 0);
+        var hasRemoval = (value.items.length > newLength);
+        hasChange = (numChanges > 0) || hasRemoval;
 
         // FIXME: this may not be reliable. possibly need to encode this variable during
         // serializagion
         var hasIndexChange = false;
 
         // ensure current array has the same length as encoded one
-        if (value.items.length > newLength) {
+        if (hasRemoval) {
           var items = cast(valueRef.items, Array<Dynamic>);
 
           for (i in newLength...valueRef.items.length) {
@@ -618,17 +613,16 @@ class Schema {
           } else {
             valueRef.onChange(value.items[newIndex], newIndex);
           }
-
-          change.push(value.items[newIndex]);
         }
 
       } else if (type == "map") {
         var isSchemaType = this._childSchemaTypes.exists(index);
         type = (isSchemaType) ? this._childSchemaTypes.get(index) : this._childPrimitiveTypes.get(index);
 
-        value = Reflect.getProperty(this, field);
-        if (value == null) { value = new MapSchema<Dynamic>(); }
-        var valueRef = value.clone();
+        var valueRef: Dynamic = Reflect.getProperty(this, field);
+        if (valueRef == null) { valueRef = new MapSchema<Dynamic>(); }
+
+        value = valueRef.clone();
 
         var length:Int = decoder.number(bytes, it);
         hasChange = (length > 0);
@@ -714,7 +708,7 @@ class Schema {
       if (hasChange) {
         changes.push({
             field: field,
-            value: (change == null) ? value : change,
+            value: value,
             previousValue: Reflect.getProperty(this, field)
         });
       }

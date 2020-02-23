@@ -5,7 +5,7 @@ io.colyseus.Client
 io.colyseus.Room
 
 -lib hxcpp
--lib haxe-ws
+-lib colyseus-websocket
 
 # this is for Mac OS X:
 -D HXCPP_M64

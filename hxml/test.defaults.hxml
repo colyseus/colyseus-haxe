@@ -1,6 +1,6 @@
 -main TestMain
 -cp src
 -cp tests
--lib haxe-ws
+-lib colyseus-websocket
 # use deprecated haxe.unit.TestCase
 -lib hx3compat
