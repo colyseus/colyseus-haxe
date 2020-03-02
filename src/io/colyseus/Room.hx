@@ -24,7 +24,7 @@ class Room<T> {
     public var connection: Connection;
 
     public var serializerId: String = null;
-    private var serializer: Serializer;
+    private var serializer: Serializer = null;
 
     private var tmpStateClass: Class<T>;
 
@@ -80,7 +80,10 @@ class Room<T> {
     }
 
     public function teardown() {
-        this.serializer.teardown();
+        if (this.serializer != null) {
+            this.serializer.teardown();
+        }
+
         // this.onJoin.removeAll();
         // this.onStateChange.removeAll();
         // this.onMessage.removeAll();
