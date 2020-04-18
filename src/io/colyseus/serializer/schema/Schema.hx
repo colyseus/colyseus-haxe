@@ -481,6 +481,8 @@ class MapSchema<T> {
 
 #if !macro @:autoBuild(io.colyseus.serializer.schema.Decorator.build()) #end
 class Schema {
+  public static var decoder = new Decoder();
+
   public function new() {}
 
   public dynamic function onChange(changes:Array<DataChange>):Void {}
@@ -490,8 +492,6 @@ class Schema {
   private var _types:Map<Int, String> = new Map<Int, String>();
   private var _childSchemaTypes:Map<Int, Class<Schema>> = new Map<Int, Class<Schema>>();
   private var _childPrimitiveTypes:Map<Int, String> = new Map<Int, String>();
-
-  private static var decoder = new Decoder();
 
   public function decode(bytes:Bytes, it:It = null) {
     var changes:Array<DataChange> = [];
