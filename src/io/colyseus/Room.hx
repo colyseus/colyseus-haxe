@@ -121,12 +121,11 @@ class Room<T> {
 
     private function onMessageCallback(data: Bytes) {
         var code = data.get(0);
+		var it:It = {offset: 1};
 
         if (code == Protocol.JOIN_ROOM) {
-            var offset: Int = 1;
-
-            this.serializerId = data.getString(offset + 1, data.get(offset));
-            offset += this.serializerId.length + 1;
+            this.serializerId = data.getString(it.offset + 1, data.get(it.offset));
+            it.offset += this.serializerId.length + 1;
 
             if (this.serializerId == "schema") {
                 this.serializer = new SchemaSerializer<T>(tmpStateClass);
@@ -134,8 +133,8 @@ class Room<T> {
                 throw "FossilDelta serializer has been deprecated! Use SchemaSerializer instead.";
             }
 
-            if (data.length > offset) {
-                this.serializer.handshake(data, offset);
+            if (data.length > it.offset) {
+                this.serializer.handshake(data, it.offset);
             }
 
             this.onJoin.dispatch();
@@ -146,23 +145,21 @@ class Room<T> {
             this.connection.send(bytes.getBytes());
 
         } else if (code == Protocol.ERROR) {
-            var code = data.get(1);
-            var message = data.getString(3, data.get(2));
-            trace("Room error: code => " + code + ", message => " + message);
-            this.onError.dispatch(code, message);
+            var errorCode: Int = Schema.decoder.number(data, it);
+            var message = Schema.decoder.string(data, it);
+            trace("Room error: code => " + errorCode + ", message => " + message);
+            this.onError.dispatch(errorCode, message);
 
         } else if (code == Protocol.LEAVE_ROOM) {
             this.leave();
 
         } else if (code == Protocol.ROOM_STATE) {
-			this.setState(data.sub(1, data.length - 1));
+			this.setState(data.sub(it.offset, data.length - 1));
 
         } else if (code == Protocol.ROOM_STATE_PATCH) {
-            this.patch(data.sub(1, data.length - 1));
+            this.patch(data.sub(it.offset, data.length - 1));
 
         } else if (code == Protocol.ROOM_DATA) {
-            var it: It = {offset: 1};
-
             var type = (SPEC.stringCheck(data, it))
                 ? Schema.decoder.string(data, it)
                 : Schema.decoder.number(data, it);
