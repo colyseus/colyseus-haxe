@@ -22,7 +22,6 @@ class Connection {
     public var reconnectionEnabled: Bool = false;
 
     private var ws: WebSocket;
-    private var _enqueuedSend: Array<Dynamic> = [];
 
     // callbacks
     public dynamic function onOpen():Void {}
@@ -36,13 +35,6 @@ class Connection {
         this.ws = WebSocket.create(url);
         this.ws.onopen = function() {
             this.onOpen();
-
-            for (i in 0...this._enqueuedSend.length) {
-                this.send(this._enqueuedSend[i]);
-            }
-
-            // reset enqueued calls
-            this._enqueuedSend = [];
         }
 
         this.ws.onmessageBytes = function(bytes) {
@@ -73,15 +65,8 @@ class Connection {
         #end
     }
 
-    public function send(data: Dynamic) {
-        if (this.ws.readyState == ReadyState.Open) {
-            return this.ws.sendBytes( MsgPack.encode(data) );
-
-        } else {
-            // WebSocket not connected.
-            // Enqueue data to be sent when readyState == OPEN
-            this._enqueuedSend.push(data);
-        }
+    public function send(data: Bytes) {
+        return this.ws.sendBytes(data);
     }
 
     public function close () {

@@ -71,12 +71,16 @@ class Main extends Sprite {
                 trace("STATE CHANGE: " + Std.string(state));
             };
 
-            this.room.onMessage += function(message) {
-                trace("ROOM MESSAGE: " + Std.string(message));
-            };
+            this.room.onMessage(0, function(message) {
+                trace("onMessage: 0 => " + message);
+            });
 
-            this.room.onError += function(message) {
-                trace("ROOM ERROR: " + message);
+            this.room.onMessage("type", function(message) {
+                trace("onMessage: 'type' => " + message);
+            });
+
+            this.room.onError += function(code: Int, message: String) {
+                trace("ROOM ERROR: " + code + " => " + message);
             };
 
             this.room.onLeave += function() {
@@ -96,13 +100,13 @@ class Main extends Sprite {
 
 	private function onKeyDown(evt:KeyboardEvent):Void {
 		if (evt.keyCode == Keyboard.UP) {
-			this.room.send({y: -1});
+			this.room.send("move", {y: -1});
 		} else if (evt.keyCode == Keyboard.DOWN) {
-			this.room.send({y: 1});
+			this.room.send("move", {y: 1});
 		} else if (evt.keyCode == Keyboard.LEFT) {
-			this.room.send({x: -1});
+			this.room.send("move", {x: -1});
 		} else if (evt.keyCode == Keyboard.RIGHT) {
-			this.room.send({x: 1});
+			this.room.send("move", {x: 1});
 		}
 	}
 

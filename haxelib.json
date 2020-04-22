@@ -4,11 +4,11 @@
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
   "description": "Multiplayer Game Client for Haxe",
-  "version": "0.12.5",
+  "version": "0.13.0",
   "classPath": "src/",
-  "releasenote": "Support for version 0.12",
+  "releasenote": "Support for version 0.13",
   "contributors": ["endel"],
   "dependencies": {
-    "colyseus-websocket": "1.0.6"
+    "colyseus-websocket": "1.0.7"
   }
 }

@@ -7,7 +7,7 @@ class Protocol {
     // Room-related (9~19)
     public static var JOIN_REQUEST = 9;
     public static var JOIN_ROOM = 10;
-    public static var JOIN_ERROR = 11;
+    public static var ERROR = 11;
     public static var LEAVE_ROOM = 12;
     public static var ROOM_DATA = 13;
     public static var ROOM_STATE = 14;

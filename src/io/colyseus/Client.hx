@@ -3,6 +3,7 @@ package io.colyseus;
 import haxe.Constraints.Function;
 
 using io.colyseus.events.EventHandler;
+using io.colyseus.error.MatchMakeError;
 
 import haxe.io.Bytes;
 import org.msgpack.MsgPack;
@@ -31,43 +32,43 @@ class Client {
     }
 
     @:generic
-    public function joinOrCreate<T>(roomName: String, options: Map<String, Dynamic>, stateClass: Class<T>, callback: (String, Room<T>)->Void) {
+    public function joinOrCreate<T>(roomName: String, options: Map<String, Dynamic>, stateClass: Class<T>, callback: (MatchMakeError, Room<T>)->Void) {
         this.createMatchMakeRequest('joinOrCreate', roomName, options, stateClass, callback);
     }
 
     @:generic
-    public function create<T>(roomName: String, options: Map<String, Dynamic>, stateClass: Class<T>, callback: (String, Room<T>)->Void) {
+    public function create<T>(roomName: String, options: Map<String, Dynamic>, stateClass: Class<T>, callback: (MatchMakeError, Room<T>)->Void) {
         this.createMatchMakeRequest('create', roomName, options, stateClass, callback);
     }
 
     @:generic
-    public function join<T>(roomName: String, options: Map<String, Dynamic>, stateClass: Class<T>, callback: (String, Room<T>)->Void) {
+    public function join<T>(roomName: String, options: Map<String, Dynamic>, stateClass: Class<T>, callback: (MatchMakeError, Room<T>)->Void) {
         this.createMatchMakeRequest('join', roomName, options, stateClass, callback);
     }
 
     @:generic
-    public function joinById<T>(roomId: String, options: Map<String, Dynamic>, stateClass: Class<T>, callback: (String, Room<T>)->Void) {
+    public function joinById<T>(roomId: String, options: Map<String, Dynamic>, stateClass: Class<T>, callback: (MatchMakeError, Room<T>)->Void) {
         this.createMatchMakeRequest('joinById', roomId, options, stateClass, callback);
     }
 
     @:generic
-    public function reconnect<T>(roomId: String, sessionId: String, stateClass: Class<T>, callback: (String, Room<T>)->Void) {
+    public function reconnect<T>(roomId: String, sessionId: String, stateClass: Class<T>, callback: (MatchMakeError, Room<T>)->Void) {
         this.createMatchMakeRequest('joinById', roomId, [ "sessionId" => sessionId ], stateClass, callback);
     }
 
-    public function getAvailableRooms(roomName: String, callback: (String, Array<RoomAvailable>)->Void) {
+    public function getAvailableRooms(roomName: String, callback: (MatchMakeError, Array<RoomAvailable>)->Void) {
         this.request("GET", "/matchmake/" + roomName, null, callback);
     }
 
     @:generic
-    public function consumeSeatReservation<T>(response: Dynamic, stateClass: Class<T>, callback: (String, Room<T>)->Void) {
+    public function consumeSeatReservation<T>(response: Dynamic, stateClass: Class<T>, callback: (MatchMakeError, Room<T>)->Void) {
         var room: Room<T> = new Room<T>(response.room.name, stateClass);
 
         room.id = response.room.roomId;
         room.sessionId = response.sessionId;
 
-        var onError = function(message) {
-            callback(message, null);
+        var onError = function(code: Int, message: String) {
+            callback(new MatchMakeError(code, message), null);
         };
         var onJoin = function() {
             room.onError -= onError;
@@ -86,7 +87,7 @@ class Client {
         roomName: String,
         options: Map<String, Dynamic>,
         stateClass: Class<T>,
-        callback: (String, Room<T>)->Void
+        callback: (MatchMakeError, Room<T>)->Void
     ) {
         if (this.auth.hasToken()) {
             options.set("token", this.auth.token);
@@ -113,7 +114,7 @@ class Client {
         return new Connection(this.endpoint + "/" + path + "?" + params.join('&'));
     }
 
-    private function request(method: String, segments: String, body: String, callback: (String,Dynamic)->Void) {
+    private function request(method: String, segments: String, body: String, callback: (MatchMakeError,Dynamic)->Void) {
         var req = new haxe.Http("http" + this.endpoint.substring(2) + segments);
 
         if (body != null) {
@@ -132,7 +133,9 @@ class Client {
             var response = haxe.Json.parse(json);
 
             if (response.error) {
-                callback(cast response.error, null);
+                var code = cast response.code;
+                var message = cast response.error;
+                callback(new MatchMakeError(code, message), null);
 
             } else {
                 callback(null, response);
@@ -140,7 +143,7 @@ class Client {
         };
 
         req.onError = function(err) {
-            callback(err, null);
+            callback(new MatchMakeError(0, err), null);
         };
 
         req.request(method == "POST");
