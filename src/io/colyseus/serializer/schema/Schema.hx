@@ -674,7 +674,7 @@ class Schema {
           }
 
           if (isNilItem) {
-            if (item && isSchemaType) {
+            if (item && isSchemaType && item.onRemove != null) {
               item.onRemove();
             }
 
