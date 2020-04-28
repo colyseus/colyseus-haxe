@@ -119,6 +119,14 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
         assertEquals(state.arrayOfNumbers.length, 1);
         assertEquals(state.arrayOfStrings.length, 1);
         assertEquals(state.arrayOfInt32.length, 1);
+
+        var zeroBytes = [ 0, 0, 0, 1, 0, 0, 2, 0, 0, 3, 0, 0 ];
+        state.decode(getBytes(zeroBytes));
+
+        assertEquals(state.arrayOfSchemas.length, 0);
+        assertEquals(state.arrayOfNumbers.length, 0);
+        assertEquals(state.arrayOfStrings.length, 0);
+        assertEquals(state.arrayOfInt32.length, 0);
     }
 
     public function testMapSchemaTypes()
