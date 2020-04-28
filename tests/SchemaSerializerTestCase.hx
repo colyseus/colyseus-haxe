@@ -74,10 +74,10 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
         var state = new ArraySchemaTypes();
         var bytes = [ 0, 2, 2, 0, 0, 100, 1, 208, 156, 193, 1, 0, 100, 1, 208, 156, 193, 1, 4, 4, 0, 0, 1, 10, 2, 20, 3, 205, 192, 13, 2, 3, 3, 0, 163, 111, 110, 101, 1, 163, 116, 119, 111, 2, 165, 116, 104, 114, 101, 101, 3, 3, 3, 0, 232, 3, 0, 0, 1, 192, 13, 0, 0, 2, 72, 244, 255, 255 ];
 
-        /* state.arrayOfSchemas.OnAdd += (value, key) => Debug.Log("onAdd, arrayOfSchemas => " + key); */
-        /* state.arrayOfNumbers.OnAdd += (value, key) => Debug.Log("onAdd, arrayOfNumbers => " + key); */
-        /* state.arrayOfStrings.OnAdd += (value, key) => Debug.Log("onAdd, arrayOfStrings => " + key); */
-        /* state.arrayOfInt32.OnAdd += (value, key) => Debug.Log("onAdd, arrayOfInt32 => " + key); */
+        // state.arrayOfSchemas.onAdd = (value, key) -> trace("onAdd, arrayOfSchemas => " + key);
+        // state.arrayOfNumbers.onAdd = (value, key) -> trace("onAdd, arrayOfNumbers => " + key);
+        // state.arrayOfStrings.onAdd = (value, key) -> trace("onAdd, arrayOfStrings => " + key);
+        // state.arrayOfInt32.onAdd = (value, key) -> trace("onAdd, arrayOfInt32 => " + key);
 
         state.onChange = function(changes) {
             trace("\nCHANGES! => " + changes);
@@ -107,11 +107,6 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
         assertEquals(state.arrayOfInt32.items[1], 3520);
         assertEquals(state.arrayOfInt32.items[2], -3000);
 
-        /* state.arrayOfSchemas.OnRemove += (value, key) => Debug.Log("onRemove, arrayOfSchemas => " + key); */
-        /* state.arrayOfNumbers.OnRemove += (value, key) => Debug.Log("onRemove, arrayOfNumbers => " + key); */
-        /* state.arrayOfStrings.OnRemove += (value, key) => Debug.Log("onRemove, arrayOfStrings => " + key); */
-        /* state.arrayOfInt32.OnRemove += (value, key) => Debug.Log("onRemove, arrayOfInt32 => " + key); */
-
         var popBytes = [ 0, 1, 0, 1, 1, 0, 3, 1, 0, 2, 1, 0 ];
         state.decode(getBytes(popBytes));
 
@@ -119,6 +114,11 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
         assertEquals(state.arrayOfNumbers.length, 1);
         assertEquals(state.arrayOfStrings.length, 1);
         assertEquals(state.arrayOfInt32.length, 1);
+
+        // state.arrayOfSchemas.onRemove = function (value, key) { trace("onRemove, arrayOfSchemas => " + key); };
+        // state.arrayOfNumbers.onRemove = function (value, key) { trace("onRemove, arrayOfNumbers => " + key); };
+        // state.arrayOfStrings.onRemove = function (value, key) { trace("onRemove, arrayOfStrings => " + key); };
+        // state.arrayOfInt32.onRemove = function (value, key) { trace("onRemove, arrayOfInt32 => " + key); };
 
         var zeroBytes = [ 0, 0, 0, 1, 0, 0, 2, 0, 0, 3, 0, 0 ];
         state.decode(getBytes(zeroBytes));
