@@ -548,7 +548,7 @@ class Schema {
         var numChanges:Int = cast(Math.min(decoder.number(bytes, it), newLength), Int);
 
         var hasRemoval = (value.items.length > newLength);
-        hasChange = (numChanges > 0) || hasRemoval;
+        hasChange = (numChanges > 0) || hasRemoval || value.items.length == 0;
 
         // FIXME: this may not be reliable. possibly need to encode this variable during
         // serializagion
