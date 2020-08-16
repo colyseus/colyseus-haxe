@@ -124,38 +124,6 @@ class Decorator {
 
 typedef It = {offset:Int}
 
-class SPEC {
-  public static var END_OF_STRUCTURE:Int = 193; // (msgpack spec: never used)
-  public static var NIL:Int = 192;
-  public static var INDEX_CHANGE:Int = 212;
-
-  public static function numberCheck(bytes:Bytes, it:It) {
-    var prefix = bytes.get(it.offset);
-    return (prefix < 0x80 || (prefix >= 0xca && prefix <= 0xd3));
-  }
-
-  public static function arrayCheck(bytes:Bytes, it:It) {
-    return bytes.get(it.offset) < 0xa0;
-  }
-
-  public static function nilCheck(bytes:Bytes, it:It) {
-    return bytes.get(it.offset) == NIL;
-  }
-
-  public static function indexChangeCheck(bytes:Bytes, it:It) {
-    return bytes.get(it.offset) == INDEX_CHANGE;
-  }
-
-  public static function stringCheck(bytes, it:It) {
-    var prefix = bytes.get(it.offset);
-    return ( // fixstr
-      (prefix < 0xc0 && prefix > 0xa0) || // str 8
-      prefix == 0xd9 || // str 16
-      prefix == 0xda || // str 32
-      prefix == 0xdb);
-  }
-}
-
 class Decoder {
   public function new() {}
 
@@ -326,157 +294,42 @@ class Decoder {
   }
 }
 
+class SPEC {
+  public static var END_OF_STRUCTURE:Int = 193; // (msgpack spec: never used)
+  public static var NIL:Int = 192;
+  public static var INDEX_CHANGE:Int = 212;
+
+  public static function numberCheck(bytes:Bytes, it:It) {
+    var prefix = bytes.get(it.offset);
+    return (prefix < 0x80 || (prefix >= 0xca && prefix <= 0xd3));
+  }
+
+  public static function arrayCheck(bytes:Bytes, it:It) {
+    return bytes.get(it.offset) < 0xa0;
+  }
+
+  public static function nilCheck(bytes:Bytes, it:It) {
+    return bytes.get(it.offset) == NIL;
+  }
+
+  public static function indexChangeCheck(bytes:Bytes, it:It) {
+    return bytes.get(it.offset) == INDEX_CHANGE;
+  }
+
+  public static function stringCheck(bytes, it:It) {
+    var prefix = bytes.get(it.offset);
+    return ( // fixstr
+      (prefix < 0xc0 && prefix > 0xa0) || // str 8
+      prefix == 0xd9 || // str 16
+      prefix == 0xda || // str 32
+      prefix == 0xdb);
+  }
+}
+
 typedef DataChange = {
   var field(default,never):String;
   var value(default,never):Any;
   var previousValue(default,never):Any;
-}
-
-@:keep
-@:generic
-class ArraySchema<T> {
-  public var items:Array<T> = [];
-  public var length(get, null): Int;
-
-  function get_length() {
-      return this.items.length;
-  }
-
-  public dynamic function onAdd(item:T, key:Int):Void {}
-  public dynamic function onChange(item:T, key:Int):Void {}
-  public dynamic function onRemove(item:T, key:Int):Void {}
-
-  public function new() {}
-
-  public function clone():ArraySchema<T> {
-    var cloned = new ArraySchema<T>();
-    cloned.items = this.items.copy();
-    cloned.onAdd = this.onAdd;
-    cloned.onChange = this.onChange;
-    cloned.onRemove = this.onRemove;
-    return cloned;
-  }
-
-  public function iterator() {
-    return this.items.iterator();
-  }
-
-  public function toString () {
-    var data = [];
-    for (item in this.items) {
-      data.push(""+item);
-    }
-    return "ArraySchema("+Lambda.count(this.items)+") { " + data.join(", ") + " } ";
-  }
-
-  /** TODO: This only works with Abstracts! */
-
-  /* @:arrayAccess */
-  /* public inline function get(key:Int) { */
-  /*   return this.items[key]; */
-  /* } */
-  /*  */
-  /* @:arrayAccess */
-  /* public inline function arrayWrite(key:Int, value:T):T { */
-  /*   this.items[key] = value; */
-  /*   return value; */
-  /* } */
-
-}
-
-class OrderedMapIterator<K,V> {
-    var map : OrderedMap<K,V>;
-    var index : Int = 0;
-    public function new(omap:OrderedMap<K,V>) { map = omap; }
-    public function hasNext() : Bool { return index < map._keys.length;}
-    public function next() : V { return map.get(map._keys[index++]); }
-}
-
-// class OrderedMap<K, V> implements IMap<K, V> {
-@:keep
-class OrderedMap<K, V> {
-    var map:Map<K, V>;
-
-    @:allow(OrderedMapIterator) // TODO: why this doesn't seem to work?
-    public var _keys:Array<K>; // FIXME: this should be private
-    var idx = 0;
-
-    public function new(_map) {
-       _keys = [];
-       map = _map;
-    }
-
-    public function set(key: K, value: V) {
-        if(!map.exists(key)) _keys.push(key);
-        map[key] = value;
-    }
-
-    public function toString() {
-        var _ret = ''; var _cnt = 0; var _len = _keys.length;
-        for(k in _keys) _ret += '$k => ${map.get(k)}${(_cnt++<_len-1?", ":"")}';
-        return '{$_ret}';
-    }
-
-    public function iterator() return new OrderedMapIterator<K,V>(this);
-    public function remove(key: K) return map.remove(key) && _keys.remove(key);
-    public function exists(key: K) return map.exists(key);
-    public function get(key: K) return map.get(key);
-    public inline function keys() return _keys.iterator();
-}
-
-
-@:keep
-@:generic
-class MapSchema<T> {
-  public var items:OrderedMap<String, T> = new OrderedMap<String, T>(new Map<String, T>());
-  public var length(get, null): Int;
-
-  function get_length() {
-      return this.items._keys.length;
-  }
-
-  public dynamic function onAdd(item:T, key:String):Void {}
-  public dynamic function onChange(item:T, key:String):Void {}
-  public dynamic function onRemove(item:T, key:String):Void {}
-
-  public function new() {}
-
-  public function clone():MapSchema<T> {
-    var cloned = new MapSchema<T>();
-
-    for (key in this.items.keys()) {
-      cloned.items.set(key, this.items.get(key));
-    }
-
-    cloned.onAdd = this.onAdd;
-    cloned.onChange = this.onChange;
-    cloned.onRemove = this.onRemove;
-
-    return cloned;
-  }
-
-  public function iterator() {
-    return this.items.iterator();
-  }
-
-  @:arrayAccess
-  public inline function get(key:String) {
-    return this.items.get(key);
-  }
-
-  @:arrayAccess
-  public inline function arrayWrite(key:String, value:T):T {
-    this.items.set(key, value);
-    return value;
-  }
-
-  public function toString () {
-    var data = [];
-    for (key in this.items.keys()) {
-      data.push(key + " => " + this.items.get(key));
-    }
-    return "MapSchema ("+ Lambda.count(this.items) +") { " + data.join(", ") + " }";
-  }
 }
 
 #if !macro @:autoBuild(io.colyseus.serializer.schema.Decorator.build()) #end
@@ -493,12 +346,11 @@ class Schema {
   private var _childSchemaTypes:Map<Int, Class<Schema>> = new Map<Int, Class<Schema>>();
   private var _childPrimitiveTypes:Map<Int, String> = new Map<Int, String>();
 
-  public function decode(bytes:Bytes, it:It = null) {
+  public function decode(bytes:Bytes, it:It = null, refs: ReferenceTracker = null) {
     var changes:Array<DataChange> = [];
 
-    if (it == null) {
-      it = {offset: 0};
-    }
+    if (it == null) { it = {offset: 0}; }
+    if (refs == null) { refs = new ReferenceTracker(); }
 
     var totalBytes = bytes.length;
     while (it.offset < totalBytes) {
@@ -730,54 +582,4 @@ class Schema {
 
     return "{ " + data.join(", ") + " }";
   }
-}
-
-class Context {
-  public var typeIds:Map<UInt, Class<Schema>> = new Map<UInt, Class<Schema>>();
-  public var schemas:Array<Class<Schema>> = new Array();
-
-  public function new() {}
-
-  public function add(schema:Class<Schema>, ?typeid:UInt) {
-    if (typeid == null) {
-      typeid = schemas.length;
-    }
-
-    this.typeIds[typeid] = schema;
-    this.schemas.push(schema);
-  }
-
-  public function get(typeid:UInt) {
-    return this.typeIds[typeid];
-  }
-}
-
-/**
- * Reflection
- */
-class ReflectionField extends Schema {
-  @:type("string")
-  public var name:String;
-
-  @:type("string")
-  public var type:String;
-
-  @:type("uint8")
-  public var referencedType:UInt;
-}
-
-class ReflectionType extends Schema {
-  @:type("uint8")
-  public var id:UInt;
-
-  @:type("array", ReflectionField)
-  public var fields:ArraySchema<ReflectionField> = new ArraySchema<ReflectionField>();
-}
-
-class Reflection extends Schema {
-  @:type("array", ReflectionType)
-  public var types:ArraySchema<ReflectionType> = new ArraySchema<ReflectionType>();
-
-  @:type("uint8")
-  public var rootType:UInt;
 }

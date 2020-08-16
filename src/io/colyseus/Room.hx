@@ -4,6 +4,8 @@ import haxe.io.BytesOutput;
 import io.colyseus.serializer.schema.Schema;
 import io.colyseus.serializer.Serializer;
 import io.colyseus.serializer.SchemaSerializer;
+import io.colyseus.serializer.NoneSerializer;
+import io.colyseus.serializer.FossilDeltaSerializer;
 
 import io.colyseus.serializer.schema.Schema.It;
 import io.colyseus.serializer.schema.Schema.SPEC;
@@ -129,8 +131,12 @@ class Room<T> {
 
             if (this.serializerId == "schema") {
                 this.serializer = new SchemaSerializer<T>(tmpStateClass);
+
+            } else if (this.serializerId == "fossil-delta") {
+                this.serializer = new FossilDeltaSerializer();
+
             } else {
-                throw "FossilDelta serializer has been deprecated! Use SchemaSerializer instead.";
+                this.serializer = new NoneSerializer();
             }
 
             if (data.length > it.offset) {

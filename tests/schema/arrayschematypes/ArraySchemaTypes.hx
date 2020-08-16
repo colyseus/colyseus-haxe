@@ -1,12 +1,12 @@
-// 
+//
 // THIS FILE HAS BEEN GENERATED AUTOMATICALLY
 // DO NOT CHANGE IT MANUALLY UNLESS YOU KNOW WHAT YOU'RE DOING
-// 
+//
 // GENERATED USING @colyseus/schema 0.4.61
-// 
+//
 
 package schema.arrayschematypes;
-import io.colyseus.serializer.schema.Schema;
+import io.colyseus.serializer.schema.*;
 
 class ArraySchemaTypes extends Schema {
 	@:type("array", IAmAChild)

@@ -6,7 +6,7 @@
 //
 
 package schema.primitivetypes;
-import io.colyseus.serializer.schema.Schema;
+import io.colyseus.serializer.schema.*;
 
 class PrimitiveTypes extends Schema {
 	@:type("int8")

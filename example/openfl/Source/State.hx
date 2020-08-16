@@ -1,12 +1,12 @@
-// 
+//
 // THIS FILE HAS BEEN GENERATED AUTOMATICALLY
 // DO NOT CHANGE IT MANUALLY UNLESS YOU KNOW WHAT YOU'RE DOING
-// 
+//
 // GENERATED USING @colyseus/schema 0.4.32
-// 
+//
 
 
-import io.colyseus.serializer.schema.Schema;
+import io.colyseus.serializer.schema.*;
 
 class State extends Schema {
 	@:type("map", Player)

@@ -1,18 +1,21 @@
 package io.colyseus.serializer;
 
 import io.colyseus.serializer.schema.Schema;
+import io.colyseus.serializer.schema.ReferenceTracker;
+
 import haxe.io.Bytes;
 
 @:generic
 class SchemaSerializer<T> implements Serializer {
     public var state: T;
+    private var refs: ReferenceTracker = new ReferenceTracker();
 
     public function new (cl: Class<T>) {
         this.state = Type.createInstance(cl, []);
     }
 
     public function setState(data: Bytes) {
-        cast(this.state, Schema).decode(data);
+        cast(this.state, Schema).decode(data, null, this.refs);
     }
 
     public function getState(): T {
@@ -20,10 +23,11 @@ class SchemaSerializer<T> implements Serializer {
     }
 
     public function patch(data: Bytes) {
-        cast(this.state, Schema).decode(data);
+        cast(this.state, Schema).decode(data, null, this.refs);
     }
 
     public function teardown() {
+        this.refs.clear();
     }
 
     public function handshake(bytes: Bytes, offset: Int) {
