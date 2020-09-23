@@ -129,7 +129,7 @@ class Encoder {
 	}
 
 	inline function writeString(b:String) {
-        var encoded = Bytes.ofString(b);
+		var encoded = Bytes.ofString(b);
 		var length = encoded.length;
 		if (length < 0x20) {
 			// fix string

@@ -4,7 +4,7 @@
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
   "description": "Multiplayer Game Client for Haxe",
-  "version": "0.13.1",
+  "version": "0.13.2",
   "classPath": "src/",
   "releasenote": "Support for version 0.13",
   "contributors": ["endel"],
