@@ -1,0 +1,57 @@
+name: Build, Release & Publish
+on: push
+
+jobs:
+  build:
+    name: Checkout & Build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+      #
+      # ADD TEST/BUILD STEPS HERE
+      #
+
+  release:
+    name: Check version & Create release
+    runs-on: ubuntu-latest
+    needs: build
+    outputs:
+      released: ${{ steps.check.outputs.version }} # expose release.outputs.released for the "publish" job
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+    - uses: EndBug/version-check@v1
+      id: check
+      with:
+        file-name: haxelib.json
+        diff-search: true
+    - name: Create Release
+      if: steps.check.outputs.changed
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.check.outputs.version }}
+        # tag_name: ${{ github.ref }}
+        release_name: ${{ steps.check.outputs.version }}
+        # release_name: ${{ github.ref }}
+        draft: false
+        prerelease: false
+
+  publish:
+    name: Publish to Haxelib
+    runs-on: ubuntu-latest
+    needs: release
+    if: needs.release.outputs.released
+    steps:
+      - uses: actions/checkout@v2
+      - uses: krdlab/setup-haxe@v1
+        with:
+          haxe-version: 4.1.2
+      - run: |
+          haxe -version
+          haxelib submit . ${{ secrets.HAXELIB_PASSWORD }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
