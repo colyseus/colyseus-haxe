@@ -1,5 +1,7 @@
 package io.colyseus.serializer.schema;
 
+import io.colyseus.serializer.schema.types.ArraySchema;
+
 /**
  * Reflection
  */

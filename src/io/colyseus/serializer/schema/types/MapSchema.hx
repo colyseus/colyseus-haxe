@@ -1,4 +1,4 @@
-package io.colyseus.serializer.schema;
+package io.colyseus.serializer.schema.types;
 
 class OrderedMapIterator<K,V> {
     var map : OrderedMap<K,V>;
@@ -17,9 +17,9 @@ class OrderedMap<K, V> {
     public var _keys:Array<K>; // FIXME: this should be private
     var idx = 0;
 
-    public function new(_map) {
+    public function new(_map: Map<K, V> = null) {
        _keys = [];
-       map = _map;
+       map = (_map != null) ? _map : new Map<K, V>();
     }
 
     public function set(key: K, value: V) {
@@ -43,19 +43,50 @@ class OrderedMap<K, V> {
 
 @:keep
 @:generic
-class MapSchema<T> {
-  public var items:OrderedMap<String, T> = new OrderedMap<String, T>(new Map<String, T>());
-  public var length(get, null): Int;
+class MapSchema<T> implements IRef implements ISchemaCollection {
+  public var __refId: Int;
+  public var _childType: Dynamic;
 
-  function get_length() {
-      return this.items._keys.length;
+  public function getIndex(fieldIndex: Int) {
+    return this.indexes[fieldIndex];
   }
+
+  public function setIndex(fieldIndex: Int, dynamicIndex: Dynamic) {
+    this.indexes[fieldIndex] = dynamicIndex;
+  }
+
+  public function getByIndex(fieldIndex: Int): Dynamic {
+    return this.items.get(this.indexes[fieldIndex]);
+  }
+
+  public function setByIndex(index: Int, dynamicIndex: Dynamic, value: Dynamic): Void {
+    this.indexes[index] = dynamicIndex;
+		this.items.set(dynamicIndex, value);
+  }
+
+  public function deleteByIndex(fieldIndex: Int): Void {
+    var index = this.indexes[fieldIndex];
+    this.items.remove(index);
+    this.indexes.remove(fieldIndex);
+  }
+
+  public var items:OrderedMap<String, T> = new OrderedMap<String, T>();
+  public var indexes:Map<Int, String> = new Map<Int, String>();
+
+  public var length(get, null): Int;
+  function get_length() { return this.items._keys.length; }
 
   public dynamic function onAdd(item:T, key:String):Void {}
   public dynamic function onChange(item:T, key:String):Void {}
   public dynamic function onRemove(item:T, key:String):Void {}
 
   public function new() {}
+
+	public function moveEventHandlers(previousInstance: Dynamic) {
+    this.onAdd = previousInstance.onAdd;
+    this.onChange = previousInstance.onChange;
+    this.onRemove = previousInstance.onRemove;
+  }
 
   public function clone():MapSchema<T> {
     var cloned = new MapSchema<T>();
