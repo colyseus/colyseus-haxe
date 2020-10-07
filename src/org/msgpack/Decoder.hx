@@ -30,9 +30,9 @@ class Decoder {
 	var o:Dynamic;
 
 	public function new(b:Bytes, option:DecodeOption) {
-		var i       = new BytesInput(b);
+		var i	   = new BytesInput(b);
 		i.bigEndian = true;
-		o           = decode(i, option);
+		o		   = decode(i, option);
 	}
 
 	function decode(i:BytesInput, option:DecodeOption):Dynamic {
@@ -50,6 +50,33 @@ class Decoder {
 				case 0xc4: return i.read(i.readByte  ());
 				case 0xc5: return i.read(i.readUInt16());
 				case 0xc6: return i.read(i.readInt32 ());
+
+				// ext: undefined
+				case 0xd4: {
+				  var type = i.readByte();
+				  if (type == 0x00) {
+					// "undefined"
+					i.readByte();
+					return null;
+				  }
+				  throw "MsgPack - unsupported extension type: "  + type;
+				}
+
+				// ext: Date
+				case 0xd7: {
+				  var type = i.readByte();
+				  if (type == 0x00) {
+					var high = i.readInt32() * Math.pow(2, 32);
+					var low: UInt = (i.readInt32());
+
+					// hi = this._view.getInt32(this._offset) * Math.pow(2, 32);
+					// lo = this._view.getUint32(this._offset + 4);
+					// this._offset += 8;
+
+					return Date.fromTime(high + low);
+				  }
+				  throw "MsgPack - unsupported extension type: "  + type;
+				}
 
 				// floating point
 				case 0xca: return i.readFloat ();
@@ -81,11 +108,11 @@ class Decoder {
 				case 0xdf: return readMap(i, i.readInt32 (), option);
 
 				default  : {
-					if (b < 0x80) {	return b;                               } else // positive fix num
+					if (b < 0x80) {	return b;							   } else // positive fix num
 					if (b < 0x90) { return readMap  (i, (0xf & b), option); } else // fix map
 					if (b < 0xa0) { return readArray(i, (0xf & b), option); } else // fix array
-					if (b < 0xc0) { return i.readString(0x1f & b);          } else // fix string
-					if (b > 0xdf) { return 0xffffff00 | b;                  }      // negative fix num
+					if (b < 0xc0) { return i.readString(0x1f & b);		  } else // fix string
+					if (b > 0xdf) { return 0xffffff00 | b;				  }	  // negative fix num
 				}
 			}
 		} catch (e:Eof) {}

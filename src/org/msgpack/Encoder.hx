@@ -30,14 +30,14 @@ class Encoder {
 			case TBool    : o.writeByte(d ? 0xc3 : 0xc2);
 			case TInt     : writeInt(d);
 			case TFloat   : writeFloat(d);
-			
-			case TClass(c): 
+
+			case TClass(c):
 				switch (Type.getClassName(c)) {
 					case "haxe._Int64.___Int64" : writeInt64(d);
 					case "haxe.io.Bytes" : writeBinary(d);
 					case "String" : writeString(d);
 					case "Array"  : writeArray (d);
-					case "haxe.ds.IntMap" | "haxe.ds.StringMap" | "haxe.ds.UnsafeStringMap" : 
+					case "haxe.ds.IntMap" | "haxe.ds.StringMap" | "haxe.ds.UnsafeStringMap" :
 					     writeMap(d);
 					default: throw 'Error: ${Type.getClassName(c)} not supported';
 				}
@@ -88,7 +88,7 @@ class Encoder {
 				o.writeByte(0xcd);
 				o.writeUInt16(d);
 			} else {
-				// unsigned int 32 
+				// unsigned int 32
 				// TODO: HaXe writeUInt32 ?
 				o.writeByte(0xce);
 				o.writeInt32(d);
@@ -96,7 +96,7 @@ class Encoder {
 		}
 	}
 
-	inline function writeFloat(d:Float) {		
+	inline function writeFloat(d:Float) {
 			var a = Math.abs(d);
 			if (a > FLOAT_SINGLE_MIN && a < FLOAT_SINGLE_MAX) {
 				// Single Precision Floating
@@ -129,11 +129,12 @@ class Encoder {
 	}
 
 	inline function writeString(b:String) {
-		var length = b.length;
+		var encoded = Bytes.ofString(b);
+		var length = encoded.length;
 		if (length < 0x20) {
 			// fix string
 			o.writeByte(0xa0 | length);
-		} else 
+		} else
 		if (length < 0x100) {
 			// string 8
 			o.writeByte(0xd9);
@@ -148,7 +149,7 @@ class Encoder {
 			o.writeByte(0xdb);
 			o.writeInt32(length);
 		}
-		o.writeString(b);
+		o.write(encoded);
 	}
 
 	inline function writeArray(d:Array<Dynamic>) {
@@ -156,7 +157,7 @@ class Encoder {
 		if (length < 0x10) {
 			// fix array
 			o.writeByte(0x90 | length);
-		} else 
+		} else
 		if (length < 0x10000) {
 			// array 16
 			o.writeByte(0xdc);
@@ -176,7 +177,7 @@ class Encoder {
 		if (length < 0x10) {
 			// fix map
 			o.writeByte(0x80 | length);
-		} else 
+		} else
 		if (length < 0x10000) {
 			// map 16
 			o.writeByte(0xde);
@@ -185,17 +186,17 @@ class Encoder {
 			// map 32
 			o.writeByte(0xdf);
 			o.writeInt32(length);
-		}		
+		}
 	}
 
 	inline function writeMap<K, V>(d:Map<K, V>) {
-		
+
 		var length = 0;
-		for (k in d.keys()) 
+		for (k in d.keys())
 			length++;
 
 		writeMapLength(length);
-		for (k in d.keys()) { 
+		for (k in d.keys()) {
 			encode(k);
 			encode(d.get(k));
 		}

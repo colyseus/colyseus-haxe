@@ -4,9 +4,9 @@
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
   "description": "Multiplayer Game Client for Haxe",
-  "version": "0.13.1",
+  "version": "0.13.3",
   "classPath": "src/",
-  "releasenote": "Support for version 0.13",
+  "releasenote": "Fixes msgpack decoder to support decoding 'undefined' and 'Date'.",
   "contributors": ["endel"],
   "dependencies": {
     "colyseus-websocket": "1.0.7"
