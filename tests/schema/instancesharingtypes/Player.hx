@@ -5,15 +5,12 @@
 // GENERATED USING @colyseus/schema 1.0.0-alpha.61
 // 
 
-package schema.inheritedtypes;
+package schema.instancesharingtypes;
 import io.colyseus.serializer.schema.Schema;
 import io.colyseus.serializer.schema.types.*;
 
-class Entity extends Schema {
-	@:type("number")
-	public var x: Dynamic = 0;
-
-	@:type("number")
-	public var y: Dynamic = 0;
+class Player extends Schema {
+	@:type("ref", Position)
+	public var position: Position = new Position();
 
 }

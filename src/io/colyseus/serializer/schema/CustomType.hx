@@ -10,17 +10,32 @@ class CustomType {
   public static var instance: CustomType = new CustomType();
   public static function getInstance() { return instance; }
 
-  private var types: Map<String, Class<Dynamic>> = new Map<String, Class<Dynamic>>();
+  public var types:Array<String> = [];
+  private var customTypes: Map<String, Class<Dynamic>> = new Map<String, Class<Dynamic>>();
+
   public function new() {
-    this.types.set("array", ArraySchema);
-    this.types.set("map", MapSchema);
+    this.set("array", ArraySchema);
+    this.set("map", MapSchema);
   }
 
   public function set(id: String, type: Dynamic) {
-    this.types.set(id, type);
+    if (!this.customTypes.exists(id)) {
+			this.customTypes.set(id, type);
+			this.types.push(id);
+    }
   }
 
   public function get(id: String) {
-    return this.types.get(id);
+    return this.customTypes.get(id);
+  }
+
+  public function getTypes() {
+    var customTypes: Array<String> = [];
+
+    for (key in this.customTypes.keys()) {
+      customTypes.push(key);
+    }
+
+    return customTypes;
   }
 }

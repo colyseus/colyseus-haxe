@@ -17,9 +17,9 @@ class OrderedMap<K, V> {
     public var _keys:Array<K>; // FIXME: this should be private
     var idx = 0;
 
-    public function new(_map: Map<K, V> = null) {
+    public function new(_map = null) {
        _keys = [];
-       map = (_map != null) ? _map : new Map<K, V>();
+       map = _map;
     }
 
     public function set(key: K, value: V) {

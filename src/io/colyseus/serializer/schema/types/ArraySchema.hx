@@ -62,10 +62,12 @@ class ArraySchema<T> implements IRef implements ISchemaCollection {
 
   public function toString () {
     var data = [];
-    for (item in this.items) {
-      data.push(""+item);
-    }
-    return "ArraySchema("+Lambda.count(this.items)+") { " + data.join(", ") + " } ";
+
+		for (item in this.items) {
+			data.push("" + item);
+		}
+
+		return "ArraySchema(" + Lambda.count(this.items) + ") { " + data.join(", ") + " } ";
   }
 
   /** TODO: This only works with Abstracts! */
