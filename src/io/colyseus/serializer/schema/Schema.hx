@@ -1,5 +1,6 @@
 package io.colyseus.serializer.schema;
 
+import haxe.ds.Either;
 import io.colyseus.serializer.schema.types.ISchemaCollection;
 import io.colyseus.serializer.schema.types.IRef;
 import io.colyseus.serializer.schema.types.ArraySchema;
@@ -387,11 +388,11 @@ class Schema implements IRef {
     this.refs = refs;
 
     var refId = 0;
-    var ref: Dynamic = this;
+		var ref:Dynamic = this;
     var changes:Array<DataChange> = [];
 
     var allChanges = new OrderedMap<Int, Array<DataChange>>(new Map<Int, Array<DataChange>>());
-    allChanges.set(refId, ref);
+    allChanges.set(refId, changes);
 
     var totalBytes = bytes.length;
 		while (it.offset < totalBytes) {
@@ -414,6 +415,7 @@ class Schema implements IRef {
       }
 
       trace("\n!! REFID SELECTED => " + refId);
+      trace("\nREF => " + ref);
 
 			var isSchema = Std.is(ref, Schema);
 
@@ -439,40 +441,40 @@ class Schema implements IRef {
 			var childType:Dynamic = null;
 
       if (isSchema) {
-        trace("IS SCHEMA!");
+        trace("\nIS SCHEMA!");
         childType = (ref : Schema)._childTypes.get(fieldIndex);
         fieldType = (ref : Schema)._types.get(fieldIndex);
 
       } else {
-        trace("NOT SCHEMA!");
+        trace("\nNOT SCHEMA!");
         var collectionChildType = (ref : ISchemaCollection)._childType;
-        trace("_childType => " + collectionChildType);
+        var isPrimitiveFieldType = Std.is(collectionChildType, String);
 
-        fieldType = (Std.is(collectionChildType, String))
+        fieldType = (isPrimitiveFieldType)
           ? collectionChildType
-          : null;
+          : "ref";
 
-        if (fieldType != null) {
+        if (!isPrimitiveFieldType) {
           childType = collectionChildType;
         }
       }
 
-      trace("isSchema? => " + isSchema);
-      trace("fieldIndex => " + fieldIndex);
-      trace("fieldName => " + fieldName);
+      trace("\nisSchema? => " + isSchema);
+      trace("\nfieldIndex => " + fieldIndex);
+      trace("\nfieldName => " + fieldName);
       try {
-        trace("fieldType => " + fieldType);
+        trace("\nfieldType => " + fieldType);
 
       } catch (e) {
-				trace("fieldType => " + Type.getClassName(fieldType));
+				trace("\nfieldType => " + Type.getClassName(fieldType));
 
       }
 
       try {
-        trace("childType => " + ((Std.is(childType, String)) ? childType : Type.getClassName(childType)));
+        trace("\nchildType => " + ((Std.is(childType, String)) ? childType : Type.getClassName(childType)));
 
       } catch (e) {
-				trace("childType => " + childType);
+				// trace("\nchildType => " + childType);
       }
 
 			var value:Dynamic = null;
@@ -480,15 +482,20 @@ class Schema implements IRef {
 			var dynamicIndex:Dynamic = null;
 
 			if (!isSchema) {
-				previousValue = ref.getByIndex(fieldIndex);
+        trace("Will getByIndex() => " + fieldIndex);
+        previousValue = ref.getByIndex(fieldIndex);
+        trace("Got by index => " + previousValue);
 
         if ((operation & cast OPERATION.ADD) == OPERATION.ADD) { // ADD or DELETE_AND_ADD
           //
           // TODO: Std.is() will not work with @:generic() types.
           //
+          trace("Will check if it's a map schema...");
+          trace("IS MAPSCHEMA?? => "  + Std.is(ref, MapSchema));
           dynamicIndex = Std.is(ref, MapSchema)
             ? decoder.string(bytes, it)
             : fieldIndex;
+
           ref.setIndex(fieldIndex, dynamicIndex);
 
 				} else {
@@ -513,7 +520,9 @@ class Schema implements IRef {
 				}
 
 				value = null;
-			}
+      }
+
+      trace("Will decide how to decode...");
 
 			if (fieldName == null) {
         trace("WARNING: @colyseus/schema definition mismatch?");
@@ -597,7 +606,6 @@ class Schema implements IRef {
           : Type.createInstance(collectionClass, []);
 
         trace("valueRef => " + valueRef);
-        trace("childType => " + childType);
 
         value = valueRef.clone();
 				value._childType = childType;
@@ -636,6 +644,10 @@ class Schema implements IRef {
         //
         if (Std.is(value, IRef)) { value.__refId = refId; }
 
+        trace("ref.setByIndex => ");
+        trace("\nfieldIndex => " + fieldIndex);
+        trace("\ndynamicIndex => " + dynamicIndex);
+        trace("\nvalue => " + value);
         ref.setByIndex(fieldIndex, dynamicIndex, value);
       }
 
@@ -690,7 +702,8 @@ class Schema implements IRef {
 
   public function toString () {
     var data = [];
-    trace(Type.getClassName(Type.getClass(this)) + ", Schema#toString() => " + this._indexes);
+    trace("#toString() => " + Type.getClassName(Type.getClass(this)));
+    trace("_indexes => " + this._indexes);
 
     for (field in this._indexes) {
       data.push(field + " => " + Reflect.getProperty(this, field));

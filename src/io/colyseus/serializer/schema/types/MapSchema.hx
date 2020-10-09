@@ -17,7 +17,7 @@ class OrderedMap<K, V> {
     public var _keys:Array<K>; // FIXME: this should be private
     var idx = 0;
 
-    public function new(_map = null) {
+    public function new(_map) {
        _keys = [];
        map = _map;
     }
@@ -48,33 +48,37 @@ class MapSchema<T> implements IRef implements ISchemaCollection {
   public var _childType: Dynamic;
 
   public function getIndex(fieldIndex: Int) {
-    return this.indexes[fieldIndex];
+    return this.indexes.get(fieldIndex);
   }
 
   public function setIndex(fieldIndex: Int, dynamicIndex: Dynamic) {
-    this.indexes[fieldIndex] = dynamicIndex;
+    this.indexes.set(fieldIndex, dynamicIndex);
   }
 
   public function getByIndex(fieldIndex: Int): Dynamic {
-    return this.items.get(this.indexes[fieldIndex]);
+    var index = this.indexes.get(fieldIndex);
+
+    return (index != null)
+      ? this.items.get(index)
+      : null;
   }
 
   public function setByIndex(index: Int, dynamicIndex: Dynamic, value: Dynamic): Void {
-    this.indexes[index] = dynamicIndex;
+    this.indexes.set(index, dynamicIndex);
 		this.items.set(dynamicIndex, value);
   }
 
   public function deleteByIndex(fieldIndex: Int): Void {
-    var index = this.indexes[fieldIndex];
+    var index = this.indexes.get(fieldIndex);
     this.items.remove(index);
     this.indexes.remove(fieldIndex);
   }
 
-  public var items:OrderedMap<String, T> = new OrderedMap<String, T>();
+  public var items:OrderedMap<String, T> = new OrderedMap<String, T>(new Map<String, T>());
   public var indexes:Map<Int, String> = new Map<Int, String>();
 
   public var length(get, null): Int;
-  function get_length() { return this.items._keys.length; }
+  function get_length() { return Lambda.count(this.items._keys); }
 
   public dynamic function onAdd(item:T, key:String):Void {}
   public dynamic function onChange(item:T, key:String):Void {}
