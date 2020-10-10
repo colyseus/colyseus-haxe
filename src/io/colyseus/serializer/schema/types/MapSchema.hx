@@ -33,6 +33,11 @@ class OrderedMap<K, V> {
         return '{$_ret}';
     }
 
+    public function clear() {
+      this.map.clear();
+      this._keys = [];
+    }
+
     public function iterator() return new OrderedMapIterator<K,V>(this);
     public function remove(key: K) return map.remove(key) && _keys.remove(key);
     public function exists(key: K) return map.exists(key);
@@ -92,6 +97,18 @@ class MapSchema<T> implements IRef implements ISchemaCollection {
     this.onRemove = previousInstance.onRemove;
   }
 
+  public function clear(refs: ReferenceTracker) {
+    if (!Std.isOfType(this._childType, String)) {
+      // clear child refs
+      for (item in this.items) {
+        refs.remove(Reflect.getProperty(item, "__refId"));
+      }
+    }
+
+    this.items.clear();
+    this.indexes.clear();
+  }
+
   public function clone():MapSchema<T> {
     var cloned = new MapSchema<T>();
 
@@ -126,6 +143,7 @@ class MapSchema<T> implements IRef implements ISchemaCollection {
     for (key in this.items.keys()) {
       data.push(key + " => " + this.items.get(key));
     }
-    return "MapSchema ("+ Lambda.count(this.items) +") { " + data.join(", ") + " }";
+
+    return "MapSchema ("+ Lambda.count(this.items) +", __refId => "+this.__refId+") { " + data.join(", ") + " }";
   }
 }

@@ -14,7 +14,7 @@ class CustomType {
   private var customTypes: Map<String, Class<Dynamic>> = new Map<String, Class<Dynamic>>();
 
   public function new() {
-    this.set("array", ArraySchema);
+    this.set("array", ArraySchemaImpl);
     this.set("map", MapSchema);
   }
 

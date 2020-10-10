@@ -356,18 +356,18 @@ class Schema implements IRef {
   public dynamic function onChange(changes:Array<DataChange>):Void {}
   public dynamic function onRemove():Void {}
 
-	public var __refId:Int;
+  public var __refId:Int = null;
 
-  private var _indexes:Map<Int, String> = new Map<Int, String>();
-  private var _types:Map<Int, String> = new Map<Int, String>();
-  private var _childTypes:Map<Int, Dynamic> = new Map<Int, Dynamic>();
+  public var _indexes:Map<Int, String> = new Map<Int, String>();
+  public var _types:Map<Int, String> = new Map<Int, String>();
+  public var _childTypes:Map<Int, Dynamic> = new Map<Int, Dynamic>();
   // private var _childSchemaTypes:Map<Int, Class<Schema>> = new Map<Int, Class<Schema>>();
   // private var _childPrimitiveTypes:Map<Int, String> = new Map<Int, String>();
 
-  private var refs:ReferenceTracker = null;
+  private var _refs:ReferenceTracker = null;
 
-	public function setByIndex(fieldIndex: Int, dynamicIndex: Dynamic, value: Dynamic) {
-		return Reflect.setProperty(this, this._indexes.get(fieldIndex), value);
+  public function setByIndex(fieldIndex: Int, dynamicIndex: Dynamic, value: Dynamic) {
+    return Reflect.setProperty(this, this._indexes.get(fieldIndex), value);
   }
 
   public function getByIndex(fieldIndex: Int) {
@@ -383,51 +383,49 @@ class Schema implements IRef {
 
   public function decode(bytes:Bytes, it:It = null, refs: ReferenceTracker = null) {
     if (it == null) { it = {offset: 0}; }
-    if (refs == null) { refs = (this.refs != null) ? this.refs : new ReferenceTracker(); }
+    if (refs == null) { refs = (this._refs != null) ? this._refs : new ReferenceTracker(); }
 
-    this.refs = refs;
+    this._refs = refs;
 
     var refId = 0;
-		var ref:Dynamic = this;
-    var changes:Array<DataChange> = [];
+    var ref:Dynamic = this;
+    refs.add(refId, ref);
 
+    var changes:Array<DataChange> = [];
     var allChanges = new OrderedMap<Int, Array<DataChange>>(new Map<Int, Array<DataChange>>());
     allChanges.set(refId, changes);
 
     var totalBytes = bytes.length;
-		while (it.offset < totalBytes) {
-			var byte = bytes.get(it.offset++);
+    while (it.offset < totalBytes) {
+      var byte = bytes.get(it.offset++);
 
-			if (byte == SPEC.SWITCH_TO_STRUCTURE) {
-				refId = decoder.number(bytes, it);
-				ref = refs.get(refId);
+      if (byte == SPEC.SWITCH_TO_STRUCTURE) {
+        refId = decoder.number(bytes, it);
+        ref = refs.get(refId);
 
-				//
-				// Trying to access a reference that haven't been decoded yet.
-				//
-				if (ref == null) { throw("refId not found: " + refId); }
+        //
+        // Trying to access a reference that haven't been decoded yet.
+        //
+        if (ref == null) { throw("refId not found: " + refId); }
 
-				// create empty list of changes for this refId.
-				changes = [];
-				allChanges.set(refId, changes);
+        // create empty list of changes for this refId.
+        changes = [];
+        allChanges.set(refId, changes);
 
-				continue;
+        continue;
       }
 
-      trace("\n!! REFID SELECTED => " + refId);
-      trace("\nREF => " + ref);
-
-			var isSchema = Std.is(ref, Schema);
+      var isSchema = Std.is(ref, Schema);
 
       var operation = (isSchema)
         ? (byte >> 6) << 6 // "compressed" index + operation
-				: byte; // "uncompressed" index + operation (array/map items)
+        : byte; // "uncompressed" index + operation (array/map items)
 
-			// Clear collection structure.
-			if (operation == OPERATION.CLEAR) {
-				ref.clear(refs);
-				continue;
-			}
+      // Clear collection structure.
+      if (operation == OPERATION.CLEAR) {
+        ref.clear(refs);
+        continue;
+      }
 
       var fieldIndex:Int = (isSchema)
         ? byte % (operation == 0 ? 255 : operation)
@@ -437,16 +435,14 @@ class Schema implements IRef {
         ? (ref : Schema)._indexes.get(fieldIndex)
         : "";
 
-			var fieldType:Dynamic = null;
-			var childType:Dynamic = null;
+      var fieldType:Dynamic = null;
+      var childType:Dynamic = null;
 
       if (isSchema) {
-        trace("\nIS SCHEMA!");
         childType = (ref : Schema)._childTypes.get(fieldIndex);
         fieldType = (ref : Schema)._types.get(fieldIndex);
 
       } else {
-        trace("\nNOT SCHEMA!");
         var collectionChildType = (ref : ISchemaCollection)._childType;
         var isPrimitiveFieldType = Std.is(collectionChildType, String);
 
@@ -459,174 +455,143 @@ class Schema implements IRef {
         }
       }
 
-      trace("\nisSchema? => " + isSchema);
-      trace("\nfieldIndex => " + fieldIndex);
-      trace("\nfieldName => " + fieldName);
-      try {
-        trace("\nfieldType => " + fieldType);
+      // trace("\nisSchema? => " + isSchema);
+      // trace("\nfieldIndex => " + fieldIndex);
+      // trace("\nfieldName => " + fieldName);
+      // try { trace("\nfieldType => " + fieldType); } catch (e) { trace("\nfieldType => " + Type.getClassName(fieldType)); }
+      // try { trace("\nchildType => " + ((Std.is(childType, String)) ? childType : Type.getClassName(childType))); } catch (e) { trace("\nchildType => " + childType); }
 
-      } catch (e) {
-				trace("\nfieldType => " + Type.getClassName(fieldType));
+      var value:Dynamic = null;
+      var previousValue:Dynamic = null;
+      var dynamicIndex:Dynamic = null;
 
-      }
-
-      try {
-        trace("\nchildType => " + ((Std.is(childType, String)) ? childType : Type.getClassName(childType)));
-
-      } catch (e) {
-				// trace("\nchildType => " + childType);
-      }
-
-			var value:Dynamic = null;
-			var previousValue:Dynamic = null;
-			var dynamicIndex:Dynamic = null;
-
-			if (!isSchema) {
-        trace("Will getByIndex() => " + fieldIndex);
+      if (!isSchema) {
         previousValue = ref.getByIndex(fieldIndex);
-        trace("Got by index => " + previousValue);
 
         if ((operation & cast OPERATION.ADD) == OPERATION.ADD) { // ADD or DELETE_AND_ADD
           //
           // TODO: Std.is() will not work with @:generic() types.
           //
-          trace("Will check if it's a map schema...");
-          trace("IS MAPSCHEMA?? => "  + Std.is(ref, MapSchema));
           dynamicIndex = Std.is(ref, MapSchema)
             ? decoder.string(bytes, it)
             : fieldIndex;
 
           ref.setIndex(fieldIndex, dynamicIndex);
 
-				} else {
-					// here
-					dynamicIndex = ref.getIndex(fieldIndex);
-				}
-			} else {
-				previousValue = Reflect.getProperty(ref, fieldName);
-			}
+        } else {
+          // here
+          dynamicIndex = ref.getIndex(fieldIndex);
+        }
 
-			//
-			// Delete operations
-			//
-			if ((operation & cast OPERATION.DELETE) == OPERATION.DELETE) {
-				if (operation != OPERATION.DELETE_AND_ADD) {
-					ref.deleteByIndex(fieldIndex);
-				}
-
-				// Flag `refId` for garbage collection.
-				if (previousValue != null && Std.isOfType(previousValue, IRef)) {
-          refs.remove(previousValue.__refId);
-				}
-
-				value = null;
+      } else if (fieldName != null) {
+        previousValue = Reflect.getProperty(ref, fieldName);
       }
 
-      trace("Will decide how to decode...");
+      //
+      // Delete operations
+      //
+      if ((operation & cast OPERATION.DELETE) == OPERATION.DELETE) {
+        if (operation != OPERATION.DELETE_AND_ADD) {
+          ref.deleteByIndex(fieldIndex);
+        }
 
-			if (fieldName == null) {
+        // Flag `refId` for garbage collection.
+        if (previousValue != null && Std.isOfType(previousValue, IRef)) {
+          refs.remove(previousValue.__refId);
+        }
+
+        value = null;
+      }
+
+      if (fieldName == null) {
         trace("WARNING: @colyseus/schema definition mismatch?");
 
-				//
-				// keep skipping next bytes until reaches a known structure
-				// by local decoder.
-				//
-				var nextIterator:It = { offset : it.offset };
+        //
+        // keep skipping next bytes until reaches a known structure
+        // by local decoder.
+        //
+        var nextIterator:It = { offset : it.offset };
 
-				while (it.offset < totalBytes) {
-					if (SPEC.switchToStructureCheck(bytes, it)) {
-						nextIterator.offset = it.offset + 1;
-						if (refs.has(decoder.number(bytes, nextIterator))) {
-							break;
-						}
-					}
+        while (it.offset < totalBytes) {
+          if (SPEC.switchToStructureCheck(bytes, it)) {
+            nextIterator.offset = it.offset + 1;
+            if (refs.has(decoder.number(bytes, nextIterator))) {
+              break;
+            }
+          }
 
-					it.offset++;
-				}
+          it.offset++;
+        }
 
         continue;
 
-			} else if (operation == OPERATION.DELETE) {
-        trace(">>> DELETE OPERATION\n");
+      } else if (operation == OPERATION.DELETE) {
 
-				//
-				// FIXME: refactor me.
-				// Don't do anything.
+        //
+        // FIXME: refactor me.
+        // Don't do anything.
         //
 
-			} else if (fieldType == "ref") {
-        trace(">>> DECODE REF\n");
-				refId = decoder.number(bytes, it);
-        value = refs.get(refId);
-
-        trace("refId => " + refId);
-
-				if (operation != OPERATION.REPLACE) {
-					var concreteChildType = this.getSchemaType(bytes, it, childType);
-
-					if (value == null) {
-						value = Type.createInstance(concreteChildType, []);
-
-						if (previousValue != null) {
-							 value.onChange = previousValue.onChange;
-							 value.onRemove = previousValue.onRemove;
-
-							if (previousValue.__refId > 0 && refId != previousValue.__refId) {
-								refs.remove(previousValue.__refId);
-							}
-						}
-					}
-
-					refs.add(refId, value, (value != previousValue));
-				}
-
-      // } else if (Std.is(childType, String)) {
-      } else if (childType == null) {
-        trace(">>> DECODE PRIMITIVE VALUE\n");
-        value = decoder.decodePrimitiveType(fieldType, bytes, it);
-        trace("value => " + value);
-
-      } else {
-        trace(">>> DECODE COLLECTION\n");
-
+      } else if (fieldType == "ref") {
         refId = decoder.number(bytes, it);
         value = refs.get(refId);
 
-        trace("refId => " + refId);
-        trace("previousValue => " + previousValue);
+        if (operation != OPERATION.REPLACE) {
+          var concreteChildType = this.getSchemaType(bytes, it, childType);
+
+          if (value == null) {
+            value = Type.createInstance(concreteChildType, []);
+            value.__refId = refId;
+
+            if (previousValue != null) {
+              value.onChange = previousValue.onChange;
+              value.onRemove = previousValue.onRemove;
+
+              if (previousValue.__refId != null && refId != previousValue.__refId) {
+                refs.remove(previousValue.__refId);
+              }
+            }
+          }
+
+          refs.add(refId, value, (value != previousValue));
+        }
+
+      } else if (childType == null) {
+        value = decoder.decodePrimitiveType(fieldType, bytes, it);
+
+      } else {
+        refId = decoder.number(bytes, it);
+        value = refs.get(refId);
 
         var collectionClass = (fieldType == null)
           ? Type.getClass(ref)
           : CustomType.getInstance().get(fieldType);
 
-        trace("Collection class => " + Type.getClassName(collectionClass));
-
         var valueRef: ISchemaCollection = (refs.has(refId))
           ? previousValue
           : Type.createInstance(collectionClass, []);
 
-        trace("valueRef => " + valueRef);
-
         value = valueRef.clone();
-				value._childType = childType;
+        value.__refId = refId;
+        value._childType = childType;
 
         if (previousValue != null)
         {
           value.moveEventHandlers(previousValue);
 
-					if (previousValue.__refId > 0 && refId != previousValue.__refId)
+          if (previousValue.__refId > 0 && refId != previousValue.__refId)
           {
             refs.remove(previousValue.__refId);
 
             var deletes = new Array<DataChange>();
             Lambda.mapi(previousValue.items, function(index, item) {
               deletes.push({
-								op: OPERATION.DELETE,
-								field: cast index,
-								dynamicIndex: cast index,
-								value: null,
-								previousValue: item
-							});
+                op: OPERATION.DELETE,
+                field: cast index,
+                dynamicIndex: cast index,
+                value: null,
+                previousValue: item
+              });
             });
 
             allChanges.set(previousValue.__refId, deletes);
@@ -642,22 +607,26 @@ class Schema implements IRef {
         //
         // assign `__refId`
         //
-        if (Std.is(value, IRef)) { value.__refId = refId; }
+        // if (Std.isOfType(value, IRef)) {
+        //   trace("SET REFID => " + refId);
+        //   value.__refId = refId;
+        // }
 
-        trace("ref.setByIndex => ");
-        trace("\nfieldIndex => " + fieldIndex);
-        trace("\ndynamicIndex => " + dynamicIndex);
-        trace("\nvalue => " + value);
+        // trace("ref.setByIndex => ");
+        // trace("\nfieldIndex => " + fieldIndex);
+        // trace("\ndynamicIndex => " + dynamicIndex);
+        // trace("\nvalue => " + value);
+
         ref.setByIndex(fieldIndex, dynamicIndex, value);
       }
 
-			if (hasChange) {
-				changes.push({
-					op: operation,
-					field: fieldName,
-					dynamicIndex: dynamicIndex,
-					value: value,
-					previousValue: previousValue
+      if (hasChange) {
+        changes.push({
+          op: operation,
+          field: fieldName,
+          dynamicIndex: dynamicIndex,
+          value: value,
+          previousValue: previousValue
         });
       }
     }
@@ -678,11 +647,11 @@ class Schema implements IRef {
   }
 
   public function triggerAll() {
-		//
-		// first state not received from the server yet.
-		// nothing to trigger.
-		//
-    if (this.refs == null) { return; }
+    //
+    // first state not received from the server yet.
+    // nothing to trigger.
+    //
+    if (this._refs == null) { return; }
 
     var allChanges = new OrderedMap<Int, Array<DataChange>>(new Map<Int, Array<DataChange>>());
     this.triggerAllFillChanges(this, allChanges);
@@ -694,7 +663,7 @@ class Schema implements IRef {
 
     if (bytes.get(it.offset) == SPEC.TYPE_ID) {
       it.offset++;
-      type = this.refs.context.get(decoder.number(bytes, it));
+      type = this._refs.context.get(decoder.number(bytes, it));
     }
 
     return type;
@@ -702,13 +671,14 @@ class Schema implements IRef {
 
   public function toString () {
     var data = [];
-    trace("#toString() => " + Type.getClassName(Type.getClass(this)));
-    trace("_indexes => " + this._indexes);
+
+    // trace("#toString() => " + Type.getClassName(Type.getClass(this)));
+    // trace("_indexes => " + this._indexes);
 
     for (field in this._indexes) {
       data.push(field + " => " + Reflect.getProperty(this, field));
     }
 
-    return "{ " + data.join(", ") + " }";
+    return "{ __refId => " + this.__refId + ", " + data.join(", ") + " }";
   }
 }
