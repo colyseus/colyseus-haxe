@@ -20,7 +20,7 @@ class ArraySchemaImpl<T> implements IRef implements ISchemaCollection implements
     //
     // FIXME: this should be of O(1) complexity.
     //
-    var targetIndex: Int = null;
+    var targetIndex: Int = -1;
     var i: Int = 0;
 
     for (key in this.indexes.keys()) {
@@ -31,7 +31,9 @@ class ArraySchemaImpl<T> implements IRef implements ISchemaCollection implements
       i++;
     }
 
-    return (targetIndex == null) ? null : this.items.get(this.indexes.get(targetIndex));
+    return (targetIndex == -1)
+      ? null
+      : this.items.get(this.indexes.get(targetIndex));
   }
 
   public function setByIndex(index: Int, dynamicIndex: Dynamic, value: Dynamic): Void {
@@ -75,7 +77,7 @@ class ArraySchemaImpl<T> implements IRef implements ISchemaCollection implements
     this.indexes.clear();
   }
 
-  public function clone():ArraySchemaImpl<T> {
+  public function clone():ISchemaCollection {
     var cloned = new ArraySchemaImpl<T>();
     cloned.items = this.items.copy();
     cloned.onAdd = this.onAdd;

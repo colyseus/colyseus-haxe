@@ -51,6 +51,7 @@ class OrderedMap<K, V> {
 class MapSchema<T> implements IRef implements ISchemaCollection {
   public var __refId: Int;
   public var _childType: Dynamic;
+  private var __isMapSchema: Bool = true;
 
   public function getIndex(fieldIndex: Int) {
     return this.indexes.get(fieldIndex);
@@ -112,7 +113,7 @@ class MapSchema<T> implements IRef implements ISchemaCollection {
   public function clone():MapSchema<T> {
     var cloned = new MapSchema<T>();
 
-    for (key in this.items.keys()) {
+    for (key in this.items._keys) {
       cloned.items.set(key, this.items.get(key));
     }
 
@@ -140,7 +141,8 @@ class MapSchema<T> implements IRef implements ISchemaCollection {
 
   public function toString () {
     var data = [];
-    for (key in this.items.keys()) {
+
+    for (key in this.items._keys) {
       data.push(key + " => " + this.items.get(key));
     }
 

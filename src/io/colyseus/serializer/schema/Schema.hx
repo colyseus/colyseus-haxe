@@ -356,7 +356,7 @@ class Schema implements IRef {
   public dynamic function onChange(changes:Array<DataChange>):Void {}
   public dynamic function onRemove():Void {}
 
-  public var __refId:Int = null;
+  public var __refId:Int = 0;
 
   public var _indexes:Map<Int, String> = new Map<Int, String>();
   public var _types:Map<Int, String> = new Map<Int, String>();
@@ -367,7 +367,7 @@ class Schema implements IRef {
   private var _refs:ReferenceTracker = null;
 
   public function setByIndex(fieldIndex: Int, dynamicIndex: Dynamic, value: Dynamic) {
-    return Reflect.setProperty(this, this._indexes.get(fieldIndex), value);
+    return Reflect.setField(this, this._indexes.get(fieldIndex), value);
   }
 
   public function getByIndex(fieldIndex: Int) {
@@ -455,12 +455,6 @@ class Schema implements IRef {
         }
       }
 
-      // trace("\nisSchema? => " + isSchema);
-      // trace("\nfieldIndex => " + fieldIndex);
-      // trace("\nfieldName => " + fieldName);
-      // try { trace("\nfieldType => " + fieldType); } catch (e) { trace("\nfieldType => " + Type.getClassName(fieldType)); }
-      // try { trace("\nchildType => " + ((Std.is(childType, String)) ? childType : Type.getClassName(childType))); } catch (e) { trace("\nchildType => " + childType); }
-
       var value:Dynamic = null;
       var previousValue:Dynamic = null;
       var dynamicIndex:Dynamic = null;
@@ -469,10 +463,8 @@ class Schema implements IRef {
         previousValue = ref.getByIndex(fieldIndex);
 
         if ((operation & cast OPERATION.ADD) == OPERATION.ADD) { // ADD or DELETE_AND_ADD
-          //
-          // TODO: Std.is() will not work with @:generic() types.
-          //
-          dynamicIndex = Std.is(ref, MapSchema)
+          // FIXME: need to detect if we're operating on a "map" here.
+          dynamicIndex = Reflect.getProperty(ref, "__isMapSchema") == true
             ? decoder.string(bytes, it)
             : fieldIndex;
 
@@ -496,7 +488,7 @@ class Schema implements IRef {
         }
 
         // Flag `refId` for garbage collection.
-        if (previousValue != null && Std.isOfType(previousValue, IRef)) {
+        if (Std.isOfType(previousValue, IRef) && previousValue.__refId > 0) {
           refs.remove(previousValue.__refId);
         }
 
@@ -547,7 +539,7 @@ class Schema implements IRef {
               value.onChange = previousValue.onChange;
               value.onRemove = previousValue.onRemove;
 
-              if (previousValue.__refId != null && refId != previousValue.__refId) {
+              if (previousValue.__refId > 0 && refId != previousValue.__refId) {
                 refs.remove(previousValue.__refId);
               }
             }
@@ -563,9 +555,13 @@ class Schema implements IRef {
         refId = decoder.number(bytes, it);
         value = refs.get(refId);
 
+        //
+        // FIXME: Type.getClass(previousValue)
+        // This may not be a reliable call, in case the previousValue is `null`.
+        //
         var collectionClass = (fieldType == null)
           ? Type.getClass(ref)
-          : CustomType.getInstance().get(fieldType);
+          : Type.getClass(previousValue); // CustomType.getInstance().get(fieldType)
 
         var valueRef: ISchemaCollection = (refs.has(refId))
           ? previousValue
@@ -604,19 +600,6 @@ class Schema implements IRef {
       var hasChange = (previousValue != value);
 
       if (value != null) {
-        //
-        // assign `__refId`
-        //
-        // if (Std.isOfType(value, IRef)) {
-        //   trace("SET REFID => " + refId);
-        //   value.__refId = refId;
-        // }
-
-        // trace("ref.setByIndex => ");
-        // trace("\nfieldIndex => " + fieldIndex);
-        // trace("\ndynamicIndex => " + dynamicIndex);
-        // trace("\nvalue => " + value);
-
         ref.setByIndex(fieldIndex, dynamicIndex, value);
       }
 
@@ -671,9 +654,6 @@ class Schema implements IRef {
 
   public function toString () {
     var data = [];
-
-    // trace("#toString() => " + Type.getClassName(Type.getClass(this)));
-    // trace("_indexes => " + this._indexes);
 
     for (field in this._indexes) {
       data.push(field + " => " + Reflect.getProperty(this, field));

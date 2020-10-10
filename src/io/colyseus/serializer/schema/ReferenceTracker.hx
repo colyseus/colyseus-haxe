@@ -58,14 +58,14 @@ class ReferenceTracker {
 					var childTypes = (ref : Schema)._childTypes;
 					for (fieldIndex in childTypes.keys()) {
 						var refId = Reflect.getProperty((ref : Schema).getByIndex(fieldIndex), "__refId");
-						if (refId != null && this.remove(refId)) {
+						if (refId > 0 && this.remove(refId)) {
 							deletedRefs.push(refId);
 						}
 					}
 				} else if (!Std.isOfType(ref._childType, String)) {
 					for (item in (ref : ISchemaCollection)) {
 						var childRefId = Reflect.getProperty(item, "__refId");
-						if (childRefId != null && this.remove(childRefId)) {
+						if (childRefId > 0 && this.remove(childRefId)) {
 							deletedRefs.push(childRefId);
 						}
 					}
