@@ -77,10 +77,11 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
         var state = new ArraySchemaTypes();
         var bytes = [128, 1, 129, 2, 130, 3, 131, 4, 255, 1, 128, 0, 5, 128, 1, 6, 255, 2, 128, 0, 0, 128, 1, 10, 128, 2, 20, 128, 3, 205, 192, 13, 255, 3, 128, 0, 163, 111, 110, 101, 128, 1, 163, 116, 119, 111, 128, 2, 165, 116, 104, 114, 101, 101, 255, 4, 128, 0, 232, 3, 0, 0, 128, 1, 192, 13, 0, 0, 128, 2, 72, 244, 255, 255, 255, 5, 128, 100, 129, 208, 156, 255, 6, 128, 100, 129, 208, 156];
 
-        // state.arrayOfSchemas.onAdd = (value, key) -> trace("onAdd, arrayOfSchemas => " + key);
-        // state.arrayOfNumbers.onAdd = (value, key) -> trace("onAdd, arrayOfNumbers => " + key);
-        // state.arrayOfStrings.onAdd = (value, key) -> trace("onAdd, arrayOfStrings => " + key);
-        // state.arrayOfInt32.onAdd = (value, key) -> trace("onAdd, arrayOfInt32 => " + key);
+        trace("testArraySchemaTypes");
+        state.arrayOfSchemas.onAdd = (value, key) -> trace("onAdd, arrayOfSchemas => key: " + key + ", value: " + value);
+        state.arrayOfNumbers.onAdd = (value, key) -> trace("onAdd, arrayOfNumbers => key: " + key + ", value: " + value);
+        state.arrayOfStrings.onAdd = (value, key) -> trace("onAdd, arrayOfStrings => key: " + key + ", value: " + value);
+        state.arrayOfInt32.onAdd = (value, key) -> trace("onAdd, arrayOfInt32 => key: " + key + ", value: " + value);
 
         state.onChange = function(changes) {
             trace("\nCHANGES! => " + changes);

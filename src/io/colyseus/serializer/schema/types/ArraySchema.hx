@@ -57,6 +57,10 @@ class ArraySchemaImpl<T> implements IRef implements ISchemaCollection implements
   public dynamic function onChange(item:T, key:Int):Void {}
   public dynamic function onRemove(item:T, key:Int):Void {}
 
+  public function invokeOnAdd(item:Any, key:Any):Void return this.onAdd(item, key);
+  public function invokeOnChange(item:Any, key:Any):Void return this.onChange(item, key);
+  public function invokeOnRemove(item:Any, key:Any):Void return this.onRemove(item, key);
+
   public function new() {}
 
 	public function moveEventHandlers(previousInstance: Dynamic) {
@@ -86,9 +90,8 @@ class ArraySchemaImpl<T> implements IRef implements ISchemaCollection implements
     return cloned;
   }
 
-  public function iterator() {
-    return this.items.iterator();
-  }
+  public function iterator() return this.items.iterator();
+  public function keyValueIterator() return this.items.keyValueIterator();
 
   public function toString () {
     var data = [];

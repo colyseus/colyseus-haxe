@@ -340,11 +340,11 @@ abstract OPERATION(Int) from Int
 }
 
 typedef DataChange = {
-  var op(default,never):OPERATION;
+  var op(default,never):Int;
   var field(default,never):String;
-  var dynamicIndex(default,never):Any;
   var value(default,never):Any;
-  var previousValue(default,never):Any;
+  var ?dynamicIndex(default,never):Any;
+  var ?previousValue(default,never):Any;
 }
 
 #if !macro @:autoBuild(io.colyseus.serializer.schema.Decorator.build()) #end
@@ -582,7 +582,7 @@ class Schema implements IRef {
             var deletes = new Array<DataChange>();
             Lambda.mapi(previousValue.items, function(index, item) {
               deletes.push({
-                op: OPERATION.DELETE,
+                op: cast OPERATION.DELETE,
                 field: cast index,
                 dynamicIndex: cast index,
                 value: null,
@@ -620,13 +620,95 @@ class Schema implements IRef {
   }
 
   private function triggerChanges (allChanges: OrderedMap<Int, Array<DataChange>>) {
-    // TODO
-    trace("triggerChanges not implemented.");
+    var refs = this._refs;
+
+    for (it in allChanges.keyValueIterator()) {
+      var changes = it.value;
+
+      var refId = it.key;
+      var ref = refs.get(refId);
+      var isSchema = Std.isOfType(ref, Schema);
+
+      for (change in changes) {
+        if (!isSchema) {
+          var container = (ref: ISchemaCollection);
+
+          if (change.op == OPERATION.ADD && change.previousValue == null) {
+            container.invokeOnAdd(change.value, (change.dynamicIndex == null) ? change.field : change.dynamicIndex);
+
+          } else if (change.op == OPERATION.DELETE) {
+            //
+            // FIXME: `previousValue` should always be avaiiable.
+            // ADD + DELETE operations are still encoding DELETE operation.
+            //
+            if (change.previousValue != null) {
+              container.invokeOnRemove(change.previousValue, (change.dynamicIndex == null) ? change.field : change.dynamicIndex);
+            }
+
+          } else if (change.op == OPERATION.DELETE_AND_ADD) {
+            if (change.previousValue != null) {
+              container.invokeOnRemove(change.previousValue, change.dynamicIndex);
+            }
+            container.invokeOnAdd(change.value, change.dynamicIndex);
+
+          } else if (change.op == OPERATION.REPLACE || change.value != change.previousValue) {
+            container.invokeOnChange(change.value, change.dynamicIndex);
+          }
+
+        }
+
+        //
+        // trigger onRemove on child structure.
+        //
+        if (
+          ((change.op & cast OPERATION.DELETE) == OPERATION.DELETE) &&
+          Std.isOfType(change.previousValue, Schema)
+        ) {
+          (change.previousValue : Schema).onRemove();
+        }
+      }
+
+      if (isSchema) {
+        (ref : Schema).onChange(changes);
+      }
+    }
   }
 
   private function triggerAllFillChanges(ref: IRef, allChanges: OrderedMap<Int, Array<DataChange>>) {
-    // TODO
-    trace("triggerAllFillChanges not implemented.");
+    if (allChanges.exists(ref.__refId)) { return; }
+
+    var changes = new Array<DataChange>();
+    allChanges.set(ref.__refId, changes);
+
+    if (Std.isOfType(ref, Schema)) {
+      var _indexes: Map<Int, String> = Reflect.getProperty(ref, "_indexes");
+      for (fieldIndex in _indexes.keyValueIterator()) {
+        var value = ref.getByIndex(fieldIndex.key);
+        changes.push({
+          field: fieldIndex.value,
+          op: cast OPERATION.ADD,
+          value: value
+        });
+
+        if (Std.isOfType(value, IRef)) {
+          this.triggerAllFillChanges(value, allChanges);
+        }
+      }
+    } else {
+      var items: IMap<Any, Any> = Reflect.getProperty(ref, "items");
+      for (item in items.keyValueIterator()) {
+        changes.push({
+          field: item.key,
+          dynamicIndex: item.key,
+          op: cast OPERATION.ADD,
+          value: item.value
+        });
+
+        if (Std.isOfType(item, IRef)) {
+          this.triggerAllFillChanges(item.value, allChanges);
+        }
+      }
+    }
   }
 
   public function triggerAll() {

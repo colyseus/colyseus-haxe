@@ -39,6 +39,7 @@ class OrderedMap<K, V> {
     }
 
     public function iterator() return new OrderedMapIterator<K,V>(this);
+    public function keyValueIterator() return this.map.keyValueIterator();
     public function remove(key: K) return map.remove(key) && _keys.remove(key);
     public function exists(key: K) return map.exists(key);
     public function get(key: K) return map.get(key);
@@ -90,6 +91,10 @@ class MapSchema<T> implements IRef implements ISchemaCollection {
   public dynamic function onChange(item:T, key:String):Void {}
   public dynamic function onRemove(item:T, key:String):Void {}
 
+  public function invokeOnAdd(item:Any, key:Any):Void return this.onAdd(item, key);
+  public function invokeOnChange(item:Any, key:Any):Void return this.onChange(item, key);
+  public function invokeOnRemove(item:Any, key:Any):Void return this.onRemove(item, key);
+
   public function new() {}
 
 	public function moveEventHandlers(previousInstance: Dynamic) {
@@ -124,9 +129,8 @@ class MapSchema<T> implements IRef implements ISchemaCollection {
     return cloned;
   }
 
-  public function iterator() {
-    return this.items.iterator();
-  }
+  public function iterator() return this.items.iterator();
+  public function keyValueIterator() return this.items.keyValueIterator();
 
   @:arrayAccess
   public inline function get(key:String) {
