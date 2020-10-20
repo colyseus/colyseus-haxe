@@ -123,7 +123,7 @@ class Room<T> {
 
     private function onMessageCallback(data: Bytes) {
         var code = data.get(0);
-		var it:It = {offset: 1};
+        var it:It = {offset: 1};
 
         if (code == Protocol.JOIN_ROOM) {
             this.serializerId = data.getString(it.offset + 1, data.get(it.offset));
@@ -160,7 +160,7 @@ class Room<T> {
             this.leave();
 
         } else if (code == Protocol.ROOM_STATE) {
-			this.setState(data.sub(it.offset, data.length - 1));
+            this.setState(data.sub(it.offset, data.length - 1));
 
         } else if (code == Protocol.ROOM_STATE_PATCH) {
             this.patch(data.sub(it.offset, data.length - 1));
