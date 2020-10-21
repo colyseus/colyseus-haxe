@@ -4,7 +4,7 @@
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
   "description": "Multiplayer Game Client for Haxe",
-  "version": "0.14.2",
+  "version": "0.14.3",
   "classPath": "src/",
   "releasenote": "New @colyseus/schema decoder implementation",
   "contributors": ["endel"],

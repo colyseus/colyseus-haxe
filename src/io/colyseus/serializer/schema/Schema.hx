@@ -581,7 +581,7 @@ class Schema implements IRef {
 
             var deletes = new Array<DataChange>();
             Lambda.mapi(previousValue.items, function(index, item) {
-              deletes.push({
+              return deletes.push({
                 op: cast OPERATION.DELETE,
                 field: cast index,
                 dynamicIndex: cast index,
