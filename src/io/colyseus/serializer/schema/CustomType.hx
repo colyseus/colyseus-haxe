@@ -4,7 +4,7 @@ import io.colyseus.serializer.schema.types.ArraySchema;
 import io.colyseus.serializer.schema.types.MapSchema;
 
 /**
- * Reflection
+ * Custom types (ArraySchema, MapSchema, etc.)
  */
 class CustomType {
   public static var instance: CustomType = new CustomType();

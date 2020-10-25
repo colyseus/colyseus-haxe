@@ -1,4 +1,5 @@
 -main TestMain
+-dce full
 -cp src
 -cp tests
 -lib colyseus-websocket

@@ -348,6 +348,7 @@ typedef DataChange = {
 }
 
 #if !macro @:autoBuild(io.colyseus.serializer.schema.Decorator.build()) #end
+@:keepSub
 class Schema implements IRef {
   public static var decoder = new Decoder();
 
