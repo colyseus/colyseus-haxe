@@ -559,10 +559,16 @@ class Schema implements IRef {
         //
         // FIXME: Type.getClass(previousValue)
         // This may not be a reliable call, in case the previousValue is `null`.
+        // (The unity3d client does not have this problem because it has a different take on this)
+        // TODO:use Type.resolveClass("io.colyseus.serializer.schema.types.MapSchema_XXX")
         //
         var collectionClass = (fieldType == null)
           ? Type.getClass(ref)
-          : Type.getClass(previousValue); // CustomType.getInstance().get(fieldType)
+          : #if (nodejs || js)
+              CustomType.getInstance().get(fieldType)
+            #else
+              Type.getClass(previousValue)
+            #end;
 
         var valueRef: ISchemaCollection = (refs.has(refId))
           ? previousValue
