@@ -4,7 +4,8 @@
   "description": "Usage Examples of Colyseus Game Server",
   "main": "index.js",
   "scripts": {
-    "start": "ts-node index.ts"
+    "start": "ts-node index.ts",
+    "schema-codegen": "schema-codegen rooms/TestRoom.ts --haxe --output ../heaps/src/"
   },
   "engines": {
     "node": "8.9.1"

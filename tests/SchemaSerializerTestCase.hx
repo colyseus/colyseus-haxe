@@ -14,6 +14,7 @@ import schema.backwardsforwards.StateV1;
 import schema.backwardsforwards.StateV2;
 import schema.filteredtypes.State in FilteredTypesState;
 import schema.instancesharingtypes.State in InstanceSharingTypes;
+import schema.callbacks.CallbacksState;
 
 class SchemaSerializerTestCase extends haxe.unit.TestCase {
 
@@ -315,6 +316,114 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
         client.decode(getBytes([255, 9, 10]), null, refs);
         assertEquals(0, client.arrayOfPlayers.length);
         assertEquals(3, refs.count());
+    }
+
+    public function testCallbacks() {
+        var state = new CallbacksState();
+
+        var containerOnChange = 0;
+        var containerOnChangeCallback = function(changes) {containerOnChange++;};
+        state.container.onChange = containerOnChangeCallback;
+
+        var arrayOfSchemasOnAdd = 0;
+        var arrayOfSchemasOnChange = 0;
+        var arrayOfSchemasOnRemove = 0;
+
+        var arrayOfSchemasOnAddCallback = function(item, key) {
+          // trace("state.container.arrayOfSchemas.onAdd");
+          arrayOfSchemasOnAdd++;
+        };
+        var arrayOfSchemasOnChangeCallback = function(item, key) {
+          // trace("state.container.arrayOfSchemas.onChange");
+          arrayOfSchemasOnChange++;
+        };
+        var arrayOfSchemasOnRemoveCallback = function(item, key) {
+          // trace("state.container.arrayOfSchemas.onRemove");
+          arrayOfSchemasOnRemove++;
+        };
+
+        state.container.arrayOfSchemas.onAdd = arrayOfSchemasOnAddCallback;
+        state.container.arrayOfSchemas.onChange = arrayOfSchemasOnChangeCallback;
+        state.container.arrayOfSchemas.onRemove = arrayOfSchemasOnRemoveCallback;
+
+        var arrayOfNumbersOnAdd = 0;
+        var arrayOfNumbersOnChange = 0;
+        var arrayOfNumbersOnRemove = 0;
+
+        var arrayOfNumbersOnAddCallback = function(item, key) {
+          // trace("state.container.arrayOfNumbers.onAdd");
+          arrayOfNumbersOnAdd++;
+        };
+        var arrayOfNumbersOnChangeCallback = function(item, key) {
+          // trace("state.container.arrayOfNumbers.onChange");
+          arrayOfNumbersOnChange++;
+        };
+        var arrayOfNumbersOnRemoveCallback = function(item, key) {
+          // trace("state.container.arrayOfNumbers.onRemove");
+          arrayOfNumbersOnRemove++;
+        };
+
+        state.container.arrayOfNumbers.onAdd = arrayOfNumbersOnAddCallback;
+        state.container.arrayOfNumbers.onChange = arrayOfNumbersOnChangeCallback;
+        state.container.arrayOfNumbers.onRemove = arrayOfNumbersOnRemoveCallback;
+
+        var arrayOfStringsOnAdd = 0;
+        var arrayOfStringsOnChange = 0;
+        var arrayOfStringsOnRemove = 0;
+
+        var arrayOfStringsOnAddCallback = function(item, key) {
+          // trace("state.container.arrayOfStrings.onAdd");
+          arrayOfStringsOnAdd++;
+        };
+        var arrayOfStringsOnChangeCallback = function(item, key) {
+          // trace("state.container.arrayOfStrings.onChange");
+          arrayOfStringsOnChange++;
+        };
+        var arrayOfStringsOnRemoveCallback = function(item, key) {
+          // trace("state.container.arrayOfStrings.onRemove");
+          arrayOfStringsOnRemove++;
+        };
+
+        state.container.arrayOfStrings.onAdd = arrayOfStringsOnAddCallback;
+        state.container.arrayOfStrings.onChange = arrayOfStringsOnChangeCallback;
+        state.container.arrayOfStrings.onRemove = arrayOfStringsOnRemoveCallback;
+
+        state.decode(getBytes([128, 1, 255, 1, 130, 2, 131, 3, 132, 4, 133, 5]));
+        assertEquals(containerOnChange, 1);
+        assertEquals(arrayOfSchemasOnAdd, 0);
+        assertEquals(arrayOfSchemasOnChange, 0);
+        assertEquals(arrayOfSchemasOnRemove, 0);
+        assertEquals(arrayOfNumbersOnAdd, 0);
+        assertEquals(arrayOfNumbersOnChange, 0);
+        assertEquals(arrayOfNumbersOnRemove, 0);
+        assertEquals(arrayOfStringsOnAdd, 0);
+        assertEquals(arrayOfStringsOnChange, 0);
+        assertEquals(arrayOfStringsOnRemove, 0);
+
+        state.decode(getBytes([255, 1, 128, 1, 129, 163, 111, 110, 101, 255, 2, 128, 1, 255, 3, 128, 0, 6, 255, 4, 128, 0, 1, 255, 5, 128, 0, 163, 111, 110, 101, 255, 6, 128, 2]));
+        assertEquals(containerOnChange, 2);
+        assertEquals(arrayOfSchemasOnAdd, 1);
+        assertEquals(arrayOfSchemasOnChange, 0);
+        assertEquals(arrayOfSchemasOnRemove, 0);
+        assertEquals(arrayOfNumbersOnAdd, 1);
+        assertEquals(arrayOfNumbersOnChange, 0);
+        assertEquals(arrayOfNumbersOnRemove, 0);
+        assertEquals(arrayOfStringsOnAdd, 1);
+        assertEquals(arrayOfStringsOnChange, 0);
+        assertEquals(arrayOfStringsOnRemove, 0);
+
+        state.decode(getBytes([128, 7, 255, 7, 130, 8, 131, 9, 132, 10, 133, 11, 128, 2, 129, 163, 116, 119, 111, 255, 8, 128, 2, 255, 9, 128, 0, 12, 255, 10, 128, 0, 2, 255, 11, 128, 0, 163, 116, 119, 111, 255, 12, 128, 4]));
+        assertEquals(containerOnChange, 3);
+        assertEquals(arrayOfSchemasOnAdd, 2);
+        assertEquals(arrayOfSchemasOnChange, 0);
+        assertEquals(arrayOfSchemasOnRemove, 0); // FIXME: ideally, this should be 1
+        assertEquals(arrayOfNumbersOnAdd, 2);
+        assertEquals(arrayOfNumbersOnChange, 0);
+        assertEquals(arrayOfNumbersOnRemove, 0); // FIXME: ideally, this should be 1
+        assertEquals(arrayOfStringsOnAdd, 2);
+        assertEquals(arrayOfStringsOnChange, 0);
+        assertEquals(arrayOfStringsOnRemove, 0); // FIXME: ideally, this should be 1
+
     }
 
 

@@ -1,9 +1,13 @@
 import { Schema, type, MapSchema, ArraySchema } from "@colyseus/schema";
 import { Room } from "colyseus";
 
-class State extends Schema {
+class Container extends Schema {
     @type({ map: "string" }) testMap = new MapSchema<string>();
     @type(["number"]) testArray = new ArraySchema<number>();
+}
+
+class State extends Schema {
+    @type(Container) container = new Container();
 }
 
 export class TestRoom extends Room {
@@ -14,14 +18,14 @@ export class TestRoom extends Room {
         let int: number = 0;
 
         this.clock.setInterval(() => {
-            this.state.testMap.set(String(int % 3), String(int));
-            this.state.testArray.push(int);
+            this.state.container.testMap.set(String(int % 3), String(int));
+            this.state.container.testArray.push(int);
 
             int++;
 
             if (int % 10 == 0) {
-                this.state.testMap = new MapSchema<string>();
-                this.state.testArray = new ArraySchema<number>();
+                this.state.container.testMap = new MapSchema<string>();
+                this.state.container.testArray = new ArraySchema<number>();
                 console.log("RESET");
             }
         }, 1000);

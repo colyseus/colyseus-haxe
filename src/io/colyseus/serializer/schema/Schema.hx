@@ -371,7 +371,7 @@ class Schema implements IRef {
     return Reflect.setField(this, this._indexes.get(fieldIndex), value);
   }
 
-  public function getByIndex(fieldIndex: Int) {
+  public function getByIndex(fieldIndex: Int): Any {
     return Reflect.getProperty(this, this._indexes.get(fieldIndex));
   }
 
@@ -381,6 +381,20 @@ class Schema implements IRef {
 
   public function setIndex(fieldIndex: Int, dynamicIndex: Int) {}
   public function getIndex(fieldIndex: Int, dynamicIndex: Int) {}
+
+  public function moveEventHandlers (previousInstance: Dynamic) {
+    var previousSchemaInstance = (previousInstance: Schema);
+
+    this.onChange = previousSchemaInstance.onChange;
+    this.onRemove = previousSchemaInstance.onRemove;
+
+    for (fieldIndex => _ in this._childTypes) {
+      var childType = this.getByIndex(fieldIndex);
+      if (Std.isOfType(childType, IRef)) {
+        (childType : IRef).moveEventHandlers(previousSchemaInstance.getByIndex(fieldIndex));
+      }
+    }
+  }
 
   public function decode(bytes:Bytes, it:It = null, refs: ReferenceTracker = null) {
     if (it == null) { it = {offset: 0}; }
@@ -537,8 +551,7 @@ class Schema implements IRef {
             value.__refId = refId;
 
             if (previousValue != null) {
-              value.onChange = previousValue.onChange;
-              value.onRemove = previousValue.onRemove;
+              (value : Schema).moveEventHandlers(previousValue);
 
               if (previousValue.__refId > 0 && refId != previousValue.__refId) {
                 refs.remove(previousValue.__refId);

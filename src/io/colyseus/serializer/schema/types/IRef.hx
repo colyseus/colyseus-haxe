@@ -5,4 +5,5 @@ interface IRef {
 	public function setByIndex(fieldIndex: Int, dynamicIndex: Dynamic, value: Dynamic): Void;
   public function getByIndex(fieldIndex: Int): Dynamic;
   public function deleteByIndex(fieldIndex: Int): Void;
+  public function moveEventHandlers(previousInstance: Dynamic): Void;
 }

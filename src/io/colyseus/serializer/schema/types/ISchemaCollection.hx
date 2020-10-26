@@ -16,5 +16,4 @@ interface ISchemaCollection extends IRef {
 
   public function clear(refs: ReferenceTracker): Void;
   public function clone(): ISchemaCollection;
-  public function moveEventHandlers(previousInstance: Dynamic): Void;
 }
