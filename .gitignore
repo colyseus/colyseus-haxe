@@ -1,6 +1,7 @@
 /tests/bin
 /example/openfl/Export
-/example/flixel/export
 .DS_Store
 .vscode
 .haxerc
+/example/heaps/build/html5/*.js
+/example/heaps/build/html5/*.js.map

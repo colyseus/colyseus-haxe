@@ -4,9 +4,9 @@
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
   "description": "Multiplayer Game Client for Haxe",
-  "version": "0.14.5",
+  "version": "0.14.6",
   "classPath": "src/",
-  "releasenote": "fixes 'refId not found' issue.",
+  "releasenote": "avoid calling onChange() with empty changeset",
   "contributors": ["endel"],
   "dependencies": {
     "colyseus-websocket": "1.0.7"

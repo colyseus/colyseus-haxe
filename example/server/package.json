@@ -1,0 +1,26 @@
+{
+  "private": true,
+  "version": "1.0.0",
+  "description": "Usage Examples of Colyseus Game Server",
+  "main": "index.js",
+  "scripts": {
+    "start": "ts-node index.ts"
+  },
+  "engines": {
+    "node": "8.9.1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@colyseus/monitor": "^0.12.1",
+    "colyseus": "^0.14.0",
+    "cors": "^2.8.5",
+    "express": "^4.14.0",
+    "serve-index": "^1.8.0",
+    "superagent": "^3.8.1"
+  },
+  "devDependencies": {
+    "ts-node": "^8.10.2",
+    "typescript": "^3.5.3"
+  }
+}

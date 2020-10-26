@@ -632,6 +632,9 @@ class Schema implements IRef {
     for (it in allChanges.keyValueIterator()) {
       var changes = it.value;
 
+      // skip on empty change list.
+      if (changes.length == 0) { continue; }
+
       var refId = it.key;
       var ref = refs.get(refId);
       var isSchema = Std.isOfType(ref, Schema);

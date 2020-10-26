@@ -1,0 +1,8 @@
+-cp src
+# include colyseus-hx directly
+-cp ../../src
+-dce full
+-lib heaps
+-lib colyseus-websocket
+-main Main
+-debug
