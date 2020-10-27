@@ -46,7 +46,7 @@ haxelib run lime test project.xml html5
 
 ## Dependencies
 
-[colyseus-hx](https://github.com/colyseus/colyseus-hx) depends on [@colyseus/haxe-ws](https://github.com/colyseus/haxe-ws)
+[colyseus-hx](https://github.com/colyseus/colyseus-hx) depends on [`colyseus-websocket`](https://github.com/colyseus/colyseus-websocket-hx)
 
 ## License
 
