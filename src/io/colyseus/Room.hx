@@ -61,8 +61,6 @@ class Room<T> {
     }
 
     public function leave(consented: Bool = true) {
-        this.teardown();
-
         if (this.connection != null) {
             if (consented) {
 				var bytes = new BytesOutput();
