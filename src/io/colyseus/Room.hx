@@ -82,7 +82,7 @@ class Room<T> {
         var bytesToSend = new BytesOutput();
         bytesToSend.writeByte(Protocol.ROOM_DATA);
 
-        if (Std.is(type, String)) {
+        if (Std.isOfType(type, String)) {
             var encodedType = Bytes.ofString(type);
             bytesToSend.writeByte(encodedType.length | 0xa0);
             bytesToSend.writeBytes(encodedType, 0, encodedType.length);
@@ -204,10 +204,10 @@ class Room<T> {
     }
 
     private function getMessageHandlerKey(type: Dynamic): String {
-        if (Std.is(type, String)) {
+        if (Std.isOfType(type, String)) {
             return type;
 
-        } else if (Std.is(type, Int)) {
+        } else if (Std.isOfType(type, Int)) {
             return "i" + type;
 
         } else {

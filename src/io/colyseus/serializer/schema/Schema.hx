@@ -430,7 +430,7 @@ class Schema implements IRef {
         continue;
       }
 
-      var isSchema = Std.is(ref, Schema);
+      var isSchema = Std.isOfType(ref, Schema);
 
       var operation = (isSchema)
         ? (byte >> 6) << 6 // "compressed" index + operation
@@ -459,7 +459,7 @@ class Schema implements IRef {
 
       } else {
         var collectionChildType = (ref : ISchemaCollection)._childType;
-        var isPrimitiveFieldType = Std.is(collectionChildType, String);
+        var isPrimitiveFieldType = Std.isOfType(collectionChildType, String);
 
         fieldType = (isPrimitiveFieldType)
           ? collectionChildType
