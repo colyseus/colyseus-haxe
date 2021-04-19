@@ -4,9 +4,9 @@
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
   "description": "Multiplayer Game Client for Haxe",
-  "version": "0.14.8",
+  "version": "0.14.9",
   "classPath": "src/",
-  "releasenote": "fixes keeping nested schema callback handlers.",
+  "releasenote": "Aidan's fixes for Haxe 4.2",
   "contributors": ["endel"],
   "dependencies": {
     "colyseus-websocket": "1.0.7"
