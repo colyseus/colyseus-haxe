@@ -8,12 +8,12 @@
     "schema-codegen": "schema-codegen rooms/TestRoom.ts --haxe --output ../heaps/src/"
   },
   "engines": {
-    "node": "8.9.1"
+    "node": ">=14.0.0"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@colyseus/monitor": "^0.12.1",
+    "@colyseus/monitor": "^0.14.3",
     "colyseus": "^0.14.0",
     "cors": "^2.8.5",
     "express": "^4.14.0",
