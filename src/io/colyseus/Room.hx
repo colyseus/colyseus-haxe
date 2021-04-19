@@ -103,7 +103,7 @@ class Room<T> {
     }
 
     public var state (get, null): T;
-    function get_state () {
+    function get_state () : T {
         return this.serializer.getState();
     }
 
