@@ -6,6 +6,7 @@ io.colyseus.Room
 
 -lib hxcpp
 -lib colyseus-websocket
+-lib tink_url
 
 # this is for Mac OS X:
 -D HXCPP_M64

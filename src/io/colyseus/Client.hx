@@ -5,6 +5,7 @@ import haxe.Constraints.Function;
 using io.colyseus.events.EventHandler;
 using io.colyseus.error.MatchMakeError;
 
+import tink.Url;
 import haxe.io.Bytes;
 import org.msgpack.MsgPack;
 
@@ -15,20 +16,38 @@ interface RoomAvailable {
     public var metadata: Dynamic;
 }
 
-class DummyState {}
+class EndpointSettings {
+	public var hostname:String;
+	public var port:Int;
+	public var useSSL:Bool;
+
+    public function new (hostname: String, port: Int, useSSL: Bool) {
+        this.hostname = hostname;
+        this.port = port;
+        this.useSSL = useSSL;
+    }
+}
 
 @:keep
 class Client {
-    public var endpoint: String;
+    // public var endpoint: String;
+    public var settings: EndpointSettings;
 
-    /**
-     * @colyseus/social is not fully implemented in the Haxe client
-     */
-    private var auth: Auth;
+    public function new (endpointOrHostname: String, ?port: Int, ?useSSL: Bool) {
+        if (port == null && useSSL == null) {
+            var url: Url = Url.parse(Std.string(endpointOrHostname));
+            var useSSL = (url.scheme == "https" || url.scheme == "wss");
+            var port = (url.host.port != null)
+                ? url.host.port
+                : (useSSL)
+                    ? 443
+                    : 80;
 
-    public function new (endpoint: String) {
-        this.endpoint = endpoint;
-        this.auth = new Auth(this.endpoint);
+            this.settings = new EndpointSettings(url.host.name, port, useSSL);
+
+        } else {
+            this.settings =  new EndpointSettings(endpointOrHostname, port, useSSL);
+        }
     }
 
     @:generic
@@ -78,7 +97,7 @@ class Client {
         room.onError += onError;
         room.onJoin += onJoin;
 
-        room.connect(this.createConnection(response.room.processId + "/" + room.id, ["sessionId" => room.sessionId]));
+        room.connect(this.createConnection(response.room, ["sessionId" => room.sessionId]));
     }
 
     @:generic
@@ -89,10 +108,6 @@ class Client {
         stateClass: Class<T>,
         callback: (MatchMakeError, Room<T>)->Void
     ) {
-        if (this.auth.hasToken()) {
-            options.set("token", this.auth.token);
-        }
-
         this.request("POST", "/matchmake/" + method + "/" + roomName, haxe.Json.stringify(options), function(err, response) {
             if (err != null) {
                 return callback(err, null);
@@ -103,7 +118,7 @@ class Client {
         });
     }
 
-    private function createConnection(path: String = '', options: Map<String, Dynamic>) {
+    private function createConnection(room: Dynamic, options: Map<String, Dynamic>) {
         // append colyseusid to connection string.
         var params: Array<String> = [];
 
@@ -111,11 +126,19 @@ class Client {
             params.push(name + "=" + options[name]);
         }
 
-        return new Connection(this.endpoint + "/" + path + "?" + params.join('&'));
+        var endpoint = (this.settings.useSSL) ? "wss://" : "ws://";
+
+		if (room.publicAddress != null) {
+			endpoint += room.publicAddress;
+		} else {
+			endpoint += '${this.settings.hostname}${this.getEndpointPort()}';
+		}
+
+        return new Connection('${endpoint}/${room.processId}/${room.roomId}?${params.join('&')}');
     }
 
     private function request(method: String, segments: String, body: String, callback: (MatchMakeError,Dynamic)->Void) {
-        var req = new haxe.Http("http" + this.endpoint.substring(2) + segments);
+        var req = new haxe.Http(this.buildHttpEndpoint(segments));
 
         if (body != null) {
             req.setPostData(body);
@@ -147,6 +170,16 @@ class Client {
         };
 
         req.request(method == "POST");
+    }
+
+    private function buildHttpEndpoint(segments: String) {
+        return '${(this.settings.useSSL) ? "https" : "http"}://${this.settings.hostname}${this.getEndpointPort()}/matchmake/${segments}';
+    }
+
+    private function getEndpointPort() {
+        return (this.settings.port != 80 && this.settings.port != 443)
+            ? ':${this.settings.port}'
+            : '';
     }
 
 }
