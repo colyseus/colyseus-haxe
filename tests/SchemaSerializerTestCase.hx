@@ -403,25 +403,25 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
         state.decode(getBytes([255, 1, 128, 1, 129, 163, 111, 110, 101, 255, 2, 128, 1, 255, 3, 128, 0, 6, 255, 4, 128, 0, 1, 255, 5, 128, 0, 163, 111, 110, 101, 255, 6, 128, 2]));
         assertEquals(2, containerOnChange);
         assertEquals(1, arrayOfSchemasOnAdd);
-        assertEquals(0, arrayOfSchemasOnChange);
+        assertEquals(1, arrayOfSchemasOnChange);
         assertEquals(0, arrayOfSchemasOnRemove);
         assertEquals(1, arrayOfNumbersOnAdd);
-        assertEquals(0, arrayOfNumbersOnChange);
+        assertEquals(1, arrayOfNumbersOnChange);
         assertEquals(0, arrayOfNumbersOnRemove);
         assertEquals(1, arrayOfStringsOnAdd);
-        assertEquals(0, arrayOfStringsOnChange);
+        assertEquals(1, arrayOfStringsOnChange);
         assertEquals(0, arrayOfStringsOnRemove);
 
         state.decode(getBytes([128, 7, 255, 7, 130, 8, 131, 9, 132, 10, 133, 11, 128, 2, 129, 163, 116, 119, 111, 255, 8, 128, 2, 255, 9, 128, 0, 12, 255, 10, 128, 0, 2, 255, 11, 128, 0, 163, 116, 119, 111, 255, 12, 128, 4]));
         assertEquals(3, containerOnChange);
         assertEquals(2, arrayOfSchemasOnAdd);
-        assertEquals(0, arrayOfSchemasOnChange);
+        assertEquals(2, arrayOfSchemasOnChange);
         assertEquals(0, arrayOfSchemasOnRemove); // FIXME: ideally, this should be 1
         assertEquals(2, arrayOfNumbersOnAdd);
-        assertEquals(0, arrayOfNumbersOnChange);
+        assertEquals(2, arrayOfNumbersOnChange);
         assertEquals(0, arrayOfNumbersOnRemove); // FIXME: ideally, this should be 1
         assertEquals(2, arrayOfStringsOnAdd);
-        assertEquals(0, arrayOfStringsOnChange);
+        assertEquals(2, arrayOfStringsOnChange);
         assertEquals(0, arrayOfStringsOnRemove); // FIXME: ideally, this should be 1
     }
 

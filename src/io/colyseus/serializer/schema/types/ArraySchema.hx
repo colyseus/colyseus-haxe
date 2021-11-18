@@ -73,21 +73,15 @@ class ArraySchemaImpl<T> implements IRef implements ISchemaCollection implements
   }
 
   public function invokeOnAdd(item:Any, key:Any):Void {
-    if (this._callbacks != null && this._callbacks[cast OPERATION.ADD] != null) {
-      for (callback in this._callbacks[cast OPERATION.ADD]) { callback(item, key); }
-    }
+    CallbackHelpers.triggerCallbacks2(this._callbacks, cast OPERATION.ADD, item, key);
   }
 
   public function invokeOnChange(item:Any, key:Any):Void {
-    if (this._callbacks != null && this._callbacks[cast OPERATION.REPLACE] != null) {
-      for (callback in this._callbacks[cast OPERATION.REPLACE]) { callback(item, key); }
-    }
+    CallbackHelpers.triggerCallbacks2(this._callbacks, cast OPERATION.REPLACE, item, key);
   }
 
   public function invokeOnRemove(item:Any, key:Any):Void {
-    if (this._callbacks != null && this._callbacks[cast OPERATION.DELETE] != null) {
-      for (callback in this._callbacks[cast OPERATION.DELETE]) { callback(item, key); }
-    }
+    CallbackHelpers.triggerCallbacks2(this._callbacks, cast OPERATION.DELETE, item, key);
   }
 
   public function new() {}

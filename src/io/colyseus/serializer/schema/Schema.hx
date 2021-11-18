@@ -6,7 +6,6 @@ import io.colyseus.serializer.schema.types.IRef;
 import io.colyseus.serializer.schema.types.ArraySchema;
 import io.colyseus.serializer.schema.types.MapSchema;
 
-import io.colyseus.serializer.schema.callbacks.SchemaCallbacks;
 import io.colyseus.serializer.schema.callbacks.CallbackHelpers;
 
 import haxe.io.Bytes;
@@ -366,7 +365,10 @@ class Schema implements IRef {
   // private var _childSchemaTypes:Map<Int, Class<Schema>> = new Map<Int, Class<Schema>>();
   // private var _childPrimitiveTypes:Map<Int, String> = new Map<Int, String>();
 
+  // callbacks
   private var _callbacks: Map<Int, Array<Dynamic>> = null;
+  private var _propertyCallbacks: Map<String, Array<Dynamic>> = null;
+
   private var _refs:ReferenceTracker = null;
 
   public function setByIndex(fieldIndex: Int, dynamicIndex: Dynamic, value: Dynamic) {
@@ -394,9 +396,18 @@ class Schema implements IRef {
     return CallbackHelpers.addCallback(this._callbacks, cast OPERATION.DELETE, callback);
   }
 
+  // TODO: it would be great to have this strictly typed.
+  public function listen(property: String, callback:Dynamic->Dynamic->Void) {
+    if (this._callbacks == null) { this._callbacks = new Map<Int, Array<Dynamic>>(); }
+    if (this._propertyCallbacks == null) { this._propertyCallbacks = new Map<String, Array<Dynamic>>(); }
+    return CallbackHelpers.addPropertyCallback(this._propertyCallbacks, property, callback);
+  }
+
   public function moveEventHandlers (previousInstance: Dynamic) {
     var previousSchemaInstance = (previousInstance: Schema);
+
     this._callbacks = previousInstance._callbacks;
+    this._propertyCallbacks = previousInstance._propertyCallbacks;
 
     for (fieldIndex => _ in this._childTypes) {
       var childType = this.getByIndex(fieldIndex);
@@ -415,9 +426,6 @@ class Schema implements IRef {
     var refId = 0;
     var ref:Dynamic = this;
     refs.add(refId, ref);
-
-    // var allChanges = new OrderedMap<Int, Array<DataChange>>(new Map<Int, Array<DataChange>>());
-    // allChanges.set(refId, changes);
 
     var allChanges = new Array<DataChange>();
 
@@ -646,68 +654,71 @@ class Schema implements IRef {
   }
 
   private function triggerChanges (allChanges: Array<DataChange>) {
+    var uniqueRefIds = new Map<Int, Bool>();
     var refs = this._refs;
 
     for (change in allChanges) {
         var refId = change.refId;
         var ref = refs.get(refId);
         var isSchema = Std.isOfType(ref, Schema);
+        var callbacks = Reflect.getProperty(ref, "_callbacks");
 
+        //
+        // trigger onRemove on child structure.
+        //
+        if (
+            ((change.op & cast OPERATION.DELETE) == OPERATION.DELETE) &&
+            Std.isOfType(change.previousValue, Schema) &&
+            (change.previousValue : Schema)._callbacks != null
+        ) {
+            CallbackHelpers.triggerCallbacks0((change.previousValue : Schema)._callbacks, cast OPERATION.DELETE);
+        }
+
+        // no callbacks defined, skip this structure!
+        if (callbacks == null) { continue; }
+
+        if (isSchema) {
+            if (!uniqueRefIds.exists(refId)) {
+                // trigger onChange
+                CallbackHelpers.triggerCallbacks1(callbacks, cast OPERATION.REPLACE, allChanges);
+            }
+
+            var propertyCallbacks = Reflect.getProperty(ref, "_propertyCallbacks");
+            if (propertyCallbacks != null) {
+                CallbackHelpers.triggerFieldCallbacks(propertyCallbacks, change.field, change.value, change.previousValue);
+            }
+
+        } else {
+          var container = (ref: ISchemaCollection);
+
+          if (change.op == OPERATION.ADD && change.previousValue == null) {
+            container.invokeOnAdd(change.value, (change.dynamicIndex == null) ? change.field : change.dynamicIndex);
+
+          } else if (change.op == OPERATION.DELETE) {
+            //
+            // FIXME: `previousValue` should always be avaiiable.
+            // ADD + DELETE operations are still encoding DELETE operation.
+            //
+            if (change.previousValue != null) {
+              container.invokeOnRemove(change.previousValue, (change.dynamicIndex == null) ? change.field : change.dynamicIndex);
+            }
+
+          } else if (change.op == OPERATION.DELETE_AND_ADD) {
+            if (change.previousValue != null) {
+              container.invokeOnRemove(change.previousValue, change.dynamicIndex);
+            }
+            container.invokeOnAdd(change.value, change.dynamicIndex);
+          }
+
+          if (change.value != change.previousValue) {
+            container.invokeOnChange(change.value, change.dynamicIndex);
+          }
+
+        }
+
+        uniqueRefIds.set(refId, true);
     }
 
-    // for (it in allChanges.keyValueIterator()) {
-    //   var changes = it.value;
-
-    //   // skip on empty change list.
-    //   if (changes.length == 0) { continue; }
-
-    //   var refId = it.key;
-    //   var ref = refs.get(refId);
-    //   var isSchema = Std.isOfType(ref, Schema);
-
-    //   for (change in changes) {
-    //     if (!isSchema) {
-    //       var container = (ref: ISchemaCollection);
-
-    //       if (change.op == OPERATION.ADD && change.previousValue == null) {
-    //         container.invokeOnAdd(change.value, (change.dynamicIndex == null) ? change.field : change.dynamicIndex);
-
-    //       } else if (change.op == OPERATION.DELETE) {
-    //         //
-    //         // FIXME: `previousValue` should always be avaiiable.
-    //         // ADD + DELETE operations are still encoding DELETE operation.
-    //         //
-    //         if (change.previousValue != null) {
-    //           container.invokeOnRemove(change.previousValue, (change.dynamicIndex == null) ? change.field : change.dynamicIndex);
-    //         }
-
-    //       } else if (change.op == OPERATION.DELETE_AND_ADD) {
-    //         if (change.previousValue != null) {
-    //           container.invokeOnRemove(change.previousValue, change.dynamicIndex);
-    //         }
-    //         container.invokeOnAdd(change.value, change.dynamicIndex);
-
-    //       } else if (change.op == OPERATION.REPLACE || change.value != change.previousValue) {
-    //         container.invokeOnChange(change.value, change.dynamicIndex);
-    //       }
-
-    //     }
-
-    //     //
-    //     // trigger onRemove on child structure.
-    //     //
-    //     if (
-    //       ((change.op & cast OPERATION.DELETE) == OPERATION.DELETE) &&
-    //       Std.isOfType(change.previousValue, Schema)
-    //     ) {
-    //       (change.previousValue : Schema).onRemove();
-    //     }
-    //   }
-
-    //   if (isSchema) {
-    //     (ref : Schema).onChange(changes);
-    //   }
-    // }
   }
 
   private function getSchemaType(bytes: Bytes, it: It, defaultType: Class<Schema>) {

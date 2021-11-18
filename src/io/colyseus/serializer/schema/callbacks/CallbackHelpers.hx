@@ -30,6 +30,40 @@ class CallbackHelpers {
         return () -> callbacks[op].remove(callback);
     }
 
+    public static function addPropertyCallback(
+        callbacks: Map<String, Array<Dynamic>>,
+        field: String,
+        callback: Dynamic
+    ) {
+        // initialize list of callbacks
+        if (callbacks.get(field) == null) {
+			callbacks.set(field, new Array<Dynamic>());
+        }
+
+        callbacks[field].push(callback);
+
+        return () -> callbacks[field].remove(callback);
+    }
+
+    public static function triggerCallbacks0(callbacks:Map<Int, Array<Dynamic>>, op:Int) {
+        if (!callbacks.exists(op)) { return; }
+        for (callback in callbacks[op]) { callback(); }
+    }
+
+    public static function triggerCallbacks1(callbacks:Map<Int, Array<Dynamic>>, op:Int, arg1: Dynamic) {
+        if (!callbacks.exists(op)) { return; }
+        for (callback in callbacks[op]) { callback(arg1); }
+    }
+
+    public static function triggerCallbacks2(callbacks:Map<Int, Array<Dynamic>>, op:Int, arg1: Dynamic, arg2: Dynamic) {
+        if (!callbacks.exists(op)) { return; }
+        for (callback in callbacks[op]) { callback(arg1, arg2); }
+    }
+
+    public static function triggerFieldCallbacks(callbacks:Map<String, Array<Dynamic>>, field:String, arg1: Dynamic, arg2: Dynamic) {
+        if (!callbacks.exists(field)) { return; }
+        for (callback in callbacks[field]) { callback(arg1, arg2); }
+    }
 
     // static function removeChildRefs(this: CollectionSchema, changes: DataChange[]) {
     //     const needRemoveRef = (typeof (this.$changes.getType()) !== "string");
