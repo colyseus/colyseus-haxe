@@ -41,6 +41,14 @@ haxelib install colyseus-websocket
 haxelib run lime test project.xml html5
 ```
 
+## Development
+
+Running the test-suite:
+
+```
+haxe hxml/test.js.hxml
+```
+
 ## Dependencies
 
 [colyseus-hx](https://github.com/colyseus/colyseus-hx) depends on [`colyseus-websocket`](https://github.com/colyseus/colyseus-websocket-hx)

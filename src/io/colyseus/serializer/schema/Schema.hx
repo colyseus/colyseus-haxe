@@ -453,7 +453,7 @@ class Schema implements IRef {
 
       // Clear collection structure.
       if (operation == OPERATION.CLEAR) {
-        ref.clear(refs);
+        (ref : ISchemaCollection).clear(allChanges, refs);
         continue;
       }
 

@@ -1,5 +1,7 @@
 package io.colyseus.serializer.schema.callbacks;
 
+import io.colyseus.serializer.schema.Schema.OPERATION;
+import io.colyseus.serializer.schema.Schema.DataChange;
 import io.colyseus.serializer.schema.types.ISchemaCollection;
 
 class CallbackHelpers {
@@ -22,8 +24,8 @@ class CallbackHelpers {
         // - OPERATION.REPLACE
         //
         if (existing != null) {
-            for (it in existing.keyValueIterator()) {
-                callback(it.value, it.key);
+            for (key => value in existing) {
+                callback(value, key);
             }
         }
 
@@ -65,22 +67,22 @@ class CallbackHelpers {
         for (callback in callbacks[field]) { callback(arg1, arg2); }
     }
 
-    // static function removeChildRefs(this: CollectionSchema, changes: DataChange[]) {
-    //     const needRemoveRef = (typeof (this.$changes.getType()) !== "string");
+    public static function removeChildRefs(collection: ISchemaCollection, changes: Array<DataChange>, refs: ReferenceTracker) {
+        var needRemoveRef = !Std.isOfType(collection._childType, String);
 
-    //     this.$items.forEach((item: any, key: any) => {
-    //         changes.push({
-    //             refId: this.$changes.refId,
-    //             op: OPERATION.DELETE,
-    //             field: key,
-    //             value: undefined,
-    //             previousValue: item
-    //         });
+        for (key => item in collection) {
+            changes.push({
+                refId: collection.__refId,
+                op: cast OPERATION.DELETE,
+                field: key,
+                value: null,
+                previousValue: item
+            });
 
-    //         if (needRemoveRef) {
-    //             this.$changes.root.removeRef(item['$changes'].refId);
-    //         }
-    //     });
-    // }
+            if (needRemoveRef) {
+                refs.remove(Reflect.getProperty(item, "__refId"));
+            }
+        }
+    }
 
 }

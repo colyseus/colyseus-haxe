@@ -1,5 +1,6 @@
 package io.colyseus.serializer.schema.types;
 
+import io.colyseus.serializer.schema.Schema.DataChange;
 import io.colyseus.serializer.schema.Schema.OPERATION;
 import io.colyseus.serializer.schema.callbacks.CallbackHelpers;
 import io.colyseus.serializer.schema.types.MapSchema.OrderedMap;
@@ -90,13 +91,8 @@ class ArraySchemaImpl<T> implements IRef implements ISchemaCollection implements
     this._callbacks = previousInstance._callbacks;
   }
 
-  public function clear(refs: ReferenceTracker) {
-    if (!Std.isOfType(this._childType, String)) {
-      // clear child refs
-      for (item in this.items) {
-        refs.remove(Reflect.getProperty(item, "__refId"));
-      }
-    }
+  public function clear(changes: Array<DataChange>, refs: ReferenceTracker) {
+    CallbackHelpers.removeChildRefs(this, changes, refs);
 
     this.items.clear();
     this.indexes.clear();
