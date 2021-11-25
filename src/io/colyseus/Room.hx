@@ -17,8 +17,9 @@ import haxe.ds.Map;
 import org.msgpack.MsgPack;
 
 class Room<T> {
-    public var id: String;
+    public var roomId: String;
     public var sessionId: String;
+    public var reconnectionToken: String;
 
     public var name: String;
 
@@ -37,7 +38,7 @@ class Room<T> {
     private var tmpStateClass: Class<T>;
 
     public function new (name: String, ?cls: Class<T>) {
-        this.id = null;
+        this.roomId = null;
         this.name = name;
         this.tmpStateClass = cls;
     }
@@ -107,6 +108,10 @@ class Room<T> {
         return this.serializer.getState();
     }
 
+    // TODO: deprecate .id
+    public var id (get, null): String;
+    function get_id () : String { return this.roomId; }
+
     public function teardown() {
         if (this.serializer != null) {
             this.serializer.teardown();
@@ -124,6 +129,9 @@ class Room<T> {
         var it:It = {offset: 1};
 
         if (code == Protocol.JOIN_ROOM) {
+            var reconnectionToken = data.getString(it.offset + 1, data.get(it.offset));
+            it.offset += reconnectionToken.length + 1;
+
             this.serializerId = data.getString(it.offset + 1, data.get(it.offset));
             it.offset += this.serializerId.length + 1;
 
@@ -140,6 +148,9 @@ class Room<T> {
             if (data.length > it.offset) {
                 this.serializer.handshake(data, it.offset);
             }
+
+            // store local reconnection token
+			this.reconnectionToken = this.roomId + ":" + reconnectionToken;
 
             this.onJoin.dispatch();
 

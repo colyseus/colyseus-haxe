@@ -71,8 +71,9 @@ class Client {
     }
 
     @:generic
-    public function reconnect<T>(roomId: String, sessionId: String, stateClass: Class<T>, callback: (MatchMakeError, Room<T>)->Void) {
-        this.createMatchMakeRequest('joinById', roomId, [ "sessionId" => sessionId ], stateClass, callback);
+    public function reconnect<T>(reconnectionToken: String, stateClass: Class<T>, callback: (MatchMakeError, Room<T>)->Void) {
+        var roomIdAndReconnectionToken = reconnectionToken.split(":");
+        this.createMatchMakeRequest('reconnect', roomIdAndReconnectionToken[0], [ "reconnectionToken" => roomIdAndReconnectionToken[1] ], stateClass, callback);
     }
 
     public function getAvailableRooms(roomName: String, callback: (MatchMakeError, Array<RoomAvailable>)->Void) {
@@ -83,7 +84,7 @@ class Client {
     public function consumeSeatReservation<T>(response: Dynamic, stateClass: Class<T>, callback: (MatchMakeError, Room<T>)->Void) {
         var room: Room<T> = new Room<T>(response.room.name, stateClass);
 
-        room.id = response.room.roomId;
+        room.roomId = response.room.roomId;
         room.sessionId = response.sessionId;
 
         var onError = function(code: Int, message: String) {
@@ -97,7 +98,13 @@ class Client {
         room.onError += onError;
         room.onJoin += onJoin;
 
-        room.connect(this.createConnection(response.room, ["sessionId" => room.sessionId]));
+        var options = ["sessionId" => room.sessionId];
+
+        if (response.reconnectionToken) {
+			options.set("reconnectionToken", response.reconnectionToken);
+        }
+
+        room.connect(this.createConnection(response.room, options));
     }
 
     @:generic
@@ -113,6 +120,9 @@ class Client {
                 return callback(err, null);
 
             } else {
+                if (method == "reconnect") {
+                    response.reconnectionToken = options.get("reconnectionToken");
+                }
                 this.consumeSeatReservation(response, stateClass, callback);
             }
         });
