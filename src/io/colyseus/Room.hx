@@ -98,6 +98,24 @@ class Room<T> {
         this.connection.send(bytesToSend.getBytes());
     }
 
+    public function sendBytes(type: Dynamic, ?bytes: Dynamic) {
+        var bytesToSend = new BytesOutput();
+        bytesToSend.writeByte(Protocol.ROOM_DATA_BYTES);
+
+        if (Std.isOfType(type, String)) {
+            var encodedType = Bytes.ofString(type);
+            bytesToSend.writeByte(encodedType.length | 0xa0);
+            bytesToSend.writeBytes(encodedType, 0, encodedType.length);
+
+        } else {
+            bytesToSend.writeByte(type);
+        }
+
+        bytesToSend.writeBytes(bytes, 0, bytes.length);
+
+        this.connection.send(bytesToSend.getBytes());
+    }
+
     public function onMessage(type: Dynamic, callback: Dynamic->Void) {
         this.onMessageHandlers[this.getMessageHandlerKey(type)] = callback;
         return this;
@@ -184,6 +202,13 @@ class Room<T> {
                 : null;
 
             this.dispatchMessage(type, message);
+
+        } else if (code == Protocol.ROOM_DATA_BYTES) {
+            var type = (SPEC.stringCheck(data, it))
+                ? Schema.decoder.string(data, it)
+                : Schema.decoder.number(data, it);
+
+            this.dispatchMessage(type, data.sub(it.offset, data.length - it.offset));
         }
     }
 

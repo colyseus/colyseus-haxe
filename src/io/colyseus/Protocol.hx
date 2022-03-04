@@ -13,6 +13,9 @@ enum abstract Protocol(Int) to Int {
     var ROOM_STATE = 14;
     var ROOM_STATE_PATCH = 15;
 
+    // var ROOM_DATA_SCHEMA = 16;
+    var ROOM_DATA_BYTES = 17;
+
     // Match-making related (20~29)
     var ROOM_LIST = 20;
 
