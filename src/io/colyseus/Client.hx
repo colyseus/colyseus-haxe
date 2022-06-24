@@ -1,5 +1,7 @@
 package io.colyseus;
 
+import haxe.Timer;
+import haxe.macro.Expr.Catch;
 import haxe.Constraints.Function;
 
 using io.colyseus.events.EventHandler;
@@ -77,7 +79,7 @@ class Client {
     }
 
     public function getAvailableRooms(roomName: String, callback: (MatchMakeError, Array<RoomAvailable>)->Void) {
-        this.request("GET", "/matchmake/" + roomName, null, callback);
+        this.request("GET", "matchmake/" + roomName, null, callback);
     }
 
     @:generic
@@ -104,7 +106,33 @@ class Client {
 			options.set("reconnectionToken", response.reconnectionToken);
         }
 
-        room.connect(this.createConnection(response.room, options));
+        var _this = this;
+
+        function reserveSeat(targetRoom: Room<T>) {
+            function devModeCloseCallBack() {
+                var retryCount = 0;
+                var maxRetryCount = 8;
+
+                function retryConnection () {
+                    retryCount++;
+
+                    if (reserveSeat(targetRoom)) {
+                        trace("[Colyseus devMode]: Successfully re-established connection with room " + room.roomId);
+                    } else if (retryCount <= maxRetryCount) {
+                        trace("[Colyseus devMode]: retrying... (" + retryCount + " out of " + maxRetryCount + ")");
+                        Timer.delay(retryConnection, 2000);
+                    } else {
+                        trace("[Colyseus devMode]: Failed to reconnect. Is your server running? Please check server logs.");
+                    }
+                };
+
+                Timer.delay(retryConnection, 2000);
+            }
+    
+            return room.connect(_this.createConnection(response.room, options), targetRoom, devModeCloseCallBack);
+        }
+
+        reserveSeat(room);
     }
 
     @:generic
@@ -115,7 +143,7 @@ class Client {
         stateClass: Class<T>,
         callback: (MatchMakeError, Room<T>)->Void
     ) {
-        this.request("POST", "/matchmake/" + method + "/" + roomName, haxe.Json.stringify(options), function(err, response) {
+        this.request("POST", "matchmake/" + method + "/" + roomName, haxe.Json.stringify(options), function(err, response) {
             if (err != null) {
                 return callback(err, null);
 
@@ -149,6 +177,7 @@ class Client {
 
     private function request(method: String, segments: String, body: String, callback: (MatchMakeError,Dynamic)->Void) {
         var req = new haxe.Http(this.buildHttpEndpoint(segments));
+        trace(segments);
 
         if (body != null) {
             req.setPostData(body);
@@ -183,7 +212,7 @@ class Client {
     }
 
     private function buildHttpEndpoint(segments: String) {
-        return '${(this.settings.useSSL) ? "https" : "http"}://${this.settings.hostname}${this.getEndpointPort()}/matchmake/${segments}';
+        return '${(this.settings.useSSL) ? "https" : "http"}://${this.settings.hostname}${this.getEndpointPort()}/${segments}';
     }
 
     private function getEndpointPort() {
@@ -191,5 +220,4 @@ class Client {
             ? ':${this.settings.port}'
             : '';
     }
-
 }

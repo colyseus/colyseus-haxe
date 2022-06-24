@@ -21,7 +21,7 @@ class Compare {
     }
 
     private static function objectKeys (obj: Dynamic): Array<Dynamic> {
-        if (Std.is(obj, Array)) {
+        if (Std.isOfType(obj, Array)) {
             var keys = new Array();
             var length: Int = ((cast (obj, Array<Dynamic>)).length);
 
@@ -33,7 +33,7 @@ class Compare {
         }
 
         /* if (Std.is(obj, Map)) { */
-        if (Std.is(obj, haxe.Constraints.IMap)) {
+        if (Std.isOfType(obj, haxe.Constraints.IMap)) {
             return obj.keys();
         }
 
@@ -62,14 +62,14 @@ class Compare {
                 !(
                     newVal == null &&
                     oldVal != null &&
-                    !Std.is(obj, Array)
+                    !Std.isOfType(obj, Array)
                 )
             ) {
                 if (
                     oldVal != null && newVal != null &&
                     !isBasicType(oldVal) && !isBasicType(newVal) &&
                     (
-                        (Std.is(obj, Array) && Std.is(mirror, Array)) ||
+                        (Std.isOfType(obj, Array) && Std.isOfType(mirror, Array)) ||
                         (Reflect.isObject(obj) && Reflect.isObject(mirror))
                     )
                 ) {
@@ -114,15 +114,15 @@ class Compare {
     }
 
     private static function isBasicType (value: Dynamic) {
-        return (Std.is(value, String) || Std.is(value, Int) || Std.is(value, Float) || Std.is(value, Bool));
+        return (Std.isOfType(value, String) || Std.isOfType(value, Int) || Std.isOfType(value, Float) || Std.isOfType(value, Bool));
     }
 
     private static function getField(obj: Dynamic, field: Dynamic) {
-        return Std.is(obj, Array) ? obj[field] : Reflect.field(obj, field);
+        return Std.isOfType(obj, Array) ? obj[field] : Reflect.field(obj, field);
     }
 
     private static function hasField (obj: Dynamic, field: Dynamic) {
-        if (Std.is(obj, Array)) {
+        if (Std.isOfType(obj, Array)) {
             return obj[field] != null;
 
         } else if (Std.string(obj) == "{}") {

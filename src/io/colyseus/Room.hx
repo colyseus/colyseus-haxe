@@ -1,5 +1,6 @@
 package io.colyseus;
 
+import haxe.net.WebSocket.ReadyState;
 import haxe.io.BytesOutput;
 import io.colyseus.serializer.schema.Schema;
 import io.colyseus.serializer.Serializer;
@@ -43,22 +44,32 @@ class Room<T> {
         this.tmpStateClass = cls;
     }
 
-    public function connect(connection: Connection) {
-        this.connection = connection;
-        this.connection.reconnectionEnabled = false;
+    public function connect(connection: Connection, room: Room<T>, ?devModeCloseCallback) {
+        if (room == null) {
+            room = this;
+        }
+        room.connection = connection;
+        room.connection.reconnectionEnabled = false;
 
-        this.connection.onMessage = function (bytes) {
-            this.onMessageCallback(bytes);
+        room.connection.onMessage = function (bytes) {
+            room.onMessageCallback(bytes);
         }
 
-        this.connection.onClose = function () {
-            this.teardown();
-            this.onLeave.dispatch();
+        room.connection.onClose = function () {
+            if (devModeCloseCallback == null) {
+                room.teardown();
+                room.onLeave.dispatch();
+            } else {
+                devModeCloseCallback();
+            }
         }
 
-        this.connection.onError = function (e) {
-            this.onError.dispatch(0, e);
+        room.connection.onError = function (e) {
+            room.onError.dispatch(0, e);
+            return false;
         };
+
+        return room.connection.state() == ReadyState.Open;
     }
 
     public function leave(consented: Bool = true) {

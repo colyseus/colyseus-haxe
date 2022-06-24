@@ -73,4 +73,8 @@ class Connection {
         this.ws.close();
     }
 
+    public function state() {
+        return ws.readyState;
+    }
+
 }

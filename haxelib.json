@@ -10,6 +10,7 @@
   "contributors": ["endel"],
   "dependencies": {
     "colyseus-websocket": "1.0.7",
-    "tink_url": "0.5.0"
+    "tink_url": "0.5.0",
+    "tink_await": "0.6.0"
   }
 }

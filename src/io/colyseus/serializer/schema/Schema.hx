@@ -615,7 +615,7 @@ class Schema implements IRef {
             refs.remove(previousValue.__refId);
 
             Lambda.mapi(previousValue.items, function(index, item) {
-              allChanges.push({
+              return allChanges.push({
                 refId: refId,
                 op: cast OPERATION.DELETE,
                 field: cast index,
