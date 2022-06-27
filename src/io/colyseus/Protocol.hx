@@ -21,4 +21,7 @@ enum abstract Protocol(Int) to Int {
 
     // Generic messages (50~60)
     var BAD_REQUEST = 50;
+
+    // devMode close code
+    var DEVMODE_RESTART = 4010;
 }
