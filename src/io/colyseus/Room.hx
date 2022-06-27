@@ -1,5 +1,6 @@
 package io.colyseus;
 
+import haxe.Exception;
 import haxe.net.WebSocket.ReadyState;
 import haxe.io.BytesOutput;
 import io.colyseus.serializer.schema.Schema;
@@ -55,21 +56,18 @@ class Room<T> {
             room.onMessageCallback(bytes);
         }
 
-        room.connection.onClose = function () {
-            if (devModeCloseCallback == null) {
+        room.connection.onClose = function (e) {
+            if (devModeCloseCallback != null && e.code == Protocol.DEVMODE_RESTART) {
+                devModeCloseCallback();
+            } else {
                 room.teardown();
                 room.onLeave.dispatch();
-            } else {
-                devModeCloseCallback();
             }
         }
 
         room.connection.onError = function (e) {
             room.onError.dispatch(0, e);
-            return false;
         };
-
-        return room.connection.state() == ReadyState.Open;
     }
 
     public function leave(consented: Bool = true) {
@@ -259,5 +257,4 @@ class Room<T> {
             return "$" + Type.getClassName(Type.getClass(type));
         }
     }
-
 }

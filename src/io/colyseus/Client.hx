@@ -1,5 +1,7 @@
 package io.colyseus;
 
+import haxe.net.WebSocket.ReadyState;
+import haxe.macro.Expr.Binop;
 import haxe.Timer;
 import haxe.macro.Expr.Catch;
 import haxe.Constraints.Function;
@@ -106,33 +108,33 @@ class Client {
 			options.set("reconnectionToken", response.reconnectionToken);
         }
 
-        var _this = this;
-
-        function reserveSeat(targetRoom: Room<T>) {
+        function reserveSeat() {
             function devModeCloseCallBack() {
                 var retryCount = 0;
                 var maxRetryCount = 8;
-
+                
                 function retryConnection () {
                     retryCount++;
+                    reserveSeat();
 
-                    if (reserveSeat(targetRoom)) {
-                        trace("[Colyseus devMode]: Successfully re-established connection with room " + room.roomId);
-                    } else if (retryCount <= maxRetryCount) {
-                        trace("[Colyseus devMode]: retrying... (" + retryCount + " out of " + maxRetryCount + ")");
-                        Timer.delay(retryConnection, 2000);
-                    } else {
-                        trace("[Colyseus devMode]: Failed to reconnect. Is your server running? Please check server logs.");
+                    room.connection.onError = function(e) {
+                        if( retryCount <= maxRetryCount) {
+                            trace("[Colyseus devMode]: retrying... (" + retryCount + " out of " + maxRetryCount + ")");
+                            Timer.delay(retryConnection, 1000);
+                        } else {
+                            trace("[Colyseus devMode]: Failed to reconnect. Is your server running? Please check server logs.");
+                        }
                     }
-                };
-
-                Timer.delay(retryConnection, 2000);
+                    
+                    room.connection.onOpen = function () {
+                        trace("[Colyseus devMode]: Successfully re-established connection with room " + room.roomId);
+                    }
+                }
+                Timer.delay(retryConnection, 1000);
             }
-    
-            return room.connect(_this.createConnection(response.room, options), targetRoom, devModeCloseCallBack);
+            room.connect(this.createConnection(response.room, options), room, response.devMode? devModeCloseCallBack: null);
         }
-
-        reserveSeat(room);
+        reserveSeat();
     }
 
     @:generic
@@ -171,13 +173,11 @@ class Client {
 		} else {
 			endpoint += '${this.settings.hostname}${this.getEndpointPort()}';
 		}
-
         return new Connection('${endpoint}/${room.processId}/${room.roomId}?${params.join('&')}');
     }
 
     private function request(method: String, segments: String, body: String, callback: (MatchMakeError,Dynamic)->Void) {
         var req = new haxe.Http(this.buildHttpEndpoint(segments));
-        trace(segments);
 
         if (body != null) {
             req.setPostData(body);
