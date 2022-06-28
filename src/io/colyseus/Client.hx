@@ -1,5 +1,9 @@
 package io.colyseus;
 
+import haxe.net.WebSocket.ReadyState;
+import haxe.macro.Expr.Binop;
+import haxe.Timer;
+import haxe.macro.Expr.Catch;
 import haxe.Constraints.Function;
 
 using io.colyseus.events.EventHandler;
@@ -77,7 +81,7 @@ class Client {
     }
 
     public function getAvailableRooms(roomName: String, callback: (MatchMakeError, Array<RoomAvailable>)->Void) {
-        this.request("GET", "/matchmake/" + roomName, null, callback);
+        this.request("GET", "matchmake/" + roomName, null, callback);
     }
 
     @:generic
@@ -104,7 +108,33 @@ class Client {
 			options.set("reconnectionToken", response.reconnectionToken);
         }
 
-        room.connect(this.createConnection(response.room, options));
+        function reserveSeat() {
+            function devModeCloseCallBack() {
+                var retryCount = 0;
+                var maxRetryCount = 8;
+                
+                function retryConnection () {
+                    retryCount++;
+                    reserveSeat();
+
+                    room.connection.onError = function(e) {
+                        if( retryCount <= maxRetryCount) {
+                            trace("[Colyseus devMode]: retrying... (" + retryCount + " out of " + maxRetryCount + ")");
+                            Timer.delay(retryConnection, 1000);
+                        } else {
+                            trace("[Colyseus devMode]: Failed to reconnect. Is your server running? Please check server logs.");
+                        }
+                    }
+                    
+                    room.connection.onOpen = function () {
+                        trace("[Colyseus devMode]: Successfully re-established connection with room " + room.roomId);
+                    }
+                }
+                Timer.delay(retryConnection, 1000);
+            }
+            room.connect(this.createConnection(response.room, options), room, response.devMode? devModeCloseCallBack: null);
+        }
+        reserveSeat();
     }
 
     @:generic
@@ -115,7 +145,7 @@ class Client {
         stateClass: Class<T>,
         callback: (MatchMakeError, Room<T>)->Void
     ) {
-        this.request("POST", "/matchmake/" + method + "/" + roomName, haxe.Json.stringify(options), function(err, response) {
+        this.request("POST", "matchmake/" + method + "/" + roomName, haxe.Json.stringify(options), function(err, response) {
             if (err != null) {
                 return callback(err, null);
 
@@ -143,7 +173,6 @@ class Client {
 		} else {
 			endpoint += '${this.settings.hostname}${this.getEndpointPort()}';
 		}
-
         return new Connection('${endpoint}/${room.processId}/${room.roomId}?${params.join('&')}');
     }
 
@@ -183,7 +212,7 @@ class Client {
     }
 
     private function buildHttpEndpoint(segments: String) {
-        return '${(this.settings.useSSL) ? "https" : "http"}://${this.settings.hostname}${this.getEndpointPort()}/matchmake/${segments}';
+        return '${(this.settings.useSSL) ? "https" : "http"}://${this.settings.hostname}${this.getEndpointPort()}/${segments}';
     }
 
     private function getEndpointPort() {
@@ -191,5 +220,4 @@ class Client {
             ? ':${this.settings.port}'
             : '';
     }
-
 }

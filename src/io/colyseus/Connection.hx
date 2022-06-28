@@ -26,7 +26,7 @@ class Connection {
     // callbacks
     public dynamic function onOpen():Void {}
     public dynamic function onMessage(bytes: Bytes):Void {}
-    public dynamic function onClose():Void {}
+    public dynamic function onClose(data: Dynamic):Void {}
     public dynamic function onError(message: String):Void {}
 
     private static var isRunnerInitialized: Bool = false;
@@ -41,8 +41,8 @@ class Connection {
             this.onMessage(bytes);
         }
 
-        this.ws.onclose = function() {
-            this.onClose();
+        this.ws.onclose = function(data) {
+            this.onClose(data);
         }
 
         this.ws.onerror = function(message) {
@@ -72,5 +72,4 @@ class Connection {
     public function close () {
         this.ws.close();
     }
-
 }
