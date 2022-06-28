@@ -9,6 +9,8 @@
   "releasenote": "Aidan's fixes for Haxe 4.2",
   "contributors": ["endel"],
   "dependencies": {
-    "colyseus-websocket": "1.0.7"
+    "colyseus-websocket": "1.0.11",
+    "tink_url": "0.5.0",
+    "tink_await": "0.6.0"
   }
 }
