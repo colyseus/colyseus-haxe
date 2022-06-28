@@ -46,40 +46,42 @@ class Main extends Sprite {
                 return;
             }
 
+			trace("joinOrCreate, roomId: " + room.roomId);
+
             this.room = room;
-            this.room.state.players.onAdd = function(player, key) {
+
+            this.room.state.players.onAdd((player, key) -> {
                 trace("PLAYER ADDED AT: ", key);
+
                 var cat = Assets.getMovieClip("library:NyanCatAnimation");
-                this.cats[key] = cat;
+                this.cats.set(key, cat);
                 cat.x = player.x;
                 cat.y = player.y;
                 addChild(cat);
-            }
 
-            this.room.state.players.onChange = function(player, key) {
-                trace("PLAYER CHANGED AT: ", key);
-                this.cats[key].x = player.x;
-                this.cats[key].y = player.y;
-            }
+				player.onChange((changes) -> {
+					this.cats.get(key).x = player.x;
+					this.cats.get(key).y = player.y;
+				});
+            });
 
-            this.room.state.players.onRemove = function(player, key) {
+            this.room.state.players.onRemove((player, key) -> {
                 trace("PLAYER REMOVED AT: ", key);
-                removeChild(this.cats[key]);
-            }
+                removeChild(this.cats.get(key));
+            });
 
-            this.room.onStateChange += function(state) {
-                trace("STATE CHANGE: " + Std.string(state));
+            this.room.onStateChange += (state) -> {
             };
 
-            this.room.onMessage(0, function(message) {
+            this.room.onMessage(0, (message) -> {
                 trace("onMessage: 0 => " + message);
             });
 
-            this.room.onMessage("type", function(message) {
+            this.room.onMessage("type", (message) -> {
                 trace("onMessage: 'type' => " + message);
             });
 
-            this.room.onError += function(code: Int, message: String) {
+            this.room.onError += (code: Int, message: String) -> {
                 trace("ROOM ERROR: " + code + " => " + message);
             };
 

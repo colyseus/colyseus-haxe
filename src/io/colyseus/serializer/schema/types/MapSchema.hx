@@ -78,7 +78,7 @@ class MapSchema<T> implements IRef implements ISchemaCollection {
 
   public function setByIndex(index: Int, dynamicIndex: Dynamic, value: Dynamic): Void {
     this.indexes.set(index, dynamicIndex);
-		this.items.set(dynamicIndex, value);
+    this.items.set(dynamicIndex, value);
   }
 
   public function deleteByIndex(fieldIndex: Int): Void {
@@ -93,17 +93,17 @@ class MapSchema<T> implements IRef implements ISchemaCollection {
   public var length(get, null): Int;
   function get_length() { return Lambda.count(this.items._keys); }
 
-  public function onAdd(callback: T->Int->Void, triggerAll: Bool = true) {
+  public function onAdd(callback: T->String->Void, triggerAll: Bool = true) {
     if (this._callbacks == null) { this._callbacks = new Map<Int, Array<Dynamic>>(); }
     return CallbackHelpers.addCallback(this._callbacks, cast OPERATION.ADD, callback, (triggerAll) ? this : null);
   }
 
-  public function onChange(callback: T->Int->Void) {
+  public function onChange(callback: T->String->Void) {
     if (this._callbacks == null) { this._callbacks = new Map<Int, Array<Dynamic>>(); }
     return CallbackHelpers.addCallback(this._callbacks, cast OPERATION.REPLACE, callback);
   }
 
-  public function onRemove(callback: T->Int->Void) {
+  public function onRemove(callback: T->String->Void) {
     if (this._callbacks == null) { this._callbacks = new Map<Int, Array<Dynamic>>(); }
     return CallbackHelpers.addCallback(this._callbacks, cast OPERATION.DELETE, callback);
   }
@@ -135,6 +135,8 @@ class MapSchema<T> implements IRef implements ISchemaCollection {
 
   public function clone():MapSchema<T> {
     var cloned = new MapSchema<T>();
+
+    cloned.indexes = this.indexes.copy();
 
     for (key in this.items._keys) {
       cloned.items.set(key, this.items.get(key));
