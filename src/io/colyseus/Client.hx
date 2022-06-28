@@ -91,11 +91,24 @@ class Client {
         room.roomId = response.room.roomId;
         room.sessionId = response.sessionId;
 
-        var onError = function(code: Int, message: String) {
+        //
+        // WORKAROUND: declare onError/onJoin first, so we can use its references to remove the listeners
+        // FIXME: EventHandler must implement a .once() method to remove the listener after the first call
+        //
+		var onError:(Int, String) -> Void;
+		var onJoin:() -> Void;
+
+        onError = function(code: Int, message: String) {
+            // TODO: this may not work on native targets + devMode
+            room.onError -= onError;
+            room.onJoin -= onJoin;
             callback(new MatchMakeError(code, message), null);
         };
-        var onJoin = function() {
+
+        onJoin = function() {
+            // TODO: this may not work on native targets + devMode
             room.onError -= onError;
+            room.onJoin -= onJoin;
             callback(null, room);
         };
 
@@ -112,7 +125,7 @@ class Client {
             function devModeCloseCallBack() {
                 var retryCount = 0;
                 var maxRetryCount = 8;
-                
+
                 function retryConnection () {
                     retryCount++;
                     reserveSeat();
@@ -120,18 +133,20 @@ class Client {
                     room.connection.onError = function(e) {
                         if( retryCount <= maxRetryCount) {
                             trace("[Colyseus devMode]: retrying... (" + retryCount + " out of " + maxRetryCount + ")");
-                            Timer.delay(retryConnection, 1000);
+                            Timer.delay(retryConnection, 2000);
                         } else {
                             trace("[Colyseus devMode]: Failed to reconnect. Is your server running? Please check server logs.");
                         }
                     }
-                    
+
                     room.connection.onOpen = function () {
                         trace("[Colyseus devMode]: Successfully re-established connection with room " + room.roomId);
                     }
                 }
-                Timer.delay(retryConnection, 1000);
+
+                Timer.delay(retryConnection, 2000);
             }
+
             room.connect(this.createConnection(response.room, options), room, response.devMode? devModeCloseCallBack: null);
         }
         reserveSeat();

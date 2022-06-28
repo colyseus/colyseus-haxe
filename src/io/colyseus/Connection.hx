@@ -41,8 +41,8 @@ class Connection {
             this.onMessage(bytes);
         }
 
-        this.ws.onclose = function(data) {
-            this.onClose(data);
+        this.ws.onclose = function(?e:Dynamic) {
+            this.onClose(e);
         }
 
         this.ws.onerror = function(message) {
