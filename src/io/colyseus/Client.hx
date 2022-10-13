@@ -86,6 +86,14 @@ class Client {
 
     @:generic
     public function consumeSeatReservation<T>(response: Dynamic, stateClass: Class<T>, callback: (MatchMakeError, Room<T>)->Void) {
+        
+        // Prevents crashing upon .room being null. Can be caused if the server itself encounters an error making a room.
+        if (response.error != null)
+		{
+			callback(new MatchMakeError(response.code, response.error), null);
+			return;
+		}
+        
         var room: Room<T> = new Room<T>(response.room.name, stateClass);
 
         room.roomId = response.room.roomId;
