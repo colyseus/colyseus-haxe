@@ -103,8 +103,8 @@ class Client {
         // WORKAROUND: declare onError/onJoin first, so we can use its references to remove the listeners
         // FIXME: EventHandler must implement a .once() method to remove the listener after the first call
         //
-		var onError:(Int, String) -> Void;
-		var onJoin:() -> Void;
+        var onError:(Int, String) -> Void;
+        var onJoin:() -> Void;
 
         onError = function(code: Int, message: String) {
             // TODO: this may not work on native targets + devMode
