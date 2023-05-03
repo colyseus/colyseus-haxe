@@ -37,8 +37,8 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
         assertEquals(state.int32, -2147483648);
 
         assertEquals(4294967295, state.uint32);
-        /* assertEquals(-9223372036854775808, state.int64); */
-        /* assertEquals(9007199254740991, haxe.Int64.toInt(state.uint64)); */
+        // assertEquals(-9223372036854775808, state.int64);
+        // assertEquals(9007199254740991, haxe.Int64.toInt(state.uint64));
 
         assertEquals(state.float32, -3.4028234663852886e+37);
         assertEquals(state.float64, 1.7976931348623157e+308);
@@ -50,8 +50,8 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
         assertEquals(state.varint_int32, -2147483648);
         assertEquals(state.varint_uint32, 4294967295);
 
-        /* // failing on cpp target */
-        /* assertEquals(state.varint_int64, -9223372036854775808); */
+        // // failing on cpp target
+        // assertEquals(state.varint_int64, -9223372036854775808);
         assertEquals(state.varint_uint64, 9007199254740991);
         assertEquals(state.varint_float32, -3.40282347e+38);
         assertEquals(state.varint_float64, 1.7976931348623157e+307);
@@ -77,14 +77,14 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
         var bytes = [128, 1, 129, 2, 130, 3, 131, 4, 255, 1, 128, 0, 5, 128, 1, 6, 255, 2, 128, 0, 0, 128, 1, 10, 128, 2, 20, 128, 3, 205, 192, 13, 255, 3, 128, 0, 163, 111, 110, 101, 128, 1, 163, 116, 119, 111, 128, 2, 165, 116, 104, 114, 101, 101, 255, 4, 128, 0, 232, 3, 0, 0, 128, 1, 192, 13, 0, 0, 128, 2, 72, 244, 255, 255, 255, 5, 128, 100, 129, 208, 156, 255, 6, 128, 100, 129, 208, 156];
 
         trace("testArraySchemaTypes");
-        state.arrayOfSchemas.onAdd = (value, key) -> trace("onAdd, arrayOfSchemas => key: " + key + ", value: " + value);
-        state.arrayOfNumbers.onAdd = (value, key) -> trace("onAdd, arrayOfNumbers => key: " + key + ", value: " + value);
-        state.arrayOfStrings.onAdd = (value, key) -> trace("onAdd, arrayOfStrings => key: " + key + ", value: " + value);
-        state.arrayOfInt32.onAdd = (value, key) -> trace("onAdd, arrayOfInt32 => key: " + key + ", value: " + value);
+        state.arrayOfSchemas.onAdd((value, key) -> trace("onAdd, arrayOfSchemas => key: " + key + ", value: " + value));
+        state.arrayOfNumbers.onAdd((value, key) -> trace("onAdd, arrayOfNumbers => key: " + key + ", value: " + value));
+        state.arrayOfStrings.onAdd((value, key) -> trace("onAdd, arrayOfStrings => key: " + key + ", value: " + value));
+        state.arrayOfInt32.onAdd((value, key) -> trace("onAdd, arrayOfInt32 => key: " + key + ", value: " + value));
 
-        state.onChange = function(changes) {
+        state.onChange(function(changes) {
             trace("\nCHANGES! => " + changes);
-        };
+        });
 
         state.decode(getBytes(bytes));
 
@@ -135,15 +135,15 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
     public function testMapSchemaTypes() {
         var state = new MapSchemaTypes();
 
-        state.mapOfSchemas.onAdd = (value, key) -> trace("onAdd, mapOfSchemas -> " + key);
-        state.mapOfNumbers.onAdd = (value, key) -> trace("onAdd, mapOfNumbers -> " + key);
-        state.mapOfStrings.onAdd = (value, key) -> trace("onAdd, mapOfStrings -> " + key);
-        state.mapOfInt32.onAdd = (value, key) -> trace("onAdd, mapOfInt32 -> " + key);
+        state.mapOfSchemas.onAdd((value, key) -> trace("onAdd, mapOfSchemas -> " + key));
+        state.mapOfNumbers.onAdd((value, key) -> trace("onAdd, mapOfNumbers -> " + key));
+        state.mapOfStrings.onAdd((value, key) -> trace("onAdd, mapOfStrings -> " + key));
+        state.mapOfInt32.onAdd((value, key) -> trace("onAdd, mapOfInt32 -> " + key));
 
-        state.mapOfSchemas.onRemove = (value, key) -> trace("onRemove, mapOfSchemas -> " + key);
-        state.mapOfNumbers.onRemove = (value, key) -> trace("onRemove, mapOfNumbers -> " + key);
-        state.mapOfStrings.onRemove = (value, key) -> trace("onRemove, mapOfStrings -> " + key);
-        state.mapOfInt32.onRemove = (value, key) -> trace("onRemove, mapOfInt32 -> " + key);
+        state.mapOfSchemas.onRemove((value, key) -> trace("onRemove, mapOfSchemas -> " + key));
+        state.mapOfNumbers.onRemove((value, key) -> trace("onRemove, mapOfNumbers -> " + key));
+        state.mapOfStrings.onRemove((value, key) -> trace("onRemove, mapOfStrings -> " + key));
+        state.mapOfInt32.onRemove((value, key) -> trace("onRemove, mapOfInt32 -> " + key));
 
         state.decode(getBytes([128, 1, 129, 2, 130, 3, 131, 4, 255, 1, 128, 0, 163, 111, 110, 101, 5, 128, 1, 163, 116, 119, 111, 6, 128, 2, 165, 116, 104, 114, 101, 101, 7, 255, 2, 128, 0, 163, 111, 110, 101, 1, 128, 1, 163, 116, 119, 111, 2, 128, 2, 165, 116, 104, 114, 101, 101, 205, 192, 13, 255, 3, 128, 0, 163, 111, 110, 101, 163, 79, 110, 101, 128, 1, 163, 116, 119, 111, 163, 84, 119, 111, 128, 2, 165, 116, 104, 114, 101, 101, 165, 84, 104, 114, 101, 101, 255, 4, 128, 0, 163, 111, 110, 101, 192, 13, 0, 0, 128, 1, 163, 116, 119, 111, 24, 252, 255, 255, 128, 2, 165, 116, 104, 114, 101, 101, 208, 7, 0, 0, 255, 5, 128, 100, 129, 204, 200, 255, 6, 128, 205, 44, 1, 129, 205, 144, 1, 255, 7, 128, 205, 244, 1, 129, 205, 88, 2]));
 
@@ -247,23 +247,21 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
         statev1.decode(getBytes(statev2bytes));
         assertEquals(statev1.str, "Hello world");
 
-        /*
-           Assert.DoesNotThrow(() =>
-           {
-        // uses StateV1 handshake with StateV2 structure.
-        var serializer = new Colyseus.SchemaSerializer<SchemaTest.Forwards.StateV2>();
-        byte[] handshake = { 0, 4, 4, 0, 0, 0, 1, 2, 2, 0, 0, 161, 120, 1, 166, 110, 117, 109, 98, 101, 114, 193, 1, 0, 161, 121, 1, 166, 110, 117, 109, 98, 101, 114, 193, 193, 1, 0, 1, 1, 2, 2, 0, 0, 163, 115, 116, 114, 1, 166, 115, 116, 114, 105, 110, 103, 193, 1, 0, 163, 109, 97, 112, 1, 163, 109, 97, 112, 2, 0, 193, 193, 2, 0, 2, 1, 4, 4, 0, 0, 161, 120, 1, 166, 110, 117, 109, 98, 101, 114, 193, 1, 0, 161, 121, 1, 166, 110, 117, 109, 98, 101, 114, 193, 2, 0, 164, 110, 97, 109, 101, 1, 166, 115, 116, 114, 105, 110, 103, 193, 3, 0, 174, 97, 114, 114, 97, 121, 79, 102, 83, 116, 114, 105, 110, 103, 115, 1, 172, 97, 114, 114, 97, 121, 58, 115, 116, 114, 105, 110, 103, 2, 255, 193, 193, 3, 0, 3, 1, 3, 3, 0, 0, 163, 115, 116, 114, 1, 166, 115, 116, 114, 105, 110, 103, 193, 1, 0, 163, 109, 97, 112, 1, 163, 109, 97, 112, 2, 2, 193, 2, 0, 169, 99, 111, 117, 110, 116, 100, 111, 119, 110, 1, 166, 110, 117, 109, 98, 101, 114, 193, 193, 1, 1 };
-        serializer.Handshake(handshake, 0);
-        }, "reflection should be backwards compatible");
+        //    Assert.DoesNotThrow(() =>
+        //    {
+        // // uses StateV1 handshake with StateV2 structure.
+        // var serializer = new Colyseus.SchemaSerializer<SchemaTest.Forwards.StateV2>();
+        // byte[] handshake = { 0, 4, 4, 0, 0, 0, 1, 2, 2, 0, 0, 161, 120, 1, 166, 110, 117, 109, 98, 101, 114, 193, 1, 0, 161, 121, 1, 166, 110, 117, 109, 98, 101, 114, 193, 193, 1, 0, 1, 1, 2, 2, 0, 0, 163, 115, 116, 114, 1, 166, 115, 116, 114, 105, 110, 103, 193, 1, 0, 163, 109, 97, 112, 1, 163, 109, 97, 112, 2, 0, 193, 193, 2, 0, 2, 1, 4, 4, 0, 0, 161, 120, 1, 166, 110, 117, 109, 98, 101, 114, 193, 1, 0, 161, 121, 1, 166, 110, 117, 109, 98, 101, 114, 193, 2, 0, 164, 110, 97, 109, 101, 1, 166, 115, 116, 114, 105, 110, 103, 193, 3, 0, 174, 97, 114, 114, 97, 121, 79, 102, 83, 116, 114, 105, 110, 103, 115, 1, 172, 97, 114, 114, 97, 121, 58, 115, 116, 114, 105, 110, 103, 2, 255, 193, 193, 3, 0, 3, 1, 3, 3, 0, 0, 163, 115, 116, 114, 1, 166, 115, 116, 114, 105, 110, 103, 193, 1, 0, 163, 109, 97, 112, 1, 163, 109, 97, 112, 2, 2, 193, 2, 0, 169, 99, 111, 117, 110, 116, 100, 111, 119, 110, 1, 166, 110, 117, 109, 98, 101, 114, 193, 193, 1, 1 };
+        // serializer.Handshake(handshake, 0);
+        // }, "reflection should be backwards compatible");
 
-        Assert.DoesNotThrow(() =>
-        {
-        // uses StateV2 handshake with StateV1 structure.
-        var serializer = new Colyseus.SchemaSerializer<SchemaTest.Backwards.StateV1>();
-        byte[] handshake = { 0, 4, 4, 0, 0, 0, 1, 2, 2, 0, 0, 161, 120, 1, 166, 110, 117, 109, 98, 101, 114, 193, 1, 0, 161, 121, 1, 166, 110, 117, 109, 98, 101, 114, 193, 193, 1, 0, 1, 1, 2, 2, 0, 0, 163, 115, 116, 114, 1, 166, 115, 116, 114, 105, 110, 103, 193, 1, 0, 163, 109, 97, 112, 1, 163, 109, 97, 112, 2, 0, 193, 193, 2, 0, 2, 1, 4, 4, 0, 0, 161, 120, 1, 166, 110, 117, 109, 98, 101, 114, 193, 1, 0, 161, 121, 1, 166, 110, 117, 109, 98, 101, 114, 193, 2, 0, 164, 110, 97, 109, 101, 1, 166, 115, 116, 114, 105, 110, 103, 193, 3, 0, 174, 97, 114, 114, 97, 121, 79, 102, 83, 116, 114, 105, 110, 103, 115, 1, 172, 97, 114, 114, 97, 121, 58, 115, 116, 114, 105, 110, 103, 2, 255, 193, 193, 3, 0, 3, 1, 3, 3, 0, 0, 163, 115, 116, 114, 1, 166, 115, 116, 114, 105, 110, 103, 193, 1, 0, 163, 109, 97, 112, 1, 163, 109, 97, 112, 2, 2, 193, 2, 0, 169, 99, 111, 117, 110, 116, 100, 111, 119, 110, 1, 166, 110, 117, 109, 98, 101, 114, 193, 193, 1, 3 };
-        serializer.Handshake(handshake, 0);
-        }, "reflection should be forwards compatible");
-         */
+        // Assert.DoesNotThrow(() =>
+        // {
+        // // uses StateV2 handshake with StateV1 structure.
+        // var serializer = new Colyseus.SchemaSerializer<SchemaTest.Backwards.StateV1>();
+        // byte[] handshake = { 0, 4, 4, 0, 0, 0, 1, 2, 2, 0, 0, 161, 120, 1, 166, 110, 117, 109, 98, 101, 114, 193, 1, 0, 161, 121, 1, 166, 110, 117, 109, 98, 101, 114, 193, 193, 1, 0, 1, 1, 2, 2, 0, 0, 163, 115, 116, 114, 1, 166, 115, 116, 114, 105, 110, 103, 193, 1, 0, 163, 109, 97, 112, 1, 163, 109, 97, 112, 2, 0, 193, 193, 2, 0, 2, 1, 4, 4, 0, 0, 161, 120, 1, 166, 110, 117, 109, 98, 101, 114, 193, 1, 0, 161, 121, 1, 166, 110, 117, 109, 98, 101, 114, 193, 2, 0, 164, 110, 97, 109, 101, 1, 166, 115, 116, 114, 105, 110, 103, 193, 3, 0, 174, 97, 114, 114, 97, 121, 79, 102, 83, 116, 114, 105, 110, 103, 115, 1, 172, 97, 114, 114, 97, 121, 58, 115, 116, 114, 105, 110, 103, 2, 255, 193, 193, 3, 0, 3, 1, 3, 3, 0, 0, 163, 115, 116, 114, 1, 166, 115, 116, 114, 105, 110, 103, 193, 1, 0, 163, 109, 97, 112, 1, 163, 109, 97, 112, 2, 2, 193, 2, 0, 169, 99, 111, 117, 110, 116, 100, 111, 119, 110, 1, 166, 110, 117, 109, 98, 101, 114, 193, 193, 1, 3 };
+        // serializer.Handshake(handshake, 0);
+        // }, "reflection should be forwards compatible");
     }
 
     public function testFilteredTypes() {
@@ -323,7 +321,7 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
 
         var containerOnChange = 0;
         var containerOnChangeCallback = function(changes) {containerOnChange++;};
-        state.container.onChange = containerOnChangeCallback;
+        state.container.onChange(containerOnChangeCallback);
 
         var arrayOfSchemasOnAdd = 0;
         var arrayOfSchemasOnChange = 0;
@@ -342,9 +340,9 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
           arrayOfSchemasOnRemove++;
         };
 
-        state.container.arrayOfSchemas.onAdd = arrayOfSchemasOnAddCallback;
-        state.container.arrayOfSchemas.onChange = arrayOfSchemasOnChangeCallback;
-        state.container.arrayOfSchemas.onRemove = arrayOfSchemasOnRemoveCallback;
+        state.container.arrayOfSchemas.onAdd(arrayOfSchemasOnAddCallback);
+        state.container.arrayOfSchemas.onChange(arrayOfSchemasOnChangeCallback);
+        state.container.arrayOfSchemas.onRemove(arrayOfSchemasOnRemoveCallback);
 
         var arrayOfNumbersOnAdd = 0;
         var arrayOfNumbersOnChange = 0;
@@ -363,9 +361,9 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
           arrayOfNumbersOnRemove++;
         };
 
-        state.container.arrayOfNumbers.onAdd = arrayOfNumbersOnAddCallback;
-        state.container.arrayOfNumbers.onChange = arrayOfNumbersOnChangeCallback;
-        state.container.arrayOfNumbers.onRemove = arrayOfNumbersOnRemoveCallback;
+        state.container.arrayOfNumbers.onAdd(arrayOfNumbersOnAddCallback);
+        state.container.arrayOfNumbers.onChange(arrayOfNumbersOnChangeCallback);
+        state.container.arrayOfNumbers.onRemove(arrayOfNumbersOnRemoveCallback);
 
         var arrayOfStringsOnAdd = 0;
         var arrayOfStringsOnChange = 0;
@@ -384,46 +382,45 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
           arrayOfStringsOnRemove++;
         };
 
-        state.container.arrayOfStrings.onAdd = arrayOfStringsOnAddCallback;
-        state.container.arrayOfStrings.onChange = arrayOfStringsOnChangeCallback;
-        state.container.arrayOfStrings.onRemove = arrayOfStringsOnRemoveCallback;
+        state.container.arrayOfStrings.onAdd(arrayOfStringsOnAddCallback);
+        state.container.arrayOfStrings.onChange(arrayOfStringsOnChangeCallback);
+        state.container.arrayOfStrings.onRemove(arrayOfStringsOnRemoveCallback);
 
         state.decode(getBytes([128, 1, 255, 1, 130, 2, 131, 3, 132, 4, 133, 5]));
-        assertEquals(containerOnChange, 1);
-        assertEquals(arrayOfSchemasOnAdd, 0);
-        assertEquals(arrayOfSchemasOnChange, 0);
-        assertEquals(arrayOfSchemasOnRemove, 0);
-        assertEquals(arrayOfNumbersOnAdd, 0);
-        assertEquals(arrayOfNumbersOnChange, 0);
-        assertEquals(arrayOfNumbersOnRemove, 0);
-        assertEquals(arrayOfStringsOnAdd, 0);
-        assertEquals(arrayOfStringsOnChange, 0);
-        assertEquals(arrayOfStringsOnRemove, 0);
+        assertEquals(1, containerOnChange);
+        assertEquals(0, arrayOfSchemasOnAdd);
+        assertEquals(0, arrayOfSchemasOnChange);
+        assertEquals(0, arrayOfSchemasOnRemove);
+        assertEquals(0, arrayOfNumbersOnAdd);
+        assertEquals(0, arrayOfNumbersOnChange);
+        assertEquals(0, arrayOfNumbersOnRemove);
+        assertEquals(0, arrayOfStringsOnAdd);
+        assertEquals(0, arrayOfStringsOnChange);
+        assertEquals(0, arrayOfStringsOnRemove);
 
         state.decode(getBytes([255, 1, 128, 1, 129, 163, 111, 110, 101, 255, 2, 128, 1, 255, 3, 128, 0, 6, 255, 4, 128, 0, 1, 255, 5, 128, 0, 163, 111, 110, 101, 255, 6, 128, 2]));
-        assertEquals(containerOnChange, 2);
-        assertEquals(arrayOfSchemasOnAdd, 1);
-        assertEquals(arrayOfSchemasOnChange, 0);
-        assertEquals(arrayOfSchemasOnRemove, 0);
-        assertEquals(arrayOfNumbersOnAdd, 1);
-        assertEquals(arrayOfNumbersOnChange, 0);
-        assertEquals(arrayOfNumbersOnRemove, 0);
-        assertEquals(arrayOfStringsOnAdd, 1);
-        assertEquals(arrayOfStringsOnChange, 0);
-        assertEquals(arrayOfStringsOnRemove, 0);
+        assertEquals(2, containerOnChange);
+        assertEquals(1, arrayOfSchemasOnAdd);
+        assertEquals(1, arrayOfSchemasOnChange);
+        assertEquals(0, arrayOfSchemasOnRemove);
+        assertEquals(1, arrayOfNumbersOnAdd);
+        assertEquals(1, arrayOfNumbersOnChange);
+        assertEquals(0, arrayOfNumbersOnRemove);
+        assertEquals(1, arrayOfStringsOnAdd);
+        assertEquals(1, arrayOfStringsOnChange);
+        assertEquals(0, arrayOfStringsOnRemove);
 
         state.decode(getBytes([128, 7, 255, 7, 130, 8, 131, 9, 132, 10, 133, 11, 128, 2, 129, 163, 116, 119, 111, 255, 8, 128, 2, 255, 9, 128, 0, 12, 255, 10, 128, 0, 2, 255, 11, 128, 0, 163, 116, 119, 111, 255, 12, 128, 4]));
-        assertEquals(containerOnChange, 3);
-        assertEquals(arrayOfSchemasOnAdd, 2);
-        assertEquals(arrayOfSchemasOnChange, 0);
-        assertEquals(arrayOfSchemasOnRemove, 0); // FIXME: ideally, this should be 1
-        assertEquals(arrayOfNumbersOnAdd, 2);
-        assertEquals(arrayOfNumbersOnChange, 0);
-        assertEquals(arrayOfNumbersOnRemove, 0); // FIXME: ideally, this should be 1
-        assertEquals(arrayOfStringsOnAdd, 2);
-        assertEquals(arrayOfStringsOnChange, 0);
-        assertEquals(arrayOfStringsOnRemove, 0); // FIXME: ideally, this should be 1
-
+        assertEquals(3, containerOnChange);
+        assertEquals(2, arrayOfSchemasOnAdd);
+        assertEquals(2, arrayOfSchemasOnChange);
+        assertEquals(0, arrayOfSchemasOnRemove); // FIXME: ideally, this should be 1
+        assertEquals(2, arrayOfNumbersOnAdd);
+        assertEquals(2, arrayOfNumbersOnChange);
+        assertEquals(0, arrayOfNumbersOnRemove); // FIXME: ideally, this should be 1
+        assertEquals(2, arrayOfStringsOnAdd);
+        assertEquals(2, arrayOfStringsOnChange);
+        assertEquals(0, arrayOfStringsOnRemove); // FIXME: ideally, this should be 1
     }
 
 

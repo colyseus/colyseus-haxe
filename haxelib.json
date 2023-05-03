@@ -1,14 +1,16 @@
 {
   "name": "colyseus",
-  "url" : "https://github.com/colyseus/colyseus-hx/",
+  "url" : "https://github.com/colyseus/colyseus-haxe/",
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
   "description": "Multiplayer Game Client for Haxe",
-  "version": "0.14.10",
+  "version": "0.15.0",
   "classPath": "src/",
-  "releasenote": "Aidan's fixes for Haxe 4.2",
+  "releasenote": "Compatible with new version 0.15 of Colyseus server",
   "contributors": ["endel"],
   "dependencies": {
-    "colyseus-websocket": "1.0.7"
+    "colyseus-websocket": "1.0.12",
+    "tink_url": "0.5.0",
+    "tink_await": "0.6.0"
   }
 }

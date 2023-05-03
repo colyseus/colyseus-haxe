@@ -1,5 +1,7 @@
 package io.colyseus.serializer.schema.types;
 
+import io.colyseus.serializer.schema.Schema.DataChange;
+
 interface ISchemaCollection extends IRef {
   public var _childType: Dynamic;
 
@@ -14,6 +16,6 @@ interface ISchemaCollection extends IRef {
   public function getIndex(index: Int): Dynamic;
   public function setByIndex(index: Int, dynamicIndex: Dynamic, value: Dynamic): Void;
 
-  public function clear(refs: ReferenceTracker): Void;
+  public function clear(changes: Array<DataChange>, refs: ReferenceTracker): Void;
   public function clone(): ISchemaCollection;
 }

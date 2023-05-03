@@ -10,9 +10,9 @@ class State extends Schema {
     @type(Container) container = new Container();
 }
 
-export class TestRoom extends Room {
+export class MyRoom extends Room {
 
-    async onCreate(options) {
+    async onCreate(options: any) {
         this.setState(new State());
 
         let int: number = 0;

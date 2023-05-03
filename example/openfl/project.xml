@@ -11,6 +11,8 @@
 
 	<haxelib name="openfl" />
 	<haxelib name="colyseus-websocket" />
+	<haxelib name="tink_url" />
+	<haxelib name="tink_await" />
 
 	<library path="Assets/library.swf" preload="true" />
 

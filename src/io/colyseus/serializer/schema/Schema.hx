@@ -6,6 +6,8 @@ import io.colyseus.serializer.schema.types.IRef;
 import io.colyseus.serializer.schema.types.ArraySchema;
 import io.colyseus.serializer.schema.types.MapSchema;
 
+import io.colyseus.serializer.schema.callbacks.CallbackHelpers;
+
 import haxe.io.Bytes;
 import haxe.Constraints.IMap;
 
@@ -340,6 +342,7 @@ abstract OPERATION(Int) from Int
 }
 
 typedef DataChange = {
+  var refId(default,never):Int;
   var op(default,never):Int;
   var field(default,never):String;
   var value(default,never):Any;
@@ -354,9 +357,6 @@ class Schema implements IRef {
 
   public function new() {}
 
-  public dynamic function onChange(changes:Array<DataChange>):Void {}
-  public dynamic function onRemove():Void {}
-
   public var __refId:Int = 0;
 
   public var _indexes:Map<Int, String> = new Map<Int, String>();
@@ -364,6 +364,10 @@ class Schema implements IRef {
   public var _childTypes:Map<Int, Dynamic> = new Map<Int, Dynamic>();
   // private var _childSchemaTypes:Map<Int, Class<Schema>> = new Map<Int, Class<Schema>>();
   // private var _childPrimitiveTypes:Map<Int, String> = new Map<Int, String>();
+
+  // callbacks
+  private var _callbacks: Map<Int, Array<Dynamic>> = null;
+  private var _propertyCallbacks: Map<String, Array<Dynamic>> = null;
 
   private var _refs:ReferenceTracker = null;
 
@@ -382,11 +386,28 @@ class Schema implements IRef {
   public function setIndex(fieldIndex: Int, dynamicIndex: Int) {}
   public function getIndex(fieldIndex: Int, dynamicIndex: Int) {}
 
+  public function onChange(callback:Array<DataChange>->Void) {
+    if (this._callbacks == null) { this._callbacks = new Map<Int, Array<Dynamic>>(); }
+    return CallbackHelpers.addCallback(this._callbacks, cast OPERATION.REPLACE, callback);
+  }
+
+  public function onRemove(callback:Void->Void) {
+    if (this._callbacks == null) { this._callbacks = new Map<Int, Array<Dynamic>>(); }
+    return CallbackHelpers.addCallback(this._callbacks, cast OPERATION.DELETE, callback);
+  }
+
+  // TODO: it would be great to have this strictly typed.
+  public function listen(property: String, callback:Dynamic->Dynamic->Void) {
+    if (this._callbacks == null) { this._callbacks = new Map<Int, Array<Dynamic>>(); }
+    if (this._propertyCallbacks == null) { this._propertyCallbacks = new Map<String, Array<Dynamic>>(); }
+    return CallbackHelpers.addPropertyCallback(this._propertyCallbacks, property, callback);
+  }
+
   public function moveEventHandlers (previousInstance: Dynamic) {
     var previousSchemaInstance = (previousInstance: Schema);
 
-    this.onChange = previousSchemaInstance.onChange;
-    this.onRemove = previousSchemaInstance.onRemove;
+    this._callbacks = previousInstance._callbacks;
+    this._propertyCallbacks = previousInstance._propertyCallbacks;
 
     for (fieldIndex => _ in this._childTypes) {
       var childType = this.getByIndex(fieldIndex);
@@ -406,9 +427,7 @@ class Schema implements IRef {
     var ref:Dynamic = this;
     refs.add(refId, ref);
 
-    var changes:Array<DataChange> = [];
-    var allChanges = new OrderedMap<Int, Array<DataChange>>(new Map<Int, Array<DataChange>>());
-    allChanges.set(refId, changes);
+    var allChanges = new Array<DataChange>();
 
     var totalBytes = bytes.length;
     while (it.offset < totalBytes) {
@@ -423,10 +442,6 @@ class Schema implements IRef {
         //
         if (ref == null) { throw("refId not found: " + refId); }
 
-        // create empty list of changes for this refId.
-        changes = [];
-        allChanges.set(refId, changes);
-
         continue;
       }
 
@@ -438,7 +453,7 @@ class Schema implements IRef {
 
       // Clear collection structure.
       if (operation == OPERATION.CLEAR) {
-        ref.clear(refs);
+        (ref : ISchemaCollection).clear(allChanges, refs);
         continue;
       }
 
@@ -540,7 +555,7 @@ class Schema implements IRef {
         //
 
       } else if (fieldType == "ref") {
-        refId = decoder.number(bytes, it);
+        var refId = decoder.number(bytes, it);
         value = refs.get(refId);
 
         if (operation != OPERATION.REPLACE) {
@@ -566,7 +581,7 @@ class Schema implements IRef {
         value = decoder.decodePrimitiveType(fieldType, bytes, it);
 
       } else {
-        refId = decoder.number(bytes, it);
+        var refId = decoder.number(bytes, it);
         value = refs.get(refId);
 
         //
@@ -599,9 +614,9 @@ class Schema implements IRef {
           {
             refs.remove(previousValue.__refId);
 
-            var deletes = new Array<DataChange>();
             Lambda.mapi(previousValue.items, function(index, item) {
-              return deletes.push({
+              return allChanges.push({
+                refId: refId,
                 op: cast OPERATION.DELETE,
                 field: cast index,
                 dynamicIndex: cast index,
@@ -609,8 +624,6 @@ class Schema implements IRef {
                 previousValue: item
               });
             });
-
-            allChanges.set(previousValue.__refId, deletes);
           }
         }
 
@@ -624,7 +637,8 @@ class Schema implements IRef {
       }
 
       if (hasChange) {
-        changes.push({
+        allChanges.push({
+          refId: refId,
           op: operation,
           field: fieldName,
           dynamicIndex: dynamicIndex,
@@ -639,21 +653,42 @@ class Schema implements IRef {
     refs.garbageCollection();
   }
 
-  private function triggerChanges (allChanges: OrderedMap<Int, Array<DataChange>>) {
+  private function triggerChanges (allChanges: Array<DataChange>) {
+    var uniqueRefIds = new Map<Int, Bool>();
     var refs = this._refs;
 
-    for (it in allChanges.keyValueIterator()) {
-      var changes = it.value;
+    for (change in allChanges) {
+        var refId = change.refId;
+        var ref = refs.get(refId);
+        var isSchema = Std.isOfType(ref, Schema);
+        var callbacks = Reflect.getProperty(ref, "_callbacks");
 
-      // skip on empty change list.
-      if (changes.length == 0) { continue; }
+        //
+        // trigger onRemove on child structure.
+        //
+        if (
+            ((change.op & cast OPERATION.DELETE) == OPERATION.DELETE) &&
+            Std.isOfType(change.previousValue, Schema) &&
+            (change.previousValue : Schema)._callbacks != null
+        ) {
+            CallbackHelpers.triggerCallbacks0((change.previousValue : Schema)._callbacks, cast OPERATION.DELETE);
+        }
 
-      var refId = it.key;
-      var ref = refs.get(refId);
-      var isSchema = Std.isOfType(ref, Schema);
+        // no callbacks defined, skip this structure!
+        if (callbacks == null) { continue; }
 
-      for (change in changes) {
-        if (!isSchema) {
+        if (isSchema) {
+            if (!uniqueRefIds.exists(refId)) {
+                // trigger onChange
+                CallbackHelpers.triggerCallbacks1(callbacks, cast OPERATION.REPLACE, allChanges);
+            }
+
+            var propertyCallbacks = Reflect.getProperty(ref, "_propertyCallbacks");
+            if (propertyCallbacks != null) {
+                CallbackHelpers.triggerFieldCallbacks(propertyCallbacks, change.field, change.value, change.previousValue);
+            }
+
+        } else {
           var container = (ref: ISchemaCollection);
 
           if (change.op == OPERATION.ADD && change.previousValue == null) {
@@ -673,77 +708,17 @@ class Schema implements IRef {
               container.invokeOnRemove(change.previousValue, change.dynamicIndex);
             }
             container.invokeOnAdd(change.value, change.dynamicIndex);
+          }
 
-          } else if (change.op == OPERATION.REPLACE || change.value != change.previousValue) {
+          if (change.value != change.previousValue) {
             container.invokeOnChange(change.value, change.dynamicIndex);
           }
 
         }
 
-        //
-        // trigger onRemove on child structure.
-        //
-        if (
-          ((change.op & cast OPERATION.DELETE) == OPERATION.DELETE) &&
-          Std.isOfType(change.previousValue, Schema)
-        ) {
-          (change.previousValue : Schema).onRemove();
-        }
-      }
-
-      if (isSchema) {
-        (ref : Schema).onChange(changes);
-      }
+        uniqueRefIds.set(refId, true);
     }
-  }
 
-  private function triggerAllFillChanges(ref: IRef, allChanges: OrderedMap<Int, Array<DataChange>>) {
-    if (allChanges.exists(ref.__refId)) { return; }
-
-    var changes = new Array<DataChange>();
-    allChanges.set(ref.__refId, changes);
-
-    if (Std.isOfType(ref, Schema)) {
-      var _indexes: Map<Int, String> = Reflect.getProperty(ref, "_indexes");
-      for (fieldIndex in _indexes.keyValueIterator()) {
-        var value = ref.getByIndex(fieldIndex.key);
-        changes.push({
-          field: fieldIndex.value,
-          op: cast OPERATION.ADD,
-          value: value
-        });
-
-        if (Std.isOfType(value, IRef)) {
-          this.triggerAllFillChanges(value, allChanges);
-        }
-      }
-    } else {
-      var items: IMap<Any, Any> = Reflect.getProperty(ref, "items");
-      for (item in items.keyValueIterator()) {
-        changes.push({
-          field: item.key,
-          dynamicIndex: item.key,
-          op: cast OPERATION.ADD,
-          value: item.value
-        });
-
-        if (Std.isOfType(item, IRef)) {
-          this.triggerAllFillChanges(item.value, allChanges);
-        }
-      }
-    }
-  }
-
-  public function triggerAll() {
-    //
-    // first state not received from the server yet.
-    // nothing to trigger.
-    //
-    if (this._refs == null) { return; }
-
-    var allChanges = new OrderedMap<Int, Array<DataChange>>(new Map<Int, Array<DataChange>>());
-    this.triggerAllFillChanges(this, allChanges);
-    this.triggerChanges(allChanges);
   }
 
   private function getSchemaType(bytes: Bytes, it: It, defaultType: Class<Schema>) {

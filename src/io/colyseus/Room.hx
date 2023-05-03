@@ -1,5 +1,7 @@
 package io.colyseus;
 
+import haxe.Exception;
+import haxe.net.WebSocket.ReadyState;
 import haxe.io.BytesOutput;
 import io.colyseus.serializer.schema.Schema;
 import io.colyseus.serializer.Serializer;
@@ -17,8 +19,9 @@ import haxe.ds.Map;
 import org.msgpack.MsgPack;
 
 class Room<T> {
-    public var id: String;
+    public var roomId: String;
     public var sessionId: String;
+    public var reconnectionToken: String;
 
     public var name: String;
 
@@ -37,26 +40,33 @@ class Room<T> {
     private var tmpStateClass: Class<T>;
 
     public function new (name: String, ?cls: Class<T>) {
-        this.id = null;
+        this.roomId = null;
         this.name = name;
         this.tmpStateClass = cls;
     }
 
-    public function connect(connection: Connection) {
-        this.connection = connection;
-        this.connection.reconnectionEnabled = false;
+    public function connect(connection: Connection, room: Room<T>, ?devModeCloseCallback) {
+        if (room == null) {
+            room = this;
+        }
+        room.connection = connection;
+        room.connection.reconnectionEnabled = false;
 
-        this.connection.onMessage = function (bytes) {
-            this.onMessageCallback(bytes);
+        room.connection.onMessage = function (bytes) {
+            room.onMessageCallback(bytes);
         }
 
-        this.connection.onClose = function () {
-            this.teardown();
-            this.onLeave.dispatch();
+        room.connection.onClose = function (e) {
+            if (devModeCloseCallback != null && e.code == Protocol.DEVMODE_RESTART) {
+                devModeCloseCallback();
+            } else {
+                room.teardown();
+                room.onLeave.dispatch();
+            }
         }
 
-        this.connection.onError = function (e) {
-            this.onError.dispatch(0, e);
+        room.connection.onError = function (e) {
+            room.onError.dispatch(0, e);
         };
     }
 
@@ -97,6 +107,24 @@ class Room<T> {
         this.connection.send(bytesToSend.getBytes());
     }
 
+    public function sendBytes(type: Dynamic, ?bytes: Dynamic) {
+        var bytesToSend = new BytesOutput();
+        bytesToSend.writeByte(Protocol.ROOM_DATA_BYTES);
+
+        if (Std.isOfType(type, String)) {
+            var encodedType = Bytes.ofString(type);
+            bytesToSend.writeByte(encodedType.length | 0xa0);
+            bytesToSend.writeBytes(encodedType, 0, encodedType.length);
+
+        } else {
+            bytesToSend.writeByte(type);
+        }
+
+        bytesToSend.writeBytes(bytes, 0, bytes.length);
+
+        this.connection.send(bytesToSend.getBytes());
+    }
+
     public function onMessage(type: Dynamic, callback: Dynamic->Void) {
         this.onMessageHandlers[this.getMessageHandlerKey(type)] = callback;
         return this;
@@ -106,6 +134,10 @@ class Room<T> {
     function get_state () : T {
         return this.serializer.getState();
     }
+
+    // TODO: deprecate .id
+    public var id (get, null): String;
+    function get_id () : String { return this.roomId; }
 
     public function teardown() {
         if (this.serializer != null) {
@@ -124,6 +156,9 @@ class Room<T> {
         var it:It = {offset: 1};
 
         if (code == Protocol.JOIN_ROOM) {
+            var reconnectionToken = data.getString(it.offset + 1, data.get(it.offset));
+            it.offset += reconnectionToken.length + 1;
+
             this.serializerId = data.getString(it.offset + 1, data.get(it.offset));
             it.offset += this.serializerId.length + 1;
 
@@ -140,6 +175,9 @@ class Room<T> {
             if (data.length > it.offset) {
                 this.serializer.handshake(data, it.offset);
             }
+
+            // store local reconnection token
+			this.reconnectionToken = this.roomId + ":" + reconnectionToken;
 
             this.onJoin.dispatch();
 
@@ -173,6 +211,13 @@ class Room<T> {
                 : null;
 
             this.dispatchMessage(type, message);
+
+        } else if (code == Protocol.ROOM_DATA_BYTES) {
+            var type = (SPEC.stringCheck(data, it))
+                ? Schema.decoder.string(data, it)
+                : Schema.decoder.number(data, it);
+
+            this.dispatchMessage(type, data.sub(it.offset, data.length - it.offset));
         }
     }
 
@@ -212,5 +257,4 @@ class Room<T> {
             return "$" + Type.getClassName(Type.getClass(type));
         }
     }
-
 }

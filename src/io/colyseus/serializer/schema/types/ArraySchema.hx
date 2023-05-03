@@ -1,5 +1,8 @@
 package io.colyseus.serializer.schema.types;
 
+import io.colyseus.serializer.schema.Schema.DataChange;
+import io.colyseus.serializer.schema.Schema.OPERATION;
+import io.colyseus.serializer.schema.callbacks.CallbackHelpers;
 import io.colyseus.serializer.schema.types.MapSchema.OrderedMap;
 
 @:keep
@@ -7,6 +10,8 @@ import io.colyseus.serializer.schema.types.MapSchema.OrderedMap;
 class ArraySchemaImpl<T> implements IRef implements ISchemaCollection implements ArrayAccess<Int> {
   public var __refId: Int;
   public var _childType: Dynamic;
+
+  private var _callbacks: Map<Int, Array<Dynamic>> = null;
 
   public function getIndex(fieldIndex: Int): Dynamic {
     return this.indexes.get(fieldIndex);
@@ -53,29 +58,41 @@ class ArraySchemaImpl<T> implements IRef implements ISchemaCollection implements
   public var length(get, null): Int;
   function get_length() { return Lambda.count(this.items); }
 
-  public dynamic function onAdd(item:T, key:Int):Void {}
-  public dynamic function onChange(item:T, key:Int):Void {}
-  public dynamic function onRemove(item:T, key:Int):Void {}
+  public function onAdd(callback: T->Int->Void, triggerAll: Bool = true) {
+    if (this._callbacks == null) { this._callbacks = new Map<Int, Array<Dynamic>>(); }
+    return CallbackHelpers.addCallback(this._callbacks, cast OPERATION.ADD, callback, (triggerAll) ? this : null);
+  }
 
-  public function invokeOnAdd(item:Any, key:Any):Void return this.onAdd(item, key);
-  public function invokeOnChange(item:Any, key:Any):Void return this.onChange(item, key);
-  public function invokeOnRemove(item:Any, key:Any):Void return this.onRemove(item, key);
+  public function onChange(callback: T->Int->Void) {
+    if (this._callbacks == null) { this._callbacks = new Map<Int, Array<Dynamic>>(); }
+    return CallbackHelpers.addCallback(this._callbacks, cast OPERATION.REPLACE, callback);
+  }
+
+  public function onRemove(callback: T->Int->Void) {
+    if (this._callbacks == null) { this._callbacks = new Map<Int, Array<Dynamic>>(); }
+    return CallbackHelpers.addCallback(this._callbacks, cast OPERATION.DELETE, callback);
+  }
+
+  public function invokeOnAdd(item:Any, key:Any):Void {
+    CallbackHelpers.triggerCallbacks2(this._callbacks, cast OPERATION.ADD, item, key);
+  }
+
+  public function invokeOnChange(item:Any, key:Any):Void {
+    CallbackHelpers.triggerCallbacks2(this._callbacks, cast OPERATION.REPLACE, item, key);
+  }
+
+  public function invokeOnRemove(item:Any, key:Any):Void {
+    CallbackHelpers.triggerCallbacks2(this._callbacks, cast OPERATION.DELETE, item, key);
+  }
 
   public function new() {}
 
-	public function moveEventHandlers(previousInstance: Dynamic) {
-    this.onAdd = previousInstance.onAdd;
-    this.onChange = previousInstance.onChange;
-    this.onRemove = previousInstance.onRemove;
+  public function moveEventHandlers(previousInstance: Dynamic) {
+    this._callbacks = previousInstance._callbacks;
   }
 
-  public function clear(refs: ReferenceTracker) {
-    if (!Std.isOfType(this._childType, String)) {
-      // clear child refs
-      for (item in this.items) {
-        refs.remove(Reflect.getProperty(item, "__refId"));
-      }
-    }
+  public function clear(changes: Array<DataChange>, refs: ReferenceTracker) {
+    CallbackHelpers.removeChildRefs(this, changes, refs);
 
     this.items.clear();
     this.indexes.clear();
@@ -84,9 +101,9 @@ class ArraySchemaImpl<T> implements IRef implements ISchemaCollection implements
   public function clone():ISchemaCollection {
     var cloned = new ArraySchemaImpl<T>();
     cloned.items = this.items.copy();
-    cloned.onAdd = this.onAdd;
-    cloned.onChange = this.onChange;
-    cloned.onRemove = this.onRemove;
+
+    cloned._callbacks = cloned._callbacks;
+
     return cloned;
   }
 

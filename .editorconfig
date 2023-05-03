@@ -3,11 +3,11 @@ end_of_line = lf
 charset = utf-8
 trim_trailing_whitespace = true
 indent_style = space
-indent_size = 2
+indent_size = 4
 
 [*.hx]
 end_of_line = lf
 charset = utf-8
 trim_trailing_whitespace = true
 indent_style = space
-indent_size = 2
+indent_size = 4

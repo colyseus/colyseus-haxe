@@ -18,32 +18,36 @@
   </h3>
 </div>
 
-| Description | Status |
-| ------| -------|
-| Master Branch Build Status | [![Build Status](https://travis-ci.org/colyseus/colyseus-hx.svg?branch=master)](https://travis-ci.org/colyseus/colyseus-hx) |
-
 ## Running the demo project
 
 First, download and install [Haxe](https://haxe.org/download/).
 
-The [`example`](https://github.com/colyseus/colyseus-hx/blob/master/example/openfl) project can be compiled to `html5`, `neko`, `cpp`, `ios`, etc.
+The [`example`](https://github.com/colyseus/colyseus-haxe/blob/master/example/openfl) project can be compiled to `html5`, `neko`, `cpp`, `ios`, etc.
 
 It uses the `state_handler` room from the [colyseus-examples](https://github.com/colyseus/colyseus-examples) project, which you can find [here](https://github.com/colyseus/colyseus-examples/blob/master/rooms/02-state-handler.ts).
 
 ### Compiling the demo project to `html5`
 
 ```
-git clone https://github.com/colyseus/colyseus-hx.git
-cd colyseus-hx/example/openfl
+git clone https://github.com/colyseus/colyseus-haxe.git
+cd colyseus-haxe/example/openfl
 haxelib install openfl
 haxelib install lime
 haxelib install colyseus-websocket
 haxelib run lime test project.xml html5
 ```
 
+## Development
+
+Running the test-suite:
+
+```
+haxe hxml/test.js.hxml
+```
+
 ## Dependencies
 
-[colyseus-hx](https://github.com/colyseus/colyseus-hx) depends on [`colyseus-websocket`](https://github.com/colyseus/colyseus-websocket-hx)
+[colyseus-haxe](https://github.com/colyseus/colyseus-haxe) depends on [`colyseus-websocket`](https://github.com/colyseus/colyseus-websocket-hx)
 
 ## License
 
