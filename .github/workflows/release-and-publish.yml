@@ -55,7 +55,8 @@ jobs:
         with:
           haxe-version: 4.1.2
       - run: |
+          zip colyseus.zip $(find src -name *.hx) tests hxml haxelib.json LICENSE README.md
           haxe -version
-          haxelib submit . ${{ secrets.HAXELIB_PASSWORD }}
+          haxelib submit colyseus.zip ${{ secrets.HAXELIB_PASSWORD }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
