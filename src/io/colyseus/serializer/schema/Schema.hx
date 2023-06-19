@@ -397,9 +397,14 @@ class Schema implements IRef {
   }
 
   // TODO: it would be great to have this strictly typed.
-  public function listen(property: String, callback:Dynamic->Dynamic->Void) {
+  public function listen(property: String, callback:Dynamic->Dynamic->Void, immediate:Bool = true) {
     if (this._callbacks == null) { this._callbacks = new Map<Int, Array<Dynamic>>(); }
     if (this._propertyCallbacks == null) { this._propertyCallbacks = new Map<String, Array<Dynamic>>(); }
+
+    if (immediate && Reflect.hasField(this, property)) {
+      callback(Reflect.getProperty(this, property), null);
+    }
+
     return CallbackHelpers.addPropertyCallback(this._propertyCallbacks, property, callback);
   }
 
