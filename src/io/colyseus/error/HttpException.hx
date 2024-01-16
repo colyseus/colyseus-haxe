@@ -1,6 +1,6 @@
 package io.colyseus.error;
 
-class MatchMakeError {
+class HttpException {
     public var code: Int;
     public var message: String;
 
