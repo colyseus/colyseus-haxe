@@ -3,7 +3,6 @@ package io.colyseus;
 import haxe.ds.Either;
 
 using io.colyseus.events.EventHandler;
-using io.colyseus.error.MatchMakeError;
 using io.colyseus.error.HttpException;
 
 using tink.http.Method;
