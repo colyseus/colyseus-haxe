@@ -7,7 +7,8 @@ class TestMain {
     // r.add(new ClientTestCase());
     // r.add(new StateContainerTestCase());
 
-    r.add(new SchemaSerializerTestCase());
+    // r.add(new SchemaSerializerTestCase());
+    r.add(new AuthTestCase());
 
     r.run();
   }

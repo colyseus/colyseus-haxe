@@ -1,19 +1,11 @@
 package io.colyseus;
 
-import io.colyseus.error.HttpException;
-import io.colyseus.HTTP.HttpOptions;
-import haxe.net.WebSocket.ReadyState;
-import haxe.macro.Expr.Binop;
 import haxe.Timer;
-import haxe.macro.Expr.Catch;
-import haxe.Constraints.Function;
 
 using io.colyseus.events.EventHandler;
 using io.colyseus.error.HttpException;
 
 import tink.Url;
-import haxe.io.Bytes;
-import org.msgpack.MsgPack;
 
 interface RoomAvailable {
     public var roomId: String;
@@ -109,8 +101,8 @@ class Client {
         // WORKAROUND: declare onError/onJoin first, so we can use its references to remove the listeners
         // FIXME: EventHandler must implement a .once() method to remove the listener after the first call
         //
-        var onError:(Int, String) -> Void;
-        var onJoin:() -> Void;
+        var onError:(Int, String) -> Void = null;
+        var onJoin:() -> Void = null;
 
         onError = function(code: Int, message: String) {
             // TODO: this may not work on native targets + devMode

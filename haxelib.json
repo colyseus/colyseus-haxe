@@ -3,14 +3,14 @@
   "url" : "https://github.com/colyseus/colyseus-haxe/",
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
-  "description": "Multiplayer Game Client for Haxe",
-  "version": "0.15.2",
+  "description": "Colyseus Multiplayer SDK",
+  "version": "0.15.3",
   "classPath": "src/",
-  "releasenote": "immediate call for .listen() if value is set. can be disabled by providing 'false' to last argument.",
+  "releasenote": "New client.auth and client.http APIs",
   "contributors": ["endel"],
   "dependencies": {
     "colyseus-websocket": "1.0.12",
     "tink_url": "0.5.0",
-    "tink_await": "0.6.0"
+    "tink_http": "0.10.0"
   }
 }

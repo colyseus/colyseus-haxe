@@ -1,7 +1,5 @@
 package io.colyseus;
 
-import haxe.Exception;
-import haxe.net.WebSocket.ReadyState;
 import haxe.io.BytesOutput;
 import io.colyseus.serializer.schema.Schema;
 import io.colyseus.serializer.Serializer;

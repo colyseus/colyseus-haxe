@@ -1,14 +1,17 @@
 package io.colyseus;
 
 import haxe.ds.Either;
-using io.colyseus.events.EventHandler;
 
+using io.colyseus.events.EventHandler;
 using io.colyseus.error.MatchMakeError;
 using io.colyseus.error.HttpException;
 
+using tink.http.Method;
+using tink.http.Header;
+
 typedef HttpOptions = {
     ?headers: Map<String, String>,
-    ?body: Either<String, Dynamic>
+    ?body: Dynamic
 }
 
 @:keep
@@ -20,85 +23,95 @@ class HTTP {
         this.client = client;
     }
 
-    public function get(segments: String, options: HttpOptions, callback: (HttpException,Dynamic)->Void) {
-		this.request("GET", segments, options, callback);
+    public function get(segments: String, ?options: HttpOptions, callback: (HttpException,Dynamic)->Void) {
+		this.request(Method.GET, segments, options, callback);
     }
 
-    public function post(segments: String, options: HttpOptions, callback: (HttpException,Dynamic)->Void) {
-		this.request("POST", segments, options, callback);
+    public function post(segments: String, ?options: HttpOptions, callback: (HttpException,Dynamic)->Void) {
+		this.request(Method.POST, segments, options, callback);
     }
 
-    public function put(segments: String, options: HttpOptions, callback: (HttpException,Dynamic)->Void) {
-		this.request("PUT", segments, options, callback);
+    public function put(segments: String, ?options: HttpOptions, callback: (HttpException,Dynamic)->Void) {
+		this.request(Method.PUT, segments, options, callback);
     }
 
-    public function delete(segments: String, options: HttpOptions, callback: (HttpException,Dynamic)->Void) {
-		this.request("DELETE", segments, options, callback);
+    public function delete(segments: String, ?options: HttpOptions, callback: (HttpException,Dynamic)->Void) {
+		this.request(Method.DELETE, segments, options, callback);
     }
 
-    public function request(method: String, segments: String, options: HttpOptions, callback: (HttpException,Dynamic)->Void) {
-        var req = new haxe.Http(this.buildHttpEndpoint(segments));
+    public function request(method: Method, segments: String, ?options: HttpOptions, callback: (HttpException,Dynamic)->Void) {
+        var headers = new Array<HeaderField>();
+        var body: String = "";
 
-        if (options.body != null) {
-            switch (options.body) {
-                case Either.Left(s):
-                    req.setPostData(s);
-                case Either.Right(d):
-                    req.setPostData(haxe.Json.stringify(d));
+        if (options != null && options.body != null) {
+            if (Std.isOfType(options.body, String)) {
+                body = cast options.body;
+            } else {
+                body = haxe.Json.stringify(options.body);
             }
-            req.setHeader("Content-Type", "application/json");
+			headers.push(new HeaderField(HeaderName.CONTENT_TYPE, 'application/json'));
+			headers.push(new HeaderField(HeaderName.CONTENT_LENGTH, body.length));
         }
 
-        req.setHeader("Accept", "application/json");
-
-        if (options.headers != null) {
+        if (options != null && options.headers != null) {
             for (header in options.headers.keys()) {
-                req.setHeader(header, options.headers.get(header));
+                headers.push(new HeaderField(header, options.headers.get(header)));
             }
         }
 
         if (this.authToken != null) {
-            req.setHeader("Authorization", "Bearer " + this.authToken);
+            headers.push(new HeaderField(HeaderName.AUTHORIZATION, 'Bearer ${this.authToken}'));
         }
 
-        var responseStatus: Int = 0;
-        req.onStatus = function(status) {
-            responseStatus = status;
-        };
+        headers.push(new HeaderField(HeaderName.ACCEPT, 'application/json'));
 
-        req.onData = function(json) {
-            var response = haxe.Json.parse(json);
+        // trace("HTTP => " + method + " => " + this.buildHttpEndpoint(segments));
+        // trace("Headers => " + headers);
+        // trace("Body => " + body);
 
-            if (response.error) {
-                var code = responseStatus;
-                var message = cast response.error;
+		tink.http.Client.fetch(this.buildHttpEndpoint(segments), {
+			method: method,
+			headers: headers,
+			body: body,
+		}).all().handle(function(o) switch o {
+			case Success(res):
+                var response = haxe.Json.parse(res.body);
+                if (response.error) {
+                    var code = res.header.statusCode;
+                    var message = cast response.error;
 
-                if (response.code != null) {
-                    code = cast response.code;
+                    if (response.code != null) {
+                        code = cast response.code;
+                    }
+
+                    callback(new HttpException(code, message), null);
+
+                } else {
+                    callback(null, response);
                 }
 
-                callback(new HttpException(code, message), null);
+			case Failure(e):
+                var message = e.message;
 
-            } else {
-                callback(null, response);
-            }
-        };
+                if (Std.isOfType(e.data, String)) {
+                    try {
+						var response = haxe.Json.parse(e.data);
+						if (response.error != null) {
+							message = cast response.error;
+						}
+                    } catch (e: Dynamic) {
+                        // ignore
+                    }
+                }
 
-        req.onError = function(err) {
-            callback(new HttpException(responseStatus, err), null);
-        };
-
-        //
-        // PUT/DELETE via POST (workaround)
-        //
-         if (method != "GET" && method != "POST") {
-            req.setHeader("X-HTTP-Method-Override", method);
-        }
-
-        req.request(method != "GET");
+                callback(new HttpException(e.code, message), null);
+		});
     }
 
     public function buildHttpEndpoint(segments: String) {
+        if (segments.charAt(0) == "/") {
+            segments = segments.substr(1);
+        }
         return '${(this.client.settings.useSSL) ? "https" : "http"}://${this.client.settings.hostname}${this.getEndpointPort()}/${segments}';
     }
 

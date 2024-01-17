@@ -1,4 +1,5 @@
 hxml/test.defaults.hxml
 -js tests/bin/js_test.js
+# -lib hxnodejs
 # Need to actually execute the tests!
 -cmd node tests/bin/js_test.js

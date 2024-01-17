@@ -4,5 +4,6 @@
 -cp tests
 -lib colyseus-websocket
 -lib tink_url
+-lib tink_http
 # use deprecated haxe.unit.TestCase
 -lib hx3compat
