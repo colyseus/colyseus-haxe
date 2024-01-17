@@ -1,0 +1,2 @@
+zip --junk-paths colyseus.zip src tests hxml haxelib.json LICENSE README.md
+haxelib submit colyseus.zip
