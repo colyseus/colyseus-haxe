@@ -1,0 +1,3 @@
+compile.hxml
+-neko build/build.n
+-cmd neko build/build.n

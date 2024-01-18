@@ -1,0 +1,5 @@
+compile.hxml
+-D HXCPP_M64
+-cpp build/cpp
+# Need to actually execute the tests!
+# -cmd build/bin/cpp_test/TestMain
