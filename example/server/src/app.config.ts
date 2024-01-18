@@ -13,6 +13,7 @@ import { playground } from "@colyseus/playground";
  * Import your Room files
  */
 import { MyRoom } from "./rooms/MyRoom";
+import "./config/auth";
 
 export default config({
     options: {
