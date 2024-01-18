@@ -6,7 +6,17 @@ class Main extends hxd.App {
   private var room: Room<State>;
 
 	override function init() {
-		this.client.joinOrCreate("test", [], State, function(err, room) {
+        // auth
+        this.client.auth.onChange(function (user) {
+            trace('auth.onChange', user);
+        });
+
+        this.client.auth.signInAnonymously(function(err, data) {
+            trace("signInAnonymously => err: " + err + ", data: " + data);
+        });
+
+        // room
+		this.client.joinOrCreate("my_room", [], State, function(err, room) {
 			if (err != null) {
 				trace(err);
 				return;
