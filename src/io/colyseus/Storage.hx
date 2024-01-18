@@ -40,7 +40,7 @@ class Storage {
 		return storage.setItem(PATH + ":" + name, value);
 	}
 
-	private static function removeData(name:String, value:String)
+	private static function removeData(name:String)
 	{
 		final storage = js.Browser.getLocalStorage();
 		if (storage == null) {
