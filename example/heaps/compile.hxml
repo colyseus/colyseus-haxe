@@ -3,6 +3,8 @@
 -cp ../../src
 -dce full
 -lib heaps
+-lib tink_url
+-lib tink_http
 -lib colyseus-websocket
 -main Main
 -debug
