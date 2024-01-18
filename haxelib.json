@@ -6,7 +6,7 @@
   "description": "Colyseus Multiplayer SDK",
   "version": "0.15.3",
   "classPath": "src/",
-  "releasenote": "New client.auth and client.http APIs",
+  "releasenote": "Introduce new client.auth and client.http API's",
   "contributors": ["endel"],
   "dependencies": {
     "colyseus-websocket": "1.0.12",
