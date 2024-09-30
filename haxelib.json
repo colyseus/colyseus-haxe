@@ -4,9 +4,9 @@
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
   "description": "Colyseus Multiplayer SDK",
-  "version": "0.15.3",
+  "version": "0.15.4",
   "classPath": "src/",
-  "releasenote": "Introduce new client.auth and client.http API's",
+  "releasenote": "fix reconnectionToken not properly checked if it exists (PR #63)",
   "contributors": ["endel"],
   "dependencies": {
     "colyseus-websocket": "1.0.12",
