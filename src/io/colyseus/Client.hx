@@ -123,7 +123,7 @@ class Client {
 
         var options = ["sessionId" => room.sessionId];
 
-        if (response.reconnectionToken) {
+        if (response.reconnectionToken != null) {
 			options.set("reconnectionToken", response.reconnectionToken);
         }
 
