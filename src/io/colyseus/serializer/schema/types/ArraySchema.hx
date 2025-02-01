@@ -1,9 +1,8 @@
 package io.colyseus.serializer.schema.types;
 
 import io.colyseus.serializer.schema.Schema.DataChange;
-import io.colyseus.serializer.schema.Schema.OPERATION;
-import io.colyseus.serializer.schema.callbacks.CallbackHelpers;
 import io.colyseus.serializer.schema.types.MapSchema.OrderedMap;
+import io.colyseus.serializer.schema.callbacks.Callbacks;
 
 @:keep
 @:generic
@@ -58,33 +57,6 @@ class ArraySchemaImpl<T> implements IRef implements ISchemaCollection implements
   public var length(get, null): Int;
   function get_length() { return Lambda.count(this.items); }
 
-  public function onAdd(callback: T->Int->Void, triggerAll: Bool = true) {
-    if (this._callbacks == null) { this._callbacks = new Map<Int, Array<Dynamic>>(); }
-    return CallbackHelpers.addCallback(this._callbacks, cast OPERATION.ADD, callback, (triggerAll) ? this : null);
-  }
-
-  public function onChange(callback: T->Int->Void) {
-    if (this._callbacks == null) { this._callbacks = new Map<Int, Array<Dynamic>>(); }
-    return CallbackHelpers.addCallback(this._callbacks, cast OPERATION.REPLACE, callback);
-  }
-
-  public function onRemove(callback: T->Int->Void) {
-    if (this._callbacks == null) { this._callbacks = new Map<Int, Array<Dynamic>>(); }
-    return CallbackHelpers.addCallback(this._callbacks, cast OPERATION.DELETE, callback);
-  }
-
-  public function invokeOnAdd(item:Any, key:Any):Void {
-    CallbackHelpers.triggerCallbacks2(this._callbacks, cast OPERATION.ADD, item, key);
-  }
-
-  public function invokeOnChange(item:Any, key:Any):Void {
-    CallbackHelpers.triggerCallbacks2(this._callbacks, cast OPERATION.REPLACE, item, key);
-  }
-
-  public function invokeOnRemove(item:Any, key:Any):Void {
-    CallbackHelpers.triggerCallbacks2(this._callbacks, cast OPERATION.DELETE, item, key);
-  }
-
   public function new() {}
 
   public function moveEventHandlers(previousInstance: Dynamic) {
@@ -92,7 +64,7 @@ class ArraySchemaImpl<T> implements IRef implements ISchemaCollection implements
   }
 
   public function clear(changes: Array<DataChange>, refs: ReferenceTracker) {
-    CallbackHelpers.removeChildRefs(this, changes, refs);
+    Callbacks.removeChildRefs(this, changes, refs);
 
     this.items.clear();
     this.indexes.clear();

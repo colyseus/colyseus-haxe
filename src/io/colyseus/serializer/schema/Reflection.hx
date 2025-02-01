@@ -20,6 +20,9 @@ class ReflectionType extends Schema {
   @:type("number")
   public var id:UInt;
 
+  @:type("number")
+  public var extendsId:UInt;
+
   @:type("array", ReflectionField)
   public var fields:ArraySchema<ReflectionField> = new ArraySchema<ReflectionField>();
 }

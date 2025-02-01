@@ -51,7 +51,7 @@ export default config({
         app.use(auth.prefix, auth.routes());
 
         // (optional) playground
-        app.use("/playground", playground);
+        app.use("/playground", playground());
     },
 
 

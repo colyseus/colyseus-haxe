@@ -9,6 +9,7 @@ import io.colyseus.serializer.FossilDeltaSerializer;
 
 import io.colyseus.serializer.schema.Schema.It;
 import io.colyseus.serializer.schema.Schema.SPEC;
+import io.colyseus.serializer.schema.encoding.Decode;
 
 using io.colyseus.events.EventHandler;
 
@@ -133,10 +134,6 @@ class Room<T> {
         return this.serializer.getState();
     }
 
-    // TODO: deprecate .id
-    public var id (get, null): String;
-    function get_id () : String { return this.roomId; }
-
     public function teardown() {
         if (this.serializer != null) {
             this.serializer.teardown();
@@ -185,8 +182,8 @@ class Room<T> {
             this.connection.send(bytes.getBytes());
 
         } else if (code == Protocol.ERROR) {
-            var errorCode: Int = Schema.decoder.number(data, it);
-            var message = Schema.decoder.string(data, it);
+            var errorCode: Int = Decode.number(data, it);
+            var message = Decode.string(data, it);
             trace("Room error: code => " + errorCode + ", message => " + message);
             this.onError.dispatch(errorCode, message);
 
@@ -201,8 +198,8 @@ class Room<T> {
 
         } else if (code == Protocol.ROOM_DATA) {
             var type = (SPEC.stringCheck(data, it))
-                ? Schema.decoder.string(data, it)
-                : Schema.decoder.number(data, it);
+                ? Decode.string(data, it)
+                : Decode.number(data, it);
 
             var message = (data.length > it.offset)
                 ? MsgPack.decode(data.sub(it.offset, data.length - it.offset))
@@ -212,8 +209,8 @@ class Room<T> {
 
         } else if (code == Protocol.ROOM_DATA_BYTES) {
             var type = (SPEC.stringCheck(data, it))
-                ? Schema.decoder.string(data, it)
-                : Schema.decoder.number(data, it);
+                ? Decode.string(data, it)
+                : Decode.number(data, it);
 
             this.dispatchMessage(type, data.sub(it.offset, data.length - it.offset));
         }

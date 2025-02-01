@@ -11,10 +11,9 @@ class State extends Schema {
 }
 
 export class MyRoom extends Room {
+    state = new State();
 
-    async onCreate(options: any) {
-        this.setState(new State());
-
+    async onCreate(_: any) {
         let int: number = 0;
 
         this.clock.setInterval(() => {

@@ -3,11 +3,14 @@ package io.colyseus.serializer.schema;
 import io.colyseus.serializer.schema.types.ISchemaCollection;
 
 class ReferenceTracker {
-	public var context:Context = new Context();
-
 	public var refs:Map<Int, Dynamic> = new Map<Int, Dynamic>();
 	public var refCounts:Map<Int, Dynamic> = new Map<Int, Dynamic>();
 	public var deletedRefs:Map<Int, Bool> = new Map<Int, Bool>();
+
+    // TODO:
+    // - use function/delegate instead of Dynamic as value.
+    // - use Either<Int,String> as key
+	public var callbacks:Map<Int, Map<Dynamic, Dynamic>> = new Map<Int, Map<Dynamic, Dynamic>>();
 
 	public function new() {}
 
@@ -73,6 +76,7 @@ class ReferenceTracker {
 
 				this.refs.remove(refId);
 				this.refCounts.remove(refId);
+				this.callbacks.remove(refId);
 			}
 		}
 
@@ -82,6 +86,7 @@ class ReferenceTracker {
 	public function clear() {
 		this.refs.clear();
 		this.refCounts.clear();
+        this.callbacks.clear();
 		this.deletedRefs.clear();
 	}
 }
