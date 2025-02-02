@@ -4,6 +4,7 @@ import tink.core.Future;
 
 class Storage {
     public static var PATH = "colyseus-storage";
+    private static var inmemoryKV: Map<String, String> = new Map<String,String>();
 
     public static function getItem(key: String) {
         var fut = new tink.core.FutureTrigger<String>();
@@ -24,8 +25,7 @@ class Storage {
 	{
 		final storage = js.Browser.getLocalStorage();
 		if (storage == null) {
-            trace("[Colyseus Storage] localStorage is not available");
-			return null;
+			return inmemoryKV[name];
         }
 		return storage.getItem(PATH + ":" + name);
 	}
@@ -34,7 +34,7 @@ class Storage {
 	{
 		final storage = js.Browser.getLocalStorage();
 		if (storage == null) {
-            trace("[Colyseus Storage] localStorage is not available");
+            inmemoryKV[name] = value;
 			return null;
         }
 		return storage.setItem(PATH + ":" + name, value);
@@ -44,7 +44,7 @@ class Storage {
 	{
 		final storage = js.Browser.getLocalStorage();
 		if (storage == null) {
-            trace("[Colyseus Storage] localStorage is not available");
+            inmemoryKV[name] = null;
 			return null;
         }
 		return storage.removeItem(PATH + ":" + name);

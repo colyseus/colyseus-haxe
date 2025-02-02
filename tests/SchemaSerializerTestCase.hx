@@ -4,6 +4,7 @@ import haxe.io.BytesData;
 import io.colyseus.serializer.SchemaSerializer;
 import io.colyseus.serializer.schema.ReferenceTracker;
 import io.colyseus.serializer.schema.Decoder;
+import io.colyseus.serializer.schema.Callbacks;
 
 import schema.primitivetypes.PrimitiveTypes;
 import schema.childschematypes.ChildSchemaTypes;
@@ -139,6 +140,11 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
     public function testMapSchemaTypes() {
         var state = new MapSchemaTypes();
         var decoder = new Decoder(state);
+        var callbacks = new SchemaCallbacks<MapSchemaTypes>(decoder);
+
+        callbacks.onAdd("mapOfSchemas", (value, key) -> {
+            trace("mapOfSchemas -> ON ADD, key: " + key + ", value: " + value);
+        });
 
         // state.mapOfSchemas.onAdd((value, key) -> trace("onAdd, mapOfSchemas -> " + key));
         // state.mapOfNumbers.onAdd((value, key) -> trace("onAdd, mapOfNumbers -> " + key));
@@ -289,10 +295,9 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
     }
 
     public function testInstanceSharingTypes() {
-        var refs = new ReferenceTracker();
-
         var client = new InstanceSharingTypes();
         var decoder = new Decoder(client);
+        var refs = decoder.refs;
         decoder.decode(getBytes([130, 1, 131, 2, 128, 3, 129, 3, 255, 1, 255, 2, 255, 3, 128, 4, 255, 3, 128, 4, 255, 4, 128, 10, 129, 10, 255, 4, 128, 10, 129, 10]));
         assertEquals(client.player1, client.player2);
         assertEquals(client.player1.position, client.player2.position);
@@ -330,6 +335,8 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
     public function testCallbacks() {
         var state = new CallbacksState();
         var decoder = new Decoder(state);
+        var callbacks = new SchemaCallbacks<CallbacksState>(decoder);
+
 
         var containerOnChange = 0;
         var containerOnChangeCallback = function(changes) {containerOnChange++;};

@@ -1,7 +1,7 @@
 package io.colyseus.serializer.schema.types;
 
 import io.colyseus.serializer.schema.Schema.DataChange;
-import io.colyseus.serializer.schema.callbacks.Callbacks;
+import io.colyseus.serializer.schema.Callbacks;
 
 class OrderedMapIterator<K,V> {
     var map : OrderedMap<K,V>;

@@ -10,7 +10,7 @@ class ReferenceTracker {
     // TODO:
     // - use function/delegate instead of Dynamic as value.
     // - use Either<Int,String> as key
-	public var callbacks:Map<Int, Map<Dynamic, Dynamic>> = new Map<Int, Map<Dynamic, Dynamic>>();
+	public var callbacks:Map<Int, Map<Dynamic, Array<Dynamic>>> = new Map<Int, Map<Dynamic, Array<Dynamic>>>();
 
 	public function new() {}
 

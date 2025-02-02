@@ -27,7 +27,7 @@ class Decoder<T> {
 		}
 
 		var refId = 0;
-		var ref:Dynamic = this;
+		var ref:Dynamic = this.state;
 		refs.add(refId, ref);
 
 		var allChanges = new Array<DataChange>();

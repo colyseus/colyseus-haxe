@@ -177,8 +177,6 @@ class Schema implements IRef {
   public var _types:Map<Int, String> = new Map<Int, String>();
   public var _childTypes:Map<Int, Dynamic> = new Map<Int, Dynamic>();
 
-  private var _refs:ReferenceTracker = null;
-
   public function setByIndex(fieldIndex: Int, dynamicIndex: Dynamic, value: Dynamic) {
     return Reflect.setField(this, this._indexes.get(fieldIndex), value);
   }

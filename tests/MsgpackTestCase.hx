@@ -12,7 +12,7 @@ class MsgpackTestCase extends haxe.unit.TestCase {
 
         assertEquals("6jqxd7P7_", decoded.sessionId);
         assertEquals(true, Std.isOfType(decoded.room.createdAt, Date));
-        assertEquals("2020-10-05 12:47:03", decoded.room.createdAt.toString());
+        assertEquals("2020-10-05 12:47:03", DateTools.format(decoded.room.createdAt, "%Y-%m-%d %H:%M:%S"));
     }
 
     public function testUndefined() {

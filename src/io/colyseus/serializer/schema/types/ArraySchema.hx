@@ -2,7 +2,7 @@ package io.colyseus.serializer.schema.types;
 
 import io.colyseus.serializer.schema.Schema.DataChange;
 import io.colyseus.serializer.schema.types.MapSchema.OrderedMap;
-import io.colyseus.serializer.schema.callbacks.Callbacks;
+import io.colyseus.serializer.schema.Callbacks;
 
 @:keep
 @:generic
@@ -30,7 +30,7 @@ class ArraySchemaImpl<T> implements IRef implements ISchemaCollection implements
     for (key in this.indexes.keys()) {
       if (i == fieldIndex) {
         targetIndex = this.indexes.get(key);
-				break;
+        break;
       }
       i++;
     }
@@ -58,10 +58,6 @@ class ArraySchemaImpl<T> implements IRef implements ISchemaCollection implements
   function get_length() { return Lambda.count(this.items); }
 
   public function new() {}
-
-  public function moveEventHandlers(previousInstance: Dynamic) {
-    this._callbacks = previousInstance._callbacks;
-  }
 
   public function clear(changes: Array<DataChange>, refs: ReferenceTracker) {
     Callbacks.removeChildRefs(this, changes, refs);

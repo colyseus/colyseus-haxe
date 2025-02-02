@@ -34,7 +34,7 @@ class Room<T> {
     public var connection: Connection;
 
     public var serializerId: String = null;
-    private var serializer: Serializer = null;
+    public var serializer: Serializer = null;
 
     private var tmpStateClass: Class<T>;
 
