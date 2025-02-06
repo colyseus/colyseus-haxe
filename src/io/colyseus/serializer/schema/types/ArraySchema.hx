@@ -7,10 +7,8 @@ import io.colyseus.serializer.schema.Callbacks;
 @:keep
 @:generic
 class ArraySchemaImpl<T> implements IRef implements ISchemaCollection implements ArrayAccess<Int> {
-  public var __refId: Int;
+  public var __refId: Int = 0;
   public var _childType: Dynamic;
-
-  private var _callbacks: Map<Int, Array<Dynamic>> = null;
 
   public function getIndex(fieldIndex: Int): Dynamic {
     return this.indexes.get(fieldIndex);
@@ -69,8 +67,6 @@ class ArraySchemaImpl<T> implements IRef implements ISchemaCollection implements
   public function clone():ISchemaCollection {
     var cloned = new ArraySchemaImpl<T>();
     cloned.items = this.items.copy();
-
-    cloned._callbacks = cloned._callbacks;
 
     return cloned;
   }

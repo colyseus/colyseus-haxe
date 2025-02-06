@@ -53,10 +53,12 @@ class OrderedMap<K, V> {
 @:keep
 @:generic
 class MapSchema<T> implements IRef implements ISchemaCollection {
-  public var __refId: Int;
+  public var __refId: Int = 0;
   public var _childType: Dynamic;
 
-  private var _callbacks: Map<Int, Array<Dynamic>> = null;
+  public var items:OrderedMap<String, T> = new OrderedMap<String, T>(new Map<String, T>());
+  public var indexes:Map<Int, String> = new Map<Int, String>();
+
   private var __isMapSchema: Bool = true;
 
   public function getIndex(fieldIndex: Int) {
@@ -85,9 +87,6 @@ class MapSchema<T> implements IRef implements ISchemaCollection {
     this.items.remove(index);
     this.indexes.remove(fieldIndex);
   }
-
-  public var items:OrderedMap<String, T> = new OrderedMap<String, T>(new Map<String, T>());
-  public var indexes:Map<Int, String> = new Map<Int, String>();
 
   public var length(get, null): Int;
   function get_length() { return Lambda.count(this.items._keys); }
@@ -129,11 +128,12 @@ class MapSchema<T> implements IRef implements ISchemaCollection {
 
   public function toString () {
     var data = [];
+    var items = this.items ?? new OrderedMap<String, T>(new Map<String, T>());
 
-    for (key in this.items._keys) {
-      data.push(key + " => " + this.items.get(key));
+    for (key in items._keys) {
+        data.push(key + " => " + items.get(key));
     }
 
-    return "MapSchema ("+ Lambda.count(this.items) +", __refId => "+this.__refId+") { " + data.join(", ") + " }";
+    return "MapSchema ("+ Lambda.count(items) +", __refId => "+this.__refId+") { " + data.join(", ") + " }";
   }
 }

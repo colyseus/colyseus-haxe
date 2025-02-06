@@ -1,7 +1,6 @@
 package io.colyseus;
 
 using haxe.Exception;
-using haxe.ds.Either;
 using io.colyseus.events.EventHandler;
 using io.colyseus.error.HttpException;
 

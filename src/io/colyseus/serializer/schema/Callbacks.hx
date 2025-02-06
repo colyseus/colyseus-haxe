@@ -108,10 +108,10 @@ class SchemaCallbacks<T> {
         var _this = this;
         var removeHandler = () -> {}
         var removeCallback = () -> removeHandler();
-        var collection: ISchemaCollection = Reflect.getProperty(instance, fieldName);
-        if (collection == null) {
+        var collection: IRef = Reflect.getProperty(instance, fieldName);
+        if (collection == null || collection.__refId == 0) {
             removeHandler = listen(instance, fieldName, (coll, _) -> {
-                removeHandler = _this.addCallback(coll.__refId, operation, callback);
+                removeHandler = _this.addCallback((coll : IRef).__refId, operation, callback);
             });
             return removeCallback;
         } else {
@@ -120,18 +120,22 @@ class SchemaCallbacks<T> {
     }
 
 	public function addCallback(refId: Int, operationOrFieldName:Dynamic, callback:Dynamic) {
+        var key = (Std.isOfType(operationOrFieldName, String))
+            ? operationOrFieldName
+            : "#" + operationOrFieldName;
+
         var callbacks = this.decoder.refs.callbacks.get(refId);
         if (callbacks == null) {
-            callbacks = new Map<Dynamic, Array<Dynamic>>();
+            callbacks = new Map<String, Array<Dynamic>>();
             this.decoder.refs.callbacks[refId] = callbacks;
         }
 
         // initialize list of callbacks
-        if (callbacks.get(operationOrFieldName) == null) {
-			callbacks.set(operationOrFieldName, new Array<Dynamic>());
+        if (callbacks.get(key) == null) {
+			callbacks.set(key, new Array<Dynamic>());
         }
 
-        callbacks[operationOrFieldName].push(callback);
+        callbacks[key].push(callback);
 
         // //
         // // Trigger callback for existing elements
@@ -147,19 +151,16 @@ class SchemaCallbacks<T> {
         return () -> callbacks[operationOrFieldName].remove(callback);
     }
 
-    public function triggerCallbacks0(callbacks:Map<Int, Array<Dynamic>>, op:Int) {
-        if (!callbacks.exists(op)) { return; }
-        for (callback in callbacks[op]) { callback(); }
+    public function triggerCallbacks0(callbacks:Map<String, Array<Dynamic>>, op:Int) {
+        var key = "#" + op;
+        if (!callbacks.exists(key)) { return; }
+        for (callback in callbacks[key]) { callback(); }
     }
 
-    public function triggerCallbacks1(callbacks:Map<Int, Array<Dynamic>>, op:Int, arg1: Dynamic) {
-        if (!callbacks.exists(op)) { return; }
-        for (callback in callbacks[op]) { callback(arg1); }
-    }
-
-    public function triggerCallbacks2(callbacks:Map<Int, Array<Dynamic>>, op:Int, arg1: Dynamic, arg2: Dynamic) {
-        if (!callbacks.exists(op)) { return; }
-        for (callback in callbacks[op]) { callback(arg1, arg2); }
+    public function triggerCallbacks2(callbacks:Map<String, Array<Dynamic>>, op:Int, arg1: Dynamic, arg2: Dynamic) {
+        var key = "#" + op;
+        if (!callbacks.exists(key)) { return; }
+        for (callback in callbacks[key]) { callback(arg1, arg2); }
     }
 
     public function triggerFieldCallbacks(callbacks:Map<String, Array<Dynamic>>, field:String, arg1: Dynamic, arg2: Dynamic) {
@@ -169,13 +170,13 @@ class SchemaCallbacks<T> {
 
 	private function triggerChanges(allChanges:Array<DataChange>) {
 		var uniqueRefIds = new Map<Int, Bool>();
-        var callbacks = decoder.refs.callbacks;
+        var allCallbacks = decoder.refs.callbacks;
 
 		for (change in allChanges) {
 			var refId = change.refId;
 			var ref = this.decoder.refs.get(refId);
 			var isSchema = Std.isOfType(ref, Schema);
-			var callbacks = callbacks.get(refId);
+			var callbacks = allCallbacks.get(refId);
 
 			// no callbacks defined, skip this structure!
 			if (callbacks == null) { continue; }
@@ -186,45 +187,40 @@ class SchemaCallbacks<T> {
 			if (((change.op & cast OPERATION.DELETE) == OPERATION.DELETE)
 				&& Std.isOfType(change.previousValue, Schema)) {
                 // TODO: get DELETE callbacks for this instance, and check if exists
-                var callbacks: Map<Int, Array<Dynamic>> = null;
-                if (callbacks != null) {
-                    triggerCallbacks0(callbacks, cast OPERATION.DELETE);
+                var deleteCallbacks: Map<String, Array<Dynamic>> = allCallbacks.get((change.previousValue : Schema).__refId);
+                if (deleteCallbacks != null) {
+                    triggerCallbacks0(deleteCallbacks, cast OPERATION.DELETE);
                 }
 			}
 
 			if (isSchema) {
 				if (!uniqueRefIds.exists(refId)) {
 					// trigger onChange
-					triggerCallbacks1(callbacks, cast OPERATION.REPLACE, allChanges);
+					triggerCallbacks0(callbacks, cast OPERATION.REPLACE);
 				}
 
-				var propertyCallbacks = Reflect.getProperty(ref, "_propertyCallbacks");
-				if (propertyCallbacks != null) {
-					triggerFieldCallbacks(propertyCallbacks, change.field, change.value, change.previousValue);
-				}
+                triggerFieldCallbacks(callbacks, change.field, change.value, change.previousValue);
 			} else {
 				var container = (ref : ISchemaCollection);
 
-				if (change.op == OPERATION.ADD && change.previousValue == null) {
-					// container.invokeOnAdd(change.value, (change.dynamicIndex == null) ? change.field : change.dynamicIndex);
+			    if ((change.op & cast OPERATION.DELETE) == OPERATION.DELETE) {
+                    if (change.previousValue != null) {
+                        // triger onRemove
+                        triggerCallbacks2(callbacks, cast OPERATION.DELETE, change.value, (change.dynamicIndex == null) ? change.field : change.dynamicIndex);
+                    }
 
-				} else if (change.op == OPERATION.DELETE) {
-					//
-					// FIXME: `previousValue` should always be avaiiable.
-					// ADD + DELETE operations are still encoding DELETE operation.
-					//
-					if (change.previousValue != null) {
-						// container.invokeOnRemove(change.previousValue, (change.dynamicIndex == null) ? change.field : change.dynamicIndex);
-					}
-				} else if (change.op == OPERATION.DELETE_AND_ADD) {
-					if (change.previousValue != null) {
-						// container.invokeOnRemove(change.previousValue, change.dynamicIndex);
-					}
-					// container.invokeOnAdd(change.value, change.dynamicIndex);
-				}
+                    // Handle DELETE_AND_ADD operations
+                    if (((change.op & cast OPERATION.ADD) == OPERATION.ADD)) {
+                        triggerCallbacks2(callbacks, cast OPERATION.ADD, change.value, (change.dynamicIndex == null) ? change.field : change.dynamicIndex);
+                    }
+
+                } else if ((change.op & cast OPERATION.ADD) == OPERATION.ADD && change.previousValue == null) {
+                    // triger onAdd
+                    triggerCallbacks2(callbacks, cast OPERATION.ADD, change.value, (change.dynamicIndex == null) ? change.field : change.dynamicIndex);
+                }
 
 				if (change.value != change.previousValue) {
-					// container.invokeOnChange(change.value, change.dynamicIndex);
+                    triggerCallbacks2(callbacks, cast OPERATION.REPLACE, change.value, (change.dynamicIndex == null) ? change.field : change.dynamicIndex);
 				}
 			}
 

@@ -173,9 +173,9 @@ class Decoder<T> {
 				}
 			} else if (childType == null) {
 				value = Decode.decodePrimitiveType(fieldType, bytes, it);
+
 			} else {
 				var refId = Decode.number(bytes, it);
-				value = refs.get(refId);
 
 				//
 				// FIXME: Type.getClass(previousValue)
@@ -183,17 +183,23 @@ class Decoder<T> {
 				// (The unity3d client does not have this problem because it has a different take on this)
 				// TODO:use Type.resolveClass("io.colyseus.serializer.schema.types.MapSchema_XXX")
 				//
-				var collectionClass = (fieldType == null) ? Type.getClass(ref) : #if (nodejs || js) CustomType.getInstance()
-					.get(fieldType) #else Type.getClass(previousValue) #end;
+				// var collectionClass = (fieldType == null)
+                //     ? Type.getClass(ref)
+                //     : CustomType.getInstance().get(fieldType);
 
-				var valueRef:ISchemaCollection = (refs.has(refId)) ? previousValue : Type.createInstance(collectionClass, []);
+				var collectionClass = (fieldType == null)
+                    ? Type.getClass(ref)
+                    : #if (nodejs || js) CustomType.getInstance().get(fieldType) #else Type.getClass(previousValue) #end;
+
+				var valueRef:ISchemaCollection = (refs.has(refId))
+                    ? previousValue ?? refs.get(refId)
+                    : Type.createInstance(collectionClass, []);
 
 				value = valueRef.clone();
 				value.__refId = refId;
 				value._childType = childType;
 
 				if (previousValue != null) {
-					// value.moveEventHandlers(previousValue);
 
 					if (previousValue.__refId > 0 && refId != previousValue.__refId) {
 						refs.remove(previousValue.__refId);
@@ -217,7 +223,8 @@ class Decoder<T> {
 			var hasChange = (previousValue != value);
 
 			if (value != null) {
-				ref.setByIndex(fieldIndex, dynamicIndex, value);
+    trace("setByIndex! " + fieldIndex + " ("+dynamicIndex+"): " + value);
+				ref.setByIndex(fieldIndex, dynamicIndex, cast value);
 			}
 
 			if (hasChange) {

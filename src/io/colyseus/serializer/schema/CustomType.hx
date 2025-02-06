@@ -20,8 +20,8 @@ class CustomType {
 
   public function set(id: String, type: Dynamic) {
     if (!this.customTypes.exists(id)) {
-			this.customTypes.set(id, type);
-			this.types.push(id);
+        this.customTypes.set(id, type);
+        this.types.push(id);
     }
   }
 

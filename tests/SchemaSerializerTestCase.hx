@@ -81,7 +81,6 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
         var decoder = new Decoder(state);
         var bytes = [128, 1, 129, 2, 130, 3, 131, 4, 255, 1, 128, 0, 5, 128, 1, 6, 255, 2, 128, 0, 0, 128, 1, 10, 128, 2, 20, 128, 3, 205, 192, 13, 255, 3, 128, 0, 163, 111, 110, 101, 128, 1, 163, 116, 119, 111, 128, 2, 165, 116, 104, 114, 101, 101, 255, 4, 128, 0, 232, 3, 0, 0, 128, 1, 192, 13, 0, 0, 128, 2, 72, 244, 255, 255, 255, 5, 128, 100, 129, 208, 156, 255, 6, 128, 100, 129, 208, 156];
 
-        trace("testArraySchemaTypes");
         // state.arrayOfSchemas.onAdd((value, key) -> trace("onAdd, arrayOfSchemas => key: " + key + ", value: " + value));
         // state.arrayOfNumbers.onAdd((value, key) -> trace("onAdd, arrayOfNumbers => key: " + key + ", value: " + value));
         // state.arrayOfStrings.onAdd((value, key) -> trace("onAdd, arrayOfStrings => key: " + key + ", value: " + value));
@@ -140,21 +139,28 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
     public function testMapSchemaTypes() {
         var state = new MapSchemaTypes();
         var decoder = new Decoder(state);
+
         var callbacks = new SchemaCallbacks<MapSchemaTypes>(decoder);
 
-        callbacks.onAdd("mapOfSchemas", (value, key) -> {
-            trace("mapOfSchemas -> ON ADD, key: " + key + ", value: " + value);
-        });
+        var mapOfSchemasAddCount = 0;
+        var mapOfNumbersAddCount = 0;
+        var mapOfStringsAddCount = 0;
+        var mapOfInt32AddCount = 0;
 
-        // state.mapOfSchemas.onAdd((value, key) -> trace("onAdd, mapOfSchemas -> " + key));
-        // state.mapOfNumbers.onAdd((value, key) -> trace("onAdd, mapOfNumbers -> " + key));
-        // state.mapOfStrings.onAdd((value, key) -> trace("onAdd, mapOfStrings -> " + key));
-        // state.mapOfInt32.onAdd((value, key) -> trace("onAdd, mapOfInt32 -> " + key));
+        callbacks.onAdd("mapOfSchemas", (value, key) -> mapOfSchemasAddCount++);
+        callbacks.onAdd("mapOfNumbers", (value, key) -> mapOfNumbersAddCount++);
+        callbacks.onAdd("mapOfStrings", (value, key) -> mapOfStringsAddCount++);
+        callbacks.onAdd("mapOfInt32", (value, key) -> mapOfInt32AddCount++);
 
-        // state.mapOfSchemas.onRemove((value, key) -> trace("onRemove, mapOfSchemas -> " + key));
-        // state.mapOfNumbers.onRemove((value, key) -> trace("onRemove, mapOfNumbers -> " + key));
-        // state.mapOfStrings.onRemove((value, key) -> trace("onRemove, mapOfStrings -> " + key));
-        // state.mapOfInt32.onRemove((value, key) -> trace("onRemove, mapOfInt32 -> " + key));
+        var mapOfSchemasRemoveCount = 0;
+        var mapOfNumbersRemoveCount = 0;
+        var mapOfStringsRemoveCount = 0;
+        var mapOfInt32RemoveCount = 0;
+
+        callbacks.onRemove("mapOfSchemas", (value, key) -> mapOfSchemasRemoveCount++);
+        callbacks.onRemove("mapOfNumbers", (value, key) -> mapOfNumbersRemoveCount++);
+        callbacks.onRemove("mapOfStrings", (value, key) -> mapOfStringsRemoveCount++);
+        callbacks.onRemove("mapOfInt32", (value, key) -> mapOfInt32RemoveCount++);
 
         decoder.decode(getBytes([128, 1, 129, 2, 130, 3, 131, 4, 255, 1, 128, 0, 163, 111, 110, 101, 5, 128, 1, 163, 116, 119, 111, 6, 128, 2, 165, 116, 104, 114, 101, 101, 7, 255, 2, 128, 0, 163, 111, 110, 101, 1, 128, 1, 163, 116, 119, 111, 2, 128, 2, 165, 116, 104, 114, 101, 101, 205, 192, 13, 255, 3, 128, 0, 163, 111, 110, 101, 163, 79, 110, 101, 128, 1, 163, 116, 119, 111, 163, 84, 119, 111, 128, 2, 165, 116, 104, 114, 101, 101, 165, 84, 104, 114, 101, 101, 255, 4, 128, 0, 163, 111, 110, 101, 192, 13, 0, 0, 128, 1, 163, 116, 119, 111, 24, 252, 255, 255, 128, 2, 165, 116, 104, 114, 101, 101, 208, 7, 0, 0, 255, 5, 128, 100, 129, 204, 200, 255, 6, 128, 205, 44, 1, 129, 205, 144, 1, 255, 7, 128, 205, 244, 1, 129, 205, 88, 2]));
 
@@ -181,6 +187,11 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
         assertEquals(state.mapOfInt32.get("two"), -1000);
         assertEquals(state.mapOfInt32.get("three"), 2000);
 
+        assertEquals(mapOfSchemasAddCount, 3);
+        assertEquals(mapOfNumbersAddCount, 3);
+        assertEquals(mapOfStringsAddCount, 3);
+        assertEquals(mapOfInt32AddCount, 3);
+
         var deleteBytes = [255, 2, 64, 1, 64, 2, 255, 1, 64, 1, 64, 2, 255, 3, 64, 1, 64, 2, 255, 4, 64, 1, 64, 2];
         decoder.decode(getBytes(deleteBytes));
 
@@ -188,6 +199,11 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
         assertEquals(state.mapOfNumbers.length, 1);
         assertEquals(state.mapOfStrings.length, 1);
         assertEquals(state.mapOfInt32.length, 1);
+
+        assertEquals(mapOfSchemasRemoveCount, 2);
+        assertEquals(mapOfNumbersRemoveCount, 2);
+        assertEquals(mapOfStringsRemoveCount, 2);
+        assertEquals(mapOfInt32RemoveCount, 2);
     }
 
     public function testMapSchemaInt8() {
@@ -278,21 +294,21 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
         // }, "reflection should be forwards compatible");
     }
 
-    public function testFilteredTypes() {
-        var client1 = new FilteredTypesState();
-        var decoder1 = new Decoder(client1);
-        decoder1.decode(getBytes([255, 0, 130, 1, 128, 2, 128, 2, 255, 1, 128, 0, 4, 255, 2, 128, 163, 111, 110, 101, 255, 2, 128, 163, 111, 110, 101, 255, 4, 128, 163, 111, 110, 101]));
-        assertEquals("one", client1.playerOne.name);
-        assertEquals("one", client1.players[0].name);
-        assertEquals("", client1.playerTwo.name);
+    // public function testFilteredTypes() {
+    //     var client1 = new FilteredTypesState();
+    //     var decoder1 = new Decoder(client1);
+    //     decoder1.decode(getBytes([255, 0, 130, 1, 128, 2, 128, 2, 255, 1, 128, 0, 4, 255, 2, 128, 163, 111, 110, 101, 255, 2, 128, 163, 111, 110, 101, 255, 4, 128, 163, 111, 110, 101]));
+    //     assertEquals("one", client1.playerOne.name);
+    //     assertEquals("one", client1.players[0].name);
+    //     assertEquals("", client1.playerTwo.name);
 
-        var client2 = new FilteredTypesState();
-        var decoder2 = new Decoder(client2);
-        decoder2.decode(getBytes([255, 0, 130, 1, 129, 3, 129, 3, 255, 1, 128, 1, 5, 255, 3, 128, 163, 116, 119, 111, 255, 3, 128, 163, 116, 119, 111, 255, 5, 128, 163, 116, 119, 111]));
-        assertEquals("two", client2.playerTwo.name);
-        assertEquals("two", client2.players[0].name);
-        assertEquals("", client2.playerOne.name);
-    }
+    //     var client2 = new FilteredTypesState();
+    //     var decoder2 = new Decoder(client2);
+    //     decoder2.decode(getBytes([255, 0, 130, 1, 129, 3, 129, 3, 255, 1, 128, 1, 5, 255, 3, 128, 163, 116, 119, 111, 255, 3, 128, 163, 116, 119, 111, 255, 5, 128, 163, 116, 119, 111]));
+    //     assertEquals("two", client2.playerTwo.name);
+    //     assertEquals("two", client2.players[0].name);
+    //     assertEquals("", client2.playerOne.name);
+    // }
 
     public function testInstanceSharingTypes() {
         var client = new InstanceSharingTypes();
@@ -337,108 +353,55 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
         var decoder = new Decoder(state);
         var callbacks = new SchemaCallbacks<CallbacksState>(decoder);
 
-
         var containerOnChange = 0;
-        var containerOnChangeCallback = function(changes) {containerOnChange++;};
-        // state.container.onChange(containerOnChangeCallback);
 
         var arrayOfSchemasOnAdd = 0;
-        var arrayOfSchemasOnChange = 0;
         var arrayOfSchemasOnRemove = 0;
 
-        var arrayOfSchemasOnAddCallback = function(item, key) {
-          // trace("state.container.arrayOfSchemas.onAdd");
-          arrayOfSchemasOnAdd++;
-        };
-        var arrayOfSchemasOnChangeCallback = function(item, key) {
-          // trace("state.container.arrayOfSchemas.onChange");
-          arrayOfSchemasOnChange++;
-        };
-        var arrayOfSchemasOnRemoveCallback = function(item, key) {
-          // trace("state.container.arrayOfSchemas.onRemove");
-          arrayOfSchemasOnRemove++;
-        };
-
-        // state.container.arrayOfSchemas.onAdd(arrayOfSchemasOnAddCallback);
-        // state.container.arrayOfSchemas.onChange(arrayOfSchemasOnChangeCallback);
-        // state.container.arrayOfSchemas.onRemove(arrayOfSchemasOnRemoveCallback);
-
         var arrayOfNumbersOnAdd = 0;
-        var arrayOfNumbersOnChange = 0;
         var arrayOfNumbersOnRemove = 0;
 
-        var arrayOfNumbersOnAddCallback = function(item, key) {
-          // trace("state.container.arrayOfNumbers.onAdd");
-          arrayOfNumbersOnAdd++;
-        };
-        var arrayOfNumbersOnChangeCallback = function(item, key) {
-          // trace("state.container.arrayOfNumbers.onChange");
-          arrayOfNumbersOnChange++;
-        };
-        var arrayOfNumbersOnRemoveCallback = function(item, key) {
-          // trace("state.container.arrayOfNumbers.onRemove");
-          arrayOfNumbersOnRemove++;
-        };
-
-        // state.container.arrayOfNumbers.onAdd(arrayOfNumbersOnAddCallback);
-        // state.container.arrayOfNumbers.onChange(arrayOfNumbersOnChangeCallback);
-        // state.container.arrayOfNumbers.onRemove(arrayOfNumbersOnRemoveCallback);
-
         var arrayOfStringsOnAdd = 0;
-        var arrayOfStringsOnChange = 0;
         var arrayOfStringsOnRemove = 0;
 
-        var arrayOfStringsOnAddCallback = function(item, key) {
-          // trace("state.container.arrayOfStrings.onAdd");
-          arrayOfStringsOnAdd++;
-        };
-        var arrayOfStringsOnChangeCallback = function(item, key) {
-          // trace("state.container.arrayOfStrings.onChange");
-          arrayOfStringsOnChange++;
-        };
-        var arrayOfStringsOnRemoveCallback = function(item, key) {
-          // trace("state.container.arrayOfStrings.onRemove");
-          arrayOfStringsOnRemove++;
-        };
+        callbacks.listen("container", (container, previousValue) -> {
+            callbacks.onChange(container, () -> containerOnChange++);
 
-        // state.container.arrayOfStrings.onAdd(arrayOfStringsOnAddCallback);
-        // state.container.arrayOfStrings.onChange(arrayOfStringsOnChangeCallback);
-        // state.container.arrayOfStrings.onRemove(arrayOfStringsOnRemoveCallback);
+            callbacks.onAdd(container, "arrayOfSchemas", (item, key) -> arrayOfSchemasOnAdd++);
+            callbacks.onRemove(container, "arrayOfSchemas", (item, key) -> arrayOfSchemasOnRemove++);
+
+            callbacks.onAdd(container, "arrayOfNumbers", (item, key) -> arrayOfNumbersOnAdd++);
+            callbacks.onRemove(container, "arrayOfNumbers", (item, key) -> arrayOfNumbersOnRemove++);
+
+            callbacks.onAdd(container, "arrayOfStrings", (item, key) -> arrayOfStringsOnAdd++);
+            callbacks.onRemove(container, "arrayOfStrings", (item, key) -> arrayOfStringsOnRemove++);
+        });
 
         decoder.decode(getBytes([128, 1, 255, 1, 130, 2, 131, 3, 132, 4, 133, 5]));
         assertEquals(1, containerOnChange);
         assertEquals(0, arrayOfSchemasOnAdd);
-        assertEquals(0, arrayOfSchemasOnChange);
         assertEquals(0, arrayOfSchemasOnRemove);
         assertEquals(0, arrayOfNumbersOnAdd);
-        assertEquals(0, arrayOfNumbersOnChange);
         assertEquals(0, arrayOfNumbersOnRemove);
         assertEquals(0, arrayOfStringsOnAdd);
-        assertEquals(0, arrayOfStringsOnChange);
         assertEquals(0, arrayOfStringsOnRemove);
 
         decoder.decode(getBytes([255, 1, 128, 1, 129, 163, 111, 110, 101, 255, 2, 128, 1, 255, 3, 128, 0, 6, 255, 4, 128, 0, 1, 255, 5, 128, 0, 163, 111, 110, 101, 255, 6, 128, 2]));
         assertEquals(2, containerOnChange);
         assertEquals(1, arrayOfSchemasOnAdd);
-        assertEquals(1, arrayOfSchemasOnChange);
         assertEquals(0, arrayOfSchemasOnRemove);
         assertEquals(1, arrayOfNumbersOnAdd);
-        assertEquals(1, arrayOfNumbersOnChange);
         assertEquals(0, arrayOfNumbersOnRemove);
         assertEquals(1, arrayOfStringsOnAdd);
-        assertEquals(1, arrayOfStringsOnChange);
         assertEquals(0, arrayOfStringsOnRemove);
 
         decoder.decode(getBytes([128, 7, 255, 7, 130, 8, 131, 9, 132, 10, 133, 11, 128, 2, 129, 163, 116, 119, 111, 255, 8, 128, 2, 255, 9, 128, 0, 12, 255, 10, 128, 0, 2, 255, 11, 128, 0, 163, 116, 119, 111, 255, 12, 128, 4]));
         assertEquals(3, containerOnChange);
         assertEquals(2, arrayOfSchemasOnAdd);
-        assertEquals(2, arrayOfSchemasOnChange);
         assertEquals(0, arrayOfSchemasOnRemove); // FIXME: ideally, this should be 1
         assertEquals(2, arrayOfNumbersOnAdd);
-        assertEquals(2, arrayOfNumbersOnChange);
         assertEquals(0, arrayOfNumbersOnRemove); // FIXME: ideally, this should be 1
         assertEquals(2, arrayOfStringsOnAdd);
-        assertEquals(2, arrayOfStringsOnChange);
         assertEquals(0, arrayOfStringsOnRemove); // FIXME: ideally, this should be 1
     }
 

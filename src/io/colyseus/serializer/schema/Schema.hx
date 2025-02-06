@@ -1,7 +1,6 @@
 package io.colyseus.serializer.schema;
 
 import io.colyseus.serializer.schema.encoding.Decode;
-import haxe.ds.Either;
 import io.colyseus.serializer.schema.types.ISchemaCollection;
 import io.colyseus.serializer.schema.types.IRef;
 import io.colyseus.serializer.schema.types.ArraySchema;
@@ -147,8 +146,7 @@ class SPEC {
   }
 }
 
-@:enum
-abstract OPERATION(Int) from Int
+enum abstract OPERATION(Int) from Int
 {
   var ADD = 128;
   var REPLACE = 0;
@@ -188,9 +186,6 @@ class Schema implements IRef {
   public function deleteByIndex(fieldIndex: Int) {
     Reflect.setField(this, this._indexes.get(fieldIndex), null);
   }
-
-  public function setIndex(fieldIndex: Int, dynamicIndex: Int) {}
-  public function getIndex(fieldIndex: Int, dynamicIndex: Int) {}
 
   public function toString () {
     var data = [];

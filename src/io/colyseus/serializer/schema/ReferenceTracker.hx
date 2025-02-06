@@ -7,10 +7,10 @@ class ReferenceTracker {
 	public var refCounts:Map<Int, Dynamic> = new Map<Int, Dynamic>();
 	public var deletedRefs:Map<Int, Bool> = new Map<Int, Bool>();
 
-    // TODO:
+    // FIXME:
     // - use function/delegate instead of Dynamic as value.
     // - use Either<Int,String> as key
-	public var callbacks:Map<Int, Map<Dynamic, Array<Dynamic>>> = new Map<Int, Map<Dynamic, Array<Dynamic>>>();
+	public var callbacks:Map<Int, Map<String, Array<Dynamic>>> = new Map<Int, Map<String, Array<Dynamic>>>();
 
 	public function new() {}
 
