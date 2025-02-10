@@ -9,8 +9,11 @@ package schema.callbacks;
 import io.colyseus.serializer.schema.Schema;
 import io.colyseus.serializer.schema.types.*;
 
-class Container extends Schema {
-	@:type("map", Player)
-	public var playersMap: MapSchema<Player> = new MapSchema<Player>();
+class Item extends Schema {
+	@:type("string")
+	public var name: String = "";
+
+	@:type("number")
+	public var value: Dynamic = 0;
 
 }

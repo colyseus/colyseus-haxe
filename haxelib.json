@@ -9,7 +9,7 @@
   "releasenote": "fix reconnectionToken not properly checked if it exists (PR #63)",
   "contributors": ["endel"],
   "dependencies": {
-    "colyseus-websocket": "1.0.12",
+    "colyseus-websocket": "1.0.14",
     "tink_url": "0.5.0",
     "tink_http": "0.10.0"
   }

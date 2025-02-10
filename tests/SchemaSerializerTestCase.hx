@@ -353,56 +353,53 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
         var decoder = new Decoder(state);
         var callbacks = new SchemaCallbacks<CallbacksState>(decoder);
 
-        var containerOnChange = 0;
-
-        var arrayOfSchemasOnAdd = 0;
-        var arrayOfSchemasOnRemove = 0;
-
-        var arrayOfNumbersOnAdd = 0;
-        var arrayOfNumbersOnRemove = 0;
-
-        var arrayOfStringsOnAdd = 0;
-        var arrayOfStringsOnRemove = 0;
+        var onListenContainer = 0;
+        var onPlayerAdd = 0;
+        var onPlayerRemove = 0;
+        var onItemAdd = 0;
+        var onItemRemove = 0;
 
         callbacks.listen("container", (container, previousValue) -> {
-            callbacks.onChange(container, () -> containerOnChange++);
+            onListenContainer++;
 
-            callbacks.onAdd(container, "arrayOfSchemas", (item, key) -> arrayOfSchemasOnAdd++);
-            callbacks.onRemove(container, "arrayOfSchemas", (item, key) -> arrayOfSchemasOnRemove++);
+            callbacks.onAdd(container, "playersMap", (player, key) -> {
+                onPlayerAdd++;
 
-            callbacks.onAdd(container, "arrayOfNumbers", (item, key) -> arrayOfNumbersOnAdd++);
-            callbacks.onRemove(container, "arrayOfNumbers", (item, key) -> arrayOfNumbersOnRemove++);
+                callbacks.onAdd(player, "items", (item, key) -> {
+                    onItemAdd++;
+                });
 
-            callbacks.onAdd(container, "arrayOfStrings", (item, key) -> arrayOfStringsOnAdd++);
-            callbacks.onRemove(container, "arrayOfStrings", (item, key) -> arrayOfStringsOnRemove++);
+                callbacks.onRemove(player, "items", (item, key) -> {
+                    onItemRemove++;
+                });
+            });
+
+            callbacks.onRemove(container, "playersMap", (item, key) -> {
+                onPlayerRemove++;
+            });
         });
 
-        decoder.decode(getBytes([128, 1, 255, 1, 130, 2, 131, 3, 132, 4, 133, 5]));
-        assertEquals(1, containerOnChange);
-        assertEquals(0, arrayOfSchemasOnAdd);
-        assertEquals(0, arrayOfSchemasOnRemove);
-        assertEquals(0, arrayOfNumbersOnAdd);
-        assertEquals(0, arrayOfNumbersOnRemove);
-        assertEquals(0, arrayOfStringsOnAdd);
-        assertEquals(0, arrayOfStringsOnRemove);
+        // (initial)
+        decoder.decode(getBytes([ 128, 1, 255, 1, 128, 2, 255, 2 ]));
 
-        decoder.decode(getBytes([255, 1, 128, 1, 129, 163, 111, 110, 101, 255, 2, 128, 1, 255, 3, 128, 0, 6, 255, 4, 128, 0, 1, 255, 5, 128, 0, 163, 111, 110, 101, 255, 6, 128, 2]));
-        assertEquals(2, containerOnChange);
-        assertEquals(1, arrayOfSchemasOnAdd);
-        assertEquals(0, arrayOfSchemasOnRemove);
-        assertEquals(1, arrayOfNumbersOnAdd);
-        assertEquals(0, arrayOfNumbersOnRemove);
-        assertEquals(1, arrayOfStringsOnAdd);
-        assertEquals(0, arrayOfStringsOnRemove);
+		// (1st encode)
+		decoder.decode(getBytes([ 255, 1, 255, 2, 128, 0, 163, 111, 110, 101, 3, 128, 1, 163, 116, 119, 111, 9, 255, 2, 255, 3, 128, 4, 129, 5, 255, 4, 128, 1, 129, 2, 130, 3, 255, 5, 128, 0, 166, 105, 116, 101, 109, 45, 49, 6, 128, 1, 166, 105, 116, 101, 109, 45, 50, 7, 128, 2, 166, 105, 116, 101, 109, 45, 51, 8, 255, 6, 128, 166, 73, 116, 101, 109, 32, 49, 129, 1, 255, 7, 128, 166, 73, 116, 101, 109, 32, 50, 129, 2, 255, 8, 128, 166, 73, 116, 101, 109, 32, 51, 129, 3, 255, 9, 128, 10, 129, 11, 255, 10, 128, 1, 129, 2, 130, 3, 255, 11, 128, 0, 166, 105, 116, 101, 109, 45, 49, 12, 128, 1, 166, 105, 116, 101, 109, 45, 50, 13, 128, 2, 166, 105, 116, 101, 109, 45, 51, 14, 255, 12, 128, 166, 73, 116, 101, 109, 32, 49, 129, 1, 255, 13, 128, 166, 73, 116, 101, 109, 32, 50, 129, 2, 255, 14, 128, 166, 73, 116, 101, 109, 32, 51, 129, 3 ]));
 
-        decoder.decode(getBytes([128, 7, 255, 7, 130, 8, 131, 9, 132, 10, 133, 11, 128, 2, 129, 163, 116, 119, 111, 255, 8, 128, 2, 255, 9, 128, 0, 12, 255, 10, 128, 0, 2, 255, 11, 128, 0, 163, 116, 119, 111, 255, 12, 128, 4]));
-        assertEquals(3, containerOnChange);
-        assertEquals(2, arrayOfSchemasOnAdd);
-        assertEquals(0, arrayOfSchemasOnRemove); // FIXME: ideally, this should be 1
-        assertEquals(2, arrayOfNumbersOnAdd);
-        assertEquals(0, arrayOfNumbersOnRemove); // FIXME: ideally, this should be 1
-        assertEquals(2, arrayOfStringsOnAdd);
-        assertEquals(0, arrayOfStringsOnRemove); // FIXME: ideally, this should be 1
+		assertEquals(1, onListenContainer);
+		assertEquals(2, onPlayerAdd);
+		assertEquals(6, onItemAdd);
+
+		// (2nd encode)
+		decoder.decode(getBytes([ 255, 1, 255, 2, 64, 1, 128, 2, 165, 116, 104, 114, 101, 101, 16, 255, 2, 255, 3, 255, 4, 255, 5, 64, 0, 64, 1, 128, 3, 166, 105, 116, 101, 109, 45, 52, 15, 255, 8, 255, 5, 255, 5, 255, 15, 128, 166, 73, 116, 101, 109, 32, 52, 129, 4, 255, 2, 255, 16, 128, 17, 129, 18, 255, 17, 128, 1, 129, 2, 130, 3, 255, 18, 128, 0, 166, 105, 116, 101, 109, 45, 49, 19, 128, 1, 166, 105, 116, 101, 109, 45, 50, 20, 128, 2, 166, 105, 116, 101, 109, 45, 51, 21, 255, 19, 128, 166, 73, 116, 101, 109, 32, 49, 129, 1, 255, 20, 128, 166, 73, 116, 101, 109, 32, 50, 129, 2, 255, 21, 128, 166, 73, 116, 101, 109, 32, 51, 129, 3 ]));
+
+		// (new container)
+		decoder.decode(getBytes([ 128, 22, 255, 2, 255, 5, 255, 5, 255, 2, 255, 0, 255, 22, 128, 23, 255, 23, 128, 0, 164, 108, 97, 115, 116, 24, 255, 24, 128, 25, 129, 26, 255, 25, 128, 10, 129, 10, 130, 10, 255, 26, 128, 0, 163, 111, 110, 101, 27, 255, 27, 128, 166, 73, 116, 101, 109, 32, 49, 129, 1 ]));
+
+        assertEquals(4, onPlayerAdd);
+        assertEquals(1, onPlayerRemove);
+        assertEquals(11, onItemAdd);
+        assertEquals(2, onItemRemove);
+
     }
 
 

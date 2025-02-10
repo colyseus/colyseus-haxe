@@ -35,6 +35,7 @@ class Callbacks {
 @:generic
 class SchemaCallbacks<T> {
     private var decoder: Decoder<T>;
+    private var isTriggering: Bool = false;
 
     public function new (decoder: Decoder<T>) {
         this.decoder = decoder;
@@ -43,19 +44,32 @@ class SchemaCallbacks<T> {
 
 	public function listen(
         instanceOrFieldName: Dynamic,
-        callbackOrProperty: Dynamic,
-        ?callback:Dynamic->Dynamic->Void
+        fieldNameOrCallback: Dynamic,
+        ?callbackOrImmediate:Dynamic,
+        ?immediate:Bool = true
     ) {
         var instance: IRef;
         var fieldName: String;
+        var callback: Dynamic->Dynamic->Void;
         if (Std.isOfType(instanceOrFieldName, String)) {
             instance = cast this.decoder.state;
             fieldName = cast instanceOrFieldName;
-            callback = cast callbackOrProperty;
+            callback = cast fieldNameOrCallback;
+            immediate = callbackOrImmediate != null ? cast callbackOrImmediate : true;
         } else {
             instance = cast instanceOrFieldName;
-            fieldName = cast callbackOrProperty;
+            fieldName = cast fieldNameOrCallback;
+            callback = cast callbackOrImmediate;
         }
+
+        var existing = Reflect.getProperty(instance, fieldName);
+        if (
+            existing != null && Std.isOfType(existing, IRef) && existing.__refId != 0 &&
+            immediate == true && !this.isTriggering
+        ) {
+            callback(existing, null);
+        }
+
 		return addCallback(instance.__refId, fieldName, callback);
 	}
 
@@ -65,20 +79,24 @@ class SchemaCallbacks<T> {
 
     public function onAdd(
         instanceOrFieldName: Dynamic,
-        callbackOrProperty: Dynamic,
-        ?callback:Dynamic->Dynamic->Void
+        fieldNameOrCallback: Dynamic,
+        ?callbackOrImmediate: Dynamic,
+        ?immediate:Bool = true
     ) {
         var instance: IRef;
         var fieldName: String;
+        var callback: Dynamic->Dynamic->Void;
         if (Std.isOfType(instanceOrFieldName, String)) {
             instance = cast this.decoder.state;
             fieldName = cast instanceOrFieldName;
-            callback = cast callbackOrProperty;
+            callback = cast fieldNameOrCallback;
+            immediate = callbackOrImmediate != null ? cast callbackOrImmediate : true;
         } else {
             instance = cast instanceOrFieldName;
-            fieldName = cast callbackOrProperty;
+            fieldName = cast fieldNameOrCallback;
+            callback = cast callbackOrImmediate;
         }
-        return addCallbackOrWaitCollectionAvailable(instance, fieldName, OPERATION.ADD, callback);
+        return addCallbackOrWaitCollectionAvailable(instance, fieldName, OPERATION.ADD, callback, immediate);
     }
 
     public function onRemove(
@@ -103,18 +121,24 @@ class SchemaCallbacks<T> {
         instance: IRef,
         fieldName: String,
         operation: OPERATION,
-        callback: Dynamic->Dynamic->Void
+        callback: Dynamic->Dynamic->Void,
+        ?immediate: Bool = true
     ) {
         var _this = this;
         var removeHandler = () -> {}
         var removeCallback = () -> removeHandler();
-        var collection: IRef = Reflect.getProperty(instance, fieldName);
+        var collection: ISchemaCollection = Reflect.getProperty(instance, fieldName);
         if (collection == null || collection.__refId == 0) {
             removeHandler = listen(instance, fieldName, (coll, _) -> {
                 removeHandler = _this.addCallback((coll : IRef).__refId, operation, callback);
             });
             return removeCallback;
         } else {
+            if (operation == OPERATION.ADD && immediate && !this.isTriggering) {
+                for (key => value in collection) {
+                    callback(value, key);
+                }
+            }
             return addCallback(collection.__refId, operation, callback);
         }
     }
@@ -137,35 +161,30 @@ class SchemaCallbacks<T> {
 
         callbacks[key].push(callback);
 
-        // //
-        // // Trigger callback for existing elements
-        // // - OPERATION.ADD
-        // // - OPERATION.REPLACE
-        // //
-        // if (existing != null) {
-        //     for (key => value in existing) {
-        //         callback(value, key);
-        //     }
-        // }
-
         return () -> callbacks[operationOrFieldName].remove(callback);
     }
 
     public function triggerCallbacks0(callbacks:Map<String, Array<Dynamic>>, op:Int) {
         var key = "#" + op;
         if (!callbacks.exists(key)) { return; }
+        isTriggering = true;
         for (callback in callbacks[key]) { callback(); }
+        isTriggering = false;
     }
 
     public function triggerCallbacks2(callbacks:Map<String, Array<Dynamic>>, op:Int, arg1: Dynamic, arg2: Dynamic) {
         var key = "#" + op;
         if (!callbacks.exists(key)) { return; }
+        isTriggering = true;
         for (callback in callbacks[key]) { callback(arg1, arg2); }
+        isTriggering = false;
     }
 
     public function triggerFieldCallbacks(callbacks:Map<String, Array<Dynamic>>, field:String, arg1: Dynamic, arg2: Dynamic) {
         if (!callbacks.exists(field)) { return; }
+        isTriggering = true;
         for (callback in callbacks[field]) { callback(arg1, arg2); }
+        isTriggering = false;
     }
 
 	private function triggerChanges(allChanges:Array<DataChange>) {

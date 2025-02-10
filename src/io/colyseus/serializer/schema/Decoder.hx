@@ -223,7 +223,6 @@ class Decoder<T> {
 			var hasChange = (previousValue != value);
 
 			if (value != null) {
-    trace("setByIndex! " + fieldIndex + " ("+dynamicIndex+"): " + value);
 				ref.setByIndex(fieldIndex, dynamicIndex, cast value);
 			}
 
