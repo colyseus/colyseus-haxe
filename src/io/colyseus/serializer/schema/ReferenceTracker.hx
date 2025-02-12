@@ -14,13 +14,20 @@ class ReferenceTracker {
 
 	public function new() {}
 
-	public function add(refId:Int, ref:Dynamic, increment:Bool = true) {
+	public function add(refId:Int, ref:Dynamic, incrementCount:Bool = true) {
 		this.refs.set(refId, ref);
 
-		if (increment) {
-			var previousCount = (this.refCounts.exists(refId)) ? this.refCounts.get(refId) : 0;
+		if (incrementCount) {
+			var previousCount = (!this.refCounts.exists(refId))
+                ? 0
+                : this.refCounts.get(refId);
+
 			this.refCounts.set(refId, previousCount + 1);
 		}
+
+        if (this.deletedRefs.exists(refId)) {
+            this.deletedRefs.remove(refId);
+        }
 	}
 
 	public function has(refId:Int) {
@@ -34,12 +41,12 @@ class ReferenceTracker {
 	public function remove(refId:Int) {
 		this.refCounts.set(refId, this.refCounts.get(refId) - 1);
 
-		var addedToDeletedRefs = (this.deletedRefs.get(refId) == null);
-		if (addedToDeletedRefs) {
+		if (!this.deletedRefs.exists(refId)) {
 			this.deletedRefs.set(refId, true);
+			return true;
 		}
 
-		return addedToDeletedRefs;
+		return false;
 	}
 
 	public function count() {

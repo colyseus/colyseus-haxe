@@ -26,7 +26,7 @@ class Callbacks {
             });
 
             if (needRemoveRef) {
-                refs.remove(Reflect.getProperty(item, "__refId"));
+                refs.remove((item : IRef).__refId);
             }
         }
     }

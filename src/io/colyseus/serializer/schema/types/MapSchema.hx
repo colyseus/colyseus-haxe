@@ -3,6 +3,12 @@ package io.colyseus.serializer.schema.types;
 import io.colyseus.serializer.schema.Schema.DataChange;
 import io.colyseus.serializer.schema.Callbacks;
 
+interface IMapSchema extends ISchemaCollection {
+	public function setIndex(index:Int, dynamicIndex:Dynamic):Void;
+	public function getIndex(index:Int):Dynamic;
+	public function setByIndex(index:Int, dynamicIndex:Dynamic, value:Dynamic):Void;
+}
+
 class OrderedMapIterator<K,V> {
     var map : OrderedMap<K,V>;
     var index : Int = 0;
@@ -52,14 +58,12 @@ class OrderedMap<K, V> {
 
 @:keep
 @:generic
-class MapSchema<T> implements IRef implements ISchemaCollection {
+class MapSchema<T> implements IMapSchema {
   public var __refId: Int = 0;
   public var _childType: Dynamic;
 
   public var items:OrderedMap<String, T> = new OrderedMap<String, T>(new Map<String, T>());
   public var indexes:Map<Int, String> = new Map<Int, String>();
-
-  private var __isMapSchema: Bool = true;
 
   public function getIndex(fieldIndex: Int) {
     return this.indexes.get(fieldIndex);

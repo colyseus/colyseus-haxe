@@ -79,7 +79,7 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
     public function testArraySchemaTypes() {
         var state = new ArraySchemaTypes();
         var decoder = new Decoder(state);
-        var bytes = [128, 1, 129, 2, 130, 3, 131, 4, 255, 1, 128, 0, 5, 128, 1, 6, 255, 2, 128, 0, 0, 128, 1, 10, 128, 2, 20, 128, 3, 205, 192, 13, 255, 3, 128, 0, 163, 111, 110, 101, 128, 1, 163, 116, 119, 111, 128, 2, 165, 116, 104, 114, 101, 101, 255, 4, 128, 0, 232, 3, 0, 0, 128, 1, 192, 13, 0, 0, 128, 2, 72, 244, 255, 255, 255, 5, 128, 100, 129, 208, 156, 255, 6, 128, 100, 129, 208, 156];
+        var bytes = [ 128, 1, 129, 2, 130, 3, 131, 4, 255, 1, 128, 0, 5, 128, 1, 6, 255, 2, 128, 0, 0, 128, 1, 10, 128, 2, 20, 128, 3, 205, 192, 13, 255, 3, 128, 0, 163, 111, 110, 101, 128, 1, 163, 116, 119, 111, 128, 2, 165, 116, 104, 114, 101, 101, 255, 4, 128, 0, 232, 3, 0, 0, 128, 1, 192, 13, 0, 0, 128, 2, 72, 244, 255, 255, 255, 5, 128, 100, 129, 208, 156, 255, 6, 128, 100, 129, 208, 156 ];
 
         // state.arrayOfSchemas.onAdd((value, key) -> trace("onAdd, arrayOfSchemas => key: " + key + ", value: " + value));
         // state.arrayOfNumbers.onAdd((value, key) -> trace("onAdd, arrayOfNumbers => key: " + key + ", value: " + value));
@@ -114,26 +114,26 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
         assertEquals(state.arrayOfInt32.items[1], 3520);
         assertEquals(state.arrayOfInt32.items[2], -3000);
 
-        var popBytes = [255, 1, 64, 1, 255, 2, 64, 3, 64, 2, 64, 1, 255, 4, 64, 2, 64, 1, 255, 3, 64, 2, 64, 1];
+        var popBytes = [ 255, 1, 64, 1, 255, 2, 64, 3, 64, 2, 64, 1, 255, 4, 64, 2, 64, 1, 255, 3, 64, 2, 64, 1 ];
         decoder.decode(getBytes(popBytes));
 
-        assertEquals(state.arrayOfSchemas.length, 1);
-        assertEquals(state.arrayOfNumbers.length, 1);
-        assertEquals(state.arrayOfStrings.length, 1);
-        assertEquals(state.arrayOfInt32.length, 1);
+        assertEquals(1, state.arrayOfSchemas.length);
+        assertEquals(1, state.arrayOfNumbers.length);
+        assertEquals(1, state.arrayOfStrings.length);
+        assertEquals(1, state.arrayOfInt32.length);
 
         // state.arrayOfSchemas.onRemove = function (value, key) { trace("onRemove, arrayOfSchemas => " + key); };
         // state.arrayOfNumbers.onRemove = function (value, key) { trace("onRemove, arrayOfNumbers => " + key); };
         // state.arrayOfStrings.onRemove = function (value, key) { trace("onRemove, arrayOfStrings => " + key); };
         // state.arrayOfInt32.onRemove = function (value, key) { trace("onRemove, arrayOfInt32 => " + key); };
 
-        var zeroBytes = [128, 7, 129, 8, 131, 9, 130, 10];
+        var zeroBytes = [ 128, 7, 129, 8, 131, 9, 130, 10, 255, 7, 255, 8, 255, 9, 255, 10 ];
         decoder.decode(getBytes(zeroBytes));
 
-        assertEquals(state.arrayOfSchemas.length, 0);
-        assertEquals(state.arrayOfNumbers.length, 0);
-        assertEquals(state.arrayOfStrings.length, 0);
-        assertEquals(state.arrayOfInt32.length, 0);
+        assertEquals(0, state.arrayOfSchemas.length);
+        assertEquals(0, state.arrayOfNumbers.length);
+        assertEquals(0, state.arrayOfStrings.length);
+        assertEquals(0, state.arrayOfInt32.length);
     }
 
     public function testMapSchemaTypes() {
@@ -314,36 +314,36 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
         var client = new InstanceSharingTypes();
         var decoder = new Decoder(client);
         var refs = decoder.refs;
-        decoder.decode(getBytes([130, 1, 131, 2, 128, 3, 129, 3, 255, 1, 255, 2, 255, 3, 128, 4, 255, 3, 128, 4, 255, 4, 128, 10, 129, 10, 255, 4, 128, 10, 129, 10]));
+        decoder.decode(getBytes([ 130, 1, 131, 2, 128, 3, 129, 3, 255, 1, 255, 2, 255, 3, 128, 4, 255, 4, 128, 10, 129, 10 ]));
         assertEquals(client.player1, client.player2);
         assertEquals(client.player1.position, client.player2.position);
         assertEquals(2, refs.refCounts[client.player1.__refId]);
         assertEquals(5, refs.count());
 
-        decoder.decode(getBytes([130, 1, 131, 2, 64, 65]));
+        decoder.decode(getBytes([ 64, 65 ]));
         assertEquals(null, client.player1);
         assertEquals(null, client.player2);
         assertEquals(3, refs.count());
 
-        decoder.decode(getBytes([255, 1, 128, 0, 5, 128, 1, 5, 128, 2, 5, 128, 3, 6, 255, 5, 128, 7, 255, 6, 128, 8, 255, 7, 128, 10, 129, 10, 255, 8, 128, 10, 129, 10 ]));
+        decoder.decode(getBytes([ 255, 1, 128, 0, 5, 128, 1, 5, 128, 2, 5, 128, 3, 7, 255, 5, 128, 6, 255, 6, 128, 10, 129, 10, 255, 7, 128, 8, 255, 8, 128, 10, 129, 10 ]));
         assertEquals(client.arrayOfPlayers[0], client.arrayOfPlayers[1]);
         assertEquals(client.arrayOfPlayers[1], client.arrayOfPlayers[2]);
         assertFalse(client.arrayOfPlayers[2] == client.arrayOfPlayers[3]);
         assertEquals(7, refs.count());
 
-        decoder.decode(getBytes([255, 1, 64, 3, 64, 2, 64, 1 ]));
+        decoder.decode(getBytes([ 255, 1, 64, 3, 64, 2, 64, 1 ]));
         assertEquals(1, client.arrayOfPlayers.length);
         assertEquals(5, refs.count());
         var previousArraySchemaRefId = client.arrayOfPlayers.__refId;
 
         // Replacing ArraySchema
-        decoder.decode(getBytes([130, 9, 255, 9, 128, 0, 10, 255, 10, 128, 11, 255, 11, 128, 10, 129, 20]));
+        decoder.decode(getBytes([ 130, 9, 255, 9, 128, 0, 10, 255, 10, 128, 11, 255, 11, 128, 10, 129, 20 ]));
         assertFalse(refs.has(previousArraySchemaRefId));
         assertEquals(1, client.arrayOfPlayers.length);
         assertEquals(5, refs.count());
 
         // Clearing ArraySchema
-        decoder.decode(getBytes([255, 9, 10]));
+        decoder.decode(getBytes([ 255, 9, 10 ]));
         assertEquals(0, client.arrayOfPlayers.length);
         assertEquals(3, refs.count());
     }

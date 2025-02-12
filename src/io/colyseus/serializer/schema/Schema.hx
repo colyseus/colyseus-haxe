@@ -152,7 +152,13 @@ enum abstract OPERATION(Int) from Int
   var REPLACE = 0;
   var DELETE = 64;
   var DELETE_AND_ADD = 192;
+  var DELETE_AND_MOVE = 96; // ArraySchema
   var CLEAR = 10;
+
+  // ArraySchema operations
+  var REVERSE = 15;
+  var DELETE_BY_REFID = 33;
+  var ADD_BY_REFID = 129;
 }
 
 typedef DataChange = {
@@ -175,7 +181,7 @@ class Schema implements IRef {
   public var _types:Map<Int, String> = new Map<Int, String>();
   public var _childTypes:Map<Int, Dynamic> = new Map<Int, Dynamic>();
 
-  public function setByIndex(fieldIndex: Int, dynamicIndex: Dynamic, value: Dynamic) {
+  public function setByIndex(fieldIndex: Int, value: Dynamic) {
     return Reflect.setField(this, this._indexes.get(fieldIndex), value);
   }
 
