@@ -302,8 +302,8 @@ class Decoder<T> {
             }
 
             if (((operation & cast OPERATION.ADD) == OPERATION.ADD)) {
+                var concreteChildType = this.getSchemaType(bytes, it, childType);
                 if (value == null) {
-                    var concreteChildType = this.getSchemaType(bytes, it, childType);
                     value = Type.createInstance(concreteChildType, []);
                     value.__refId = refId;
                 }
