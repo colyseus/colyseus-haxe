@@ -289,22 +289,30 @@ class Decoder<T> {
 			var refId = Decode.number(bytes, it);
 			value = refs.get(refId);
 
-			if (operation != OPERATION.REPLACE) {
-				var concreteChildType = this.getSchemaType(bytes, it, childType);
+            if (previousValue != null) {
+                var previousRefId = previousValue.__refId;
+                if (
+                    previousRefId > 0 &&
+                    refId != previousRefId &&
+                    // FIXME: we may need to check for REPLACE operation as well
+                    ((operation & cast OPERATION.DELETE) == OPERATION.DELETE)
+                ) {
+                    refs.remove(previousRefId);
+                }
+            }
 
-				if (value == null) {
-					value = Type.createInstance(concreteChildType, []);
-					value.__refId = refId;
+            if (((operation & cast OPERATION.ADD) == OPERATION.ADD)) {
+                if (value == null) {
+                    var concreteChildType = this.getSchemaType(bytes, it, childType);
+                    value = Type.createInstance(concreteChildType, []);
+                    value.__refId = refId;
+                }
 
-					if (previousValue != null) {
-						if (previousValue.__refId > 0 && refId != previousValue.__refId) {
-							refs.remove(previousValue.__refId);
-						}
-					}
-				}
-
-				refs.add(refId, value, (value != previousValue));
-			}
+				refs.add(refId, value, (
+                    value != previousValue || // increment ref count if value has changed
+                    (operation == OPERATION.DELETE_AND_ADD && value == previousValue) // increment ref count if it's a DELETE operation
+                ));
+            }
 
 		} else if (childType == null) {
 			value = Decode.decodePrimitiveType(fieldType, bytes, it);
