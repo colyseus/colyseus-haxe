@@ -78,10 +78,6 @@ class Client {
         this.createMatchMakeRequest('reconnect', roomIdAndReconnectionToken[0], [ "reconnectionToken" => roomIdAndReconnectionToken[1] ], stateClass, callback);
     }
 
-    public function getAvailableRooms(roomName: String, callback: (HttpException, Array<RoomAvailable>)->Void) {
-        this.http.get("matchmake/" + roomName, null, callback);
-    }
-
     @:generic
     public function consumeSeatReservation<T>(response: Dynamic, stateClass: Class<T>, callback: (HttpException, Room<T>)->Void) {
 
