@@ -4,9 +4,9 @@
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
   "description": "Colyseus Multiplayer SDK",
-  "version": "0.15.4",
+  "version": "0.16.0",
   "classPath": "src/",
-  "releasenote": "fix reconnectionToken not properly checked if it exists (PR #63)",
+  "releasenote": "Compatible with Colyseus 0.16. Reestructuring of schema encoder/decoder and callbacks API.",
   "contributors": ["endel"],
   "dependencies": {
     "colyseus-websocket": "1.0.14",
