@@ -4,9 +4,9 @@
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
   "description": "Colyseus Multiplayer SDK",
-  "version": "0.16.0",
+  "version": "0.16.1",
   "classPath": "src/",
-  "releasenote": "Compatible with Colyseus 0.16. Reestructuring of schema encoder/decoder and callbacks API.",
+  "releasenote": "Bring back .onChange() callback for collections.",
   "contributors": ["endel"],
   "dependencies": {
     "colyseus-websocket": "1.0.14",

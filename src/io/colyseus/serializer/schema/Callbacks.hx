@@ -73,10 +73,6 @@ class SchemaCallbacks<T> {
 		return addCallback(instance.__refId, fieldName, callback);
 	}
 
-	public function onChange(instance: IRef, callback:Void->Void) {
-		return addCallback(instance.__refId, OPERATION.REPLACE, callback);
-	}
-
     public function onAdd(
         instanceOrFieldName: Dynamic,
         fieldNameOrCallback: Dynamic,
@@ -97,6 +93,24 @@ class SchemaCallbacks<T> {
             callback = cast callbackOrImmediate;
         }
         return addCallbackOrWaitCollectionAvailable(instance, fieldName, OPERATION.ADD, callback, immediate);
+    }
+
+    public function onChange(
+        instanceOrFieldName: Dynamic,
+        callbackOrProperty: Dynamic,
+        ?callback:Dynamic->Dynamic->Void
+    ) {
+        var instance: IRef;
+        var fieldName: String;
+        if (Std.isOfType(instanceOrFieldName, String)) {
+            instance = cast this.decoder.state;
+            fieldName = cast instanceOrFieldName;
+            callback = cast callbackOrProperty;
+        } else {
+            instance = cast instanceOrFieldName;
+            fieldName = cast callbackOrProperty;
+        }
+        return addCallbackOrWaitCollectionAvailable(instance, fieldName, OPERATION.REPLACE, callback);
     }
 
     public function onRemove(
