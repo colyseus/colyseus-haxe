@@ -14,7 +14,7 @@
     <img src="https://img.shields.io/discord/525739117951320081.svg?style=for-the-badge&colorB=7581dc&logo=discord&logoColor=white">
   </a>
   <h3>
-     Multiplayer Game Client for <a href="https://haxe.org/">Haxe</a> <br /><a href="https://docs.colyseus.io/getting-started/haxe-client/">View documentation</a>
+     Multiplayer Game Client for <a href="https://haxe.org/">Haxe</a> <br /><a href="https://docs.colyseus.io/getting-started/haxe">View documentation</a>
   </h3>
 </div>
 
