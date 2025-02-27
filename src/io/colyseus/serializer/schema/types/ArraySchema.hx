@@ -1,6 +1,5 @@
 package io.colyseus.serializer.schema.types;
 
-import schema.callbacks.Item;
 import io.colyseus.serializer.schema.Schema.OPERATION;
 import io.colyseus.serializer.schema.Schema.DataChange;
 import io.colyseus.serializer.schema.Callbacks;
