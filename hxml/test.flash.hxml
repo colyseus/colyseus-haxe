@@ -1,0 +1,3 @@
+hxml/test.defaults.hxml
+--swf tests/bin/flash_test.swf
+-swf-version 11

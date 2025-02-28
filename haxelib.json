@@ -4,9 +4,9 @@
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
   "description": "Colyseus Multiplayer SDK",
-  "version": "0.16.2",
+  "version": "0.16.3",
   "classPath": "src/",
-  "releasenote": "Bring back .onChange() callback for collections.",
+  "releasenote": "AirSDK: fix cache/storage support via flash.net.SharedObject",
   "contributors": ["endel"],
   "dependencies": {
     "colyseus-websocket": "1.0.14",
