@@ -2,74 +2,83 @@ package io.colyseus;
 
 import haxe.io.Bytes;
 import org.msgpack.MsgPack;
-
 import haxe.net.WebSocket;
 import haxe.net.WebSocket.ReadyState;
-
 #if !haxe4
-    #if neko
-        import neko.vm.Thread;
-    #elseif hl
-        import hl.vm.Thread;
-    #elseif cpp
-        import cpp.vm.Thread;
-    #end
+#if neko
+import neko.vm.Thread;
+#elseif hl
+import hl.vm.Thread;
+#elseif cpp
+import cpp.vm.Thread;
+#end
 #elseif sys
-    import sys.thread.Thread;
+import sys.thread.Thread;
 #end
 
+@:keep
 class Connection {
-    public var reconnectionEnabled: Bool = false;
+	public var reconnectionEnabled:Bool = false;
 
-    private var ws: WebSocket;
+	public var _isOpen(get, never):Bool;
 
-    // callbacks
-    public dynamic function onOpen():Void {}
-    public dynamic function onMessage(bytes: Bytes):Void {}
-    public dynamic function onClose(data: Dynamic):Void {}
-    public dynamic function onError(message: String):Void {}
+	@:getter(isOpen)
+	function get__isOpen():Bool {
+		return (this.ws.readyState == ReadyState.Open);
+	}
 
-    private static var isRunnerInitialized: Bool = false;
+	private var ws:WebSocket;
 
-    public function new (url: String) {
-        this.ws = WebSocket.create(url);
-        this.ws.onopen = function() {
-            this.onOpen();
-        }
+	// callbacks
+	public dynamic function onOpen():Void {}
 
-        this.ws.onmessageBytes = function(bytes) {
-            this.onMessage(bytes);
-        }
+	public dynamic function onMessage(bytes:Bytes):Void {}
 
-        this.ws.onclose = function(?e:Dynamic) {
-            this.onClose(e);
-        }
+	public dynamic function onClose(data:Dynamic):Void {}
 
-        this.ws.onerror = function(message) {
-            this.onError(message);
-        }
+	public dynamic function onError(message:String):Void {}
 
-        #if sys
-        Thread.create(function() {
-            while (true) {
-                this.ws.process();
+	private static var isRunnerInitialized:Bool = false;
 
-                if (this.ws.readyState == ReadyState.Closed) {
-                    trace("WebSocket connection has been closed, stopping the thread!");
-                    break;
-                }
+	public function new(url:String) {
+		this.ws = WebSocket.create(url);
+		this.ws.onopen = function() {
+			this.onOpen();
+		}
 
-                Sys.sleep(.01);
-            }
-        });
-        #end
-    }
+		this.ws.onmessageBytes = function(bytes) {
+			this.onMessage(bytes);
+		}
 
-    public function send(data: Bytes) {
-        return this.ws.sendBytes(data);
-    }
+		this.ws.onclose = function(?e:Dynamic) {
+			this.onClose(e);
+		}
 
-    public function close () {
-        this.ws.close();
-    }
+		this.ws.onerror = function(message) {
+			this.onError(message);
+		}
+
+		#if sys
+		Thread.create(function() {
+			while (true) {
+				this.ws.process();
+
+				if (this.ws.readyState == ReadyState.Closed) {
+					trace("WebSocket connection has been closed, stopping the thread!");
+					break;
+				}
+
+				Sys.sleep(.01);
+			}
+		});
+		#end
+	}
+
+	public function send(data:Bytes) {
+		return this.ws.sendBytes(data);
+	}
+
+	public function close() {
+		this.ws.close();
+	}
 }
