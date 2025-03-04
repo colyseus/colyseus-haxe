@@ -4,9 +4,9 @@
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
   "description": "Colyseus Multiplayer SDK",
-  "version": "0.16.3",
+  "version": "0.16.4",
   "classPath": "src/",
-  "releasenote": "AirSDK: fix cache/storage support via flash.net.SharedObject",
+  "releasenote": "add room.connection.isOpen (thanks to @Shaunmax)",
   "contributors": ["endel"],
   "dependencies": {
     "colyseus-websocket": "1.0.14",
