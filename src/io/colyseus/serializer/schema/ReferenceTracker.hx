@@ -39,10 +39,18 @@ class ReferenceTracker {
 	}
 
 	public function remove(refId:Int) {
-		this.refCounts.set(refId, this.refCounts.get(refId) - 1);
+		var refCount = this.refCounts.get(refId);
+		if (refCount == null) { return false; }
 
-		if (!this.deletedRefs.exists(refId)) {
-			this.deletedRefs.set(refId, true);
+		if (refCount == 0) {
+			trace("trying to remove refId with 0 refCount", refId);
+			return false;
+		}
+
+		this.refCounts.set(refId, refCount - 1);
+
+		if (this.refCounts[refId] <= 0) {
+            this.deletedRefs.set(refId, true);
 			return true;
 		}
 
@@ -67,15 +75,15 @@ class ReferenceTracker {
 				if (Std.isOfType(ref, Schema)) {
 					var childTypes = (ref : Schema)._childTypes;
 					for (fieldIndex in childTypes.keys()) {
-						var refId = Reflect.getProperty((ref : Schema).getByIndex(fieldIndex), "__refId");
-						if (refId > 0 && this.remove(refId)) {
-							deletedRefs.push(refId);
+						var childRefId = Reflect.getProperty((ref : Schema).getByIndex(fieldIndex), "__refId");
+						if (childRefId > 0 && !this.deletedRefs.exists(childRefId) && this.remove(childRefId)) {
+							deletedRefs.push(childRefId);
 						}
 					}
 				} else if (!Std.isOfType(ref._childType, String)) {
 					for (item in (ref : ISchemaCollection)) {
 						var childRefId = Reflect.getProperty(item, "__refId");
-						if (childRefId > 0 && this.remove(childRefId)) {
+						if (childRefId > 0 && !this.deletedRefs.exists(childRefId) && this.remove(childRefId)) {
 							deletedRefs.push(childRefId);
 						}
 					}

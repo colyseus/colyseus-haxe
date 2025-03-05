@@ -267,13 +267,13 @@ class Decoder<T> {
 		// Delete operations
 		//
 		if ((operation & cast OPERATION.DELETE) == OPERATION.DELETE) {
-			if (operation != OPERATION.DELETE_AND_ADD) {
-				ref.deleteByIndex(fieldIndex);
-			}
-
 			// Flag `refId` for garbage collection.
 			if (Std.isOfType(previousValue, IRef) && previousValue.__refId > 0) {
 				refs.remove(previousValue.__refId);
+			}
+
+			if (operation != OPERATION.DELETE_AND_ADD) {
+				ref.deleteByIndex(fieldIndex);
 			}
 
 			value = null;
@@ -288,18 +288,6 @@ class Decoder<T> {
 		} else if (fieldType == "ref") {
 			var refId = Decode.number(bytes, it);
 			value = refs.get(refId);
-
-            if (previousValue != null) {
-                var previousRefId = previousValue.__refId;
-                if (
-                    previousRefId > 0 &&
-                    refId != previousRefId &&
-                    // FIXME: we may need to check for REPLACE operation as well
-                    ((operation & cast OPERATION.DELETE) == OPERATION.DELETE)
-                ) {
-                    refs.remove(previousRefId);
-                }
-            }
 
             if (((operation & cast OPERATION.ADD) == OPERATION.ADD)) {
                 var concreteChildType = this.getSchemaType(bytes, it, childType);
@@ -344,9 +332,11 @@ class Decoder<T> {
 
 			if (previousValue != null) {
 				if (previousValue.__refId > 0 && refId != previousValue.__refId) {
-					refs.remove(previousValue.__refId);
+					for (index => item in (previousValue : ISchemaCollection)) {
+						if (Std.isOfType(item, IRef) && item.__refId > 0) {
+							refs.remove(item.__refId);
+						}
 
-                    for (index => item in (previousValue : ISchemaCollection)) {
 						allChanges.push({
 							refId: previousValue.__refId,
 							op: cast OPERATION.DELETE,
@@ -359,7 +349,10 @@ class Decoder<T> {
 				}
 			}
 
-			refs.add(refId, value, valueRef != previousValue);
+			refs.add(refId, value, (
+                valueRef != previousValue ||
+                (operation == OPERATION.DELETE_AND_ADD && valueRef == previousValue) // increment ref count if it's a DELETE operation
+            ));
 		}
 		return {value: value, previousValue: previousValue};
 	}

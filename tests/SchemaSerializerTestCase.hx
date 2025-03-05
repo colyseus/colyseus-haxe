@@ -334,36 +334,36 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
         var client = new InstanceSharingTypes();
         var decoder = new Decoder(client);
         var refs = decoder.refs;
-        decoder.decode(getBytes([ 130, 1, 131, 2, 128, 3, 129, 3, 255, 1, 255, 2, 255, 3, 128, 4, 255, 4, 128, 10, 129, 10 ]));
+        decoder.decode(getBytes([130, 1, 131, 2, 128, 3, 129, 3, 255, 3, 128, 4, 255, 4, 128, 10, 129, 10]));
         assertEquals(client.player1, client.player2);
         assertEquals(client.player1.position, client.player2.position);
         assertEquals(2, refs.refCounts[client.player1.__refId]);
         assertEquals(5, refs.count());
 
-        decoder.decode(getBytes([ 64, 65 ]));
+        decoder.decode(getBytes([64, 65, 255, 0, 64, 65]));
         assertEquals(null, client.player1);
         assertEquals(null, client.player2);
         assertEquals(3, refs.count());
 
-        decoder.decode(getBytes([ 255, 1, 128, 0, 5, 128, 1, 5, 128, 2, 5, 128, 3, 7, 255, 5, 128, 6, 255, 6, 128, 10, 129, 10, 255, 7, 128, 8, 255, 8, 128, 10, 129, 10 ]));
+        decoder.decode(getBytes([255, 1, 128, 0, 5, 128, 1, 5, 128, 2, 5, 128, 3, 7, 255, 5, 128, 6, 255, 6, 128, 10, 129, 10, 255, 7, 128, 8, 255, 8, 128, 10, 129, 10]));
         assertEquals(client.arrayOfPlayers[0], client.arrayOfPlayers[1]);
         assertEquals(client.arrayOfPlayers[1], client.arrayOfPlayers[2]);
         assertFalse(client.arrayOfPlayers[2] == client.arrayOfPlayers[3]);
         assertEquals(7, refs.count());
 
-        decoder.decode(getBytes([ 255, 1, 64, 3, 64, 2, 64, 1 ]));
+        decoder.decode(getBytes([255, 1, 64, 3, 64, 2, 64, 1]));
         assertEquals(1, client.arrayOfPlayers.length);
         assertEquals(5, refs.count());
         var previousArraySchemaRefId = client.arrayOfPlayers.__refId;
 
         // Replacing ArraySchema
-        decoder.decode(getBytes([ 130, 9, 255, 9, 128, 0, 10, 255, 10, 128, 11, 255, 11, 128, 10, 129, 20 ]));
+        decoder.decode(getBytes([194, 9, 255, 9, 128, 0, 10, 255, 10, 128, 11, 255, 11, 128, 10, 129, 20]));
         assertFalse(refs.has(previousArraySchemaRefId));
         assertEquals(1, client.arrayOfPlayers.length);
         assertEquals(5, refs.count());
 
         // Clearing ArraySchema
-        decoder.decode(getBytes([ 255, 9, 10 ]));
+        decoder.decode(getBytes([255, 9, 10]));
         assertEquals(0, client.arrayOfPlayers.length);
         assertEquals(3, refs.count());
     }

@@ -4,9 +4,9 @@
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
   "description": "Colyseus Multiplayer SDK",
-  "version": "0.16.4",
+  "version": "0.16.5",
   "classPath": "src/",
-  "releasenote": "add room.connection.isOpen (thanks to @Shaunmax)",
+  "releasenote": "@colyseus/schema: improve instance sharing and ref count tracking.",
   "contributors": ["endel"],
   "dependencies": {
     "colyseus-websocket": "1.0.14",
