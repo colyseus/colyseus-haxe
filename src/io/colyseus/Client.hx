@@ -176,8 +176,12 @@ class Client {
     }
 
     private function createConnection(room: Dynamic, options: Map<String, Dynamic>) {
-        // append colyseusid to connection string.
+        // build query string
         var params: Array<String> = [];
+
+        if (this.http.authToken != null) {
+            options.set("_authToken", this.http.authToken);
+        }
 
         for (name in options.keys()) {
             params.push(name + "=" + options[name]);
