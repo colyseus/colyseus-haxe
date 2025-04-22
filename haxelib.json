@@ -4,9 +4,9 @@
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
   "description": "Colyseus Multiplayer SDK",
-  "version": "0.16.6",
+  "version": "0.16.7",
   "classPath": "src/",
-  "releasenote": "onAuth() fix forwarding built-in auth token to server",
+  "releasenote": "schema callbacks: fix triggering onAdd on existing key",
   "contributors": ["endel"],
   "dependencies": {
     "colyseus-websocket": "1.0.14",

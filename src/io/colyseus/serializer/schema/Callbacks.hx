@@ -247,7 +247,7 @@ class SchemaCallbacks<T> {
                         triggerCallbacks2(callbacks, cast OPERATION.ADD, change.value, (change.dynamicIndex == null) ? change.field : change.dynamicIndex);
                     }
 
-                } else if ((change.op & cast OPERATION.ADD) == OPERATION.ADD && change.previousValue == null) {
+                } else if ((change.op & cast OPERATION.ADD) == OPERATION.ADD && change.previousValue != change.value) {
                     // triger onAdd
                     triggerCallbacks2(callbacks, cast OPERATION.ADD, change.value, (change.dynamicIndex == null) ? change.field : change.dynamicIndex);
                 }
