@@ -12,8 +12,14 @@
 	<haxelib name="openfl" />
 	<haxelib name="colyseus-websocket" />
 	<haxelib name="tink_url" />
+	<haxelib name="tink_http" />
 	<haxelib name="tink_await" />
 
 	<library path="Assets/library.swf" preload="true" />
+
+    <!-- Debug options for hxcpp -->
+	<haxedef name="HXCPP_CHECK_POINTER" />
+	<haxedef name="HXCPP_STACK_TRACE" />
+	<haxeflag name="-debug" />
 
 </project>

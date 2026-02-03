@@ -5,3 +5,4 @@
 .haxerc
 /example/heaps/build/html5/*.js
 /example/heaps/build/html5/*.js.map
+build

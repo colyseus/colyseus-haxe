@@ -24,8 +24,6 @@ First, download and install [Haxe](https://haxe.org/download/).
 
 The [`example`](https://github.com/colyseus/colyseus-haxe/blob/master/example/openfl) project can be compiled to `html5`, `neko`, `cpp`, `ios`, etc.
 
-It uses the `state_handler` room from the [colyseus-examples](https://github.com/colyseus/colyseus-examples) project, which you can find [here](https://github.com/colyseus/colyseus-examples/blob/master/rooms/02-state-handler.ts).
-
 ### Compiling the demo project to `html5`
 
 ```
@@ -33,8 +31,22 @@ git clone https://github.com/colyseus/colyseus-haxe.git
 cd colyseus-haxe/example/openfl
 haxelib install openfl
 haxelib install lime
+haxelib install tink_http
+haxelib install tink_await
+haxelib install swf
 haxelib install colyseus-websocket
 haxelib run lime test project.xml html5
+```
+
+### Running the server
+
+The demo project uses the **SDK Test Server** from the main Colyseus monorepo. You can start the server by running the following commands:
+
+```
+git clone https://github.com/colyseus/colyseus.git
+cd colyseus
+pnpm install
+pnpm run sdk-test-server
 ```
 
 ## Development
@@ -44,6 +56,12 @@ Running the test-suite:
 ```
 haxe hxml/test.js.hxml
 ```
+
+## Troubleshooting
+
+> Error#500: Chunked encoding is not supported and the content-length header is required.
+
+Make sure your HTTP responses from the server-side don't respond with `Transfer-Encoding: chunked` header. Include the `Content-Length: xxx` header to avoid _"chunked"_ responses.
 
 ## Dependencies
 

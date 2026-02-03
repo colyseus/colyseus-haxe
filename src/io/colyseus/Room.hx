@@ -1,6 +1,7 @@
 package io.colyseus;
 
 import haxe.io.BytesOutput;
+import haxe.Timer;
 import io.colyseus.serializer.schema.Schema;
 import io.colyseus.serializer.Serializer;
 import io.colyseus.serializer.SchemaSerializer;
@@ -11,11 +12,37 @@ import io.colyseus.serializer.schema.Schema.It;
 import io.colyseus.serializer.schema.Schema.SPEC;
 import io.colyseus.serializer.schema.encoding.Decode;
 
+using io.colyseus.Protocol.CloseCode;
 using io.colyseus.events.EventHandler;
 
 import haxe.io.Bytes;
 import haxe.ds.Map;
 import org.msgpack.MsgPack;
+
+typedef EnqueuedMessage = {
+    data: Bytes
+};
+
+typedef ReconnectionOptions = {
+    /** The maximum number of reconnection attempts. */
+    var maxRetries: Int;
+    /** The minimum delay between reconnection attempts (ms). */
+    var minDelay: Int;
+    /** The maximum delay between reconnection attempts (ms). */
+    var maxDelay: Int;
+    /** The minimum uptime of the room before reconnection attempts can be made (ms). */
+    var minUptime: Int;
+    /** The current number of reconnection attempts. */
+    var retryCount: Int;
+    /** The initial delay between reconnection attempts (ms). */
+    var delay: Int;
+    /** The maximum number of enqueued messages to buffer. */
+    var maxEnqueuedMessages: Int;
+    /** Buffer for messages sent while connection is not open. */
+    var enqueuedMessages: Array<EnqueuedMessage>;
+    /** Whether the room is currently reconnecting. */
+    var isReconnecting: Bool;
+};
 
 class Room<T> {
     public var roomId: String;
@@ -28,7 +55,11 @@ class Room<T> {
     public var onJoin = new EventHandler<Void->Void>();
     public var onStateChange = new EventHandler<Dynamic->Void>();
     public var onError = new EventHandler<Int->String->Void>();
-    public var onLeave = new EventHandler<Void->Void>();
+    public var onLeave = new EventHandler<Int->Void>();
+
+    public var onDrop = new EventHandler<Int->Void>();
+    public var onReconnect = new EventHandler<Void->Void>();
+
     private var onMessageHandlers = new Map<String, Dynamic->Void>();
 
     public var connection: Connection;
@@ -38,34 +69,62 @@ class Room<T> {
 
     private var tmpStateClass: Class<T>;
 
+    // ping-related
+    private var lastPingTime: Float = 0;
+    private var pingCallback: Null<Float->Void> = null;
+
+    // reconnection logic
+    public var reconnection: ReconnectionOptions = {
+        retryCount: 0,
+        maxRetries: 15,
+        delay: 100,
+        minDelay: 100,
+        maxDelay: 5000,
+        minUptime: 5000,
+        maxEnqueuedMessages: 10,
+        enqueuedMessages: [],
+        isReconnecting: false
+    };
+    private var joinedAtTime: Float = 0;
+
     public function new (name: String, ?cls: Class<T>) {
         this.roomId = null;
         this.name = name;
         this.tmpStateClass = cls;
     }
 
-    public function connect(connection: Connection, room: Room<T>, ?devModeCloseCallback) {
-        if (room == null) {
-            room = this;
-        }
-        room.connection = connection;
-        room.connection.reconnectionEnabled = false;
+    public function connect(connection: Connection) {
+        this.connection = connection;
+        this.connection.reconnectionEnabled = false;
 
-        room.connection.onMessage = function (bytes) {
-            room.onMessageCallback(bytes);
+        this.connection.onMessage = function (bytes) {
+            this.onMessageCallback(bytes);
         }
 
-        room.connection.onClose = function (e) {
-            if (devModeCloseCallback != null && e.code == Protocol.DEVMODE_RESTART) {
-                devModeCloseCallback();
+		this.connection.onClose = function(e:Dynamic) {
+            if (this.joinedAtTime == 0) {
+                trace("Room connection was closed unexpectedly (" + e.code + "): " + e.reason);
+                this.onError.dispatch(e.code, e.reason);
+                return;
+            }
+
+            if (
+                e.code == CloseCode.NO_STATUS_RECEIVED ||
+                e.code == CloseCode.ABNORMAL_CLOSURE ||
+                e.code == CloseCode.GOING_AWAY ||
+                e.code == CloseCode.MAY_TRY_RECONNECT
+            ) {
+                this.onDrop.dispatch(e.code);
+                this.handleReconnection();
+
             } else {
-                room.teardown();
-                room.onLeave.dispatch();
+                this.teardown();
+                this.onLeave.dispatch(e.code);
             }
         }
 
-        room.connection.onError = function (e) {
-            room.onError.dispatch(0, e);
+        this.connection.onError = function (e) {
+            this.onError.dispatch(0, e);
         };
     }
 
@@ -81,7 +140,7 @@ class Room<T> {
             }
 
         } else {
-            this.onLeave.dispatch();
+            this.onLeave.dispatch(0);
         }
     }
 
@@ -103,7 +162,14 @@ class Room<T> {
             bytesToSend.writeBytes(encodedMessage, 0, encodedMessage.length);
         }
 
-        this.connection.send(bytesToSend.getBytes());
+        var data = bytesToSend.getBytes();
+
+        // If connection is not open, buffer the message
+        if (!this.connection._isOpen) {
+            this.enqueueMessage(data);
+        } else {
+            this.connection.send(data);
+        }
     }
 
     public function sendBytes(type: Dynamic, ?bytes: Dynamic) {
@@ -121,7 +187,28 @@ class Room<T> {
 
         bytesToSend.writeBytes(bytes, 0, bytes.length);
 
-        this.connection.send(bytesToSend.getBytes());
+        var data = bytesToSend.getBytes();
+
+        // If connection is not open, buffer the message
+        if (!this.connection._isOpen) {
+            this.enqueueMessage(data);
+        } else {
+            this.connection.send(data);
+        }
+    }
+
+    public function ping(callback: Float->Void) {
+        // skip if connection is not open
+        if (this.connection == null || !this.connection._isOpen) {
+            return;
+        }
+
+        this.lastPingTime = haxe.Timer.stamp() * 1000;
+        this.pingCallback = callback;
+
+        var bytes = new BytesOutput();
+        bytes.writeByte(Protocol.PING);
+        this.connection.send(bytes.getBytes());
     }
 
     public function onMessage(type: Dynamic, callback: Dynamic->Void) {
@@ -157,29 +244,52 @@ class Room<T> {
             this.serializerId = data.getString(it.offset + 1, data.get(it.offset));
             it.offset += this.serializerId.length + 1;
 
-            if (this.serializerId == "schema") {
-                this.serializer = new SchemaSerializer<T>(tmpStateClass);
+            // Instantiate serializer if not locally available
+            if (this.serializer == null) {
+                if (this.serializerId == "schema") {
+                    this.serializer = new SchemaSerializer<T>(tmpStateClass);
 
-            } else if (this.serializerId == "fossil-delta") {
-                this.serializer = new FossilDeltaSerializer();
+                } else if (this.serializerId == "fossil-delta") {
+                    this.serializer = new FossilDeltaSerializer();
 
-            } else {
-                this.serializer = new NoneSerializer();
+                } else {
+                    this.serializer = new NoneSerializer();
+                }
             }
 
-            if (data.length > it.offset) {
+            // Apply handshake on first join (no need to do this on reconnect)
+            if (data.length > it.offset && this.serializer != null) {
                 this.serializer.handshake(data, it.offset);
+            }
+
+            if (this.joinedAtTime == 0) {
+                // First join
+                this.joinedAtTime = Timer.stamp() * 1000;
+                this.onJoin.dispatch();
+
+            } else {
+                // Reconnection successful
+                trace("[Colyseus reconnection]: reconnection successful!");
+                this.reconnection.isReconnecting = false;
+                this.onReconnect.dispatch();
             }
 
             // store local reconnection token
 			this.reconnectionToken = this.roomId + ":" + reconnectionToken;
 
-            this.onJoin.dispatch();
-
             // acknowledge JOIN_ROOM
             var bytes = new BytesOutput();
             bytes.writeByte(Protocol.JOIN_ROOM);
             this.connection.send(bytes.getBytes());
+
+            // Send any enqueued messages that were buffered while disconnected
+            if (this.reconnection.enqueuedMessages.length > 0) {
+                for (message in this.reconnection.enqueuedMessages) {
+                    this.connection.send(message.data);
+                }
+                // Clear the buffer after sending
+                this.reconnection.enqueuedMessages = [];
+            }
 
         } else if (code == Protocol.ERROR) {
             var errorCode: Int = Decode.number(data, it);
@@ -213,6 +323,13 @@ class Room<T> {
                 : Decode.number(data, it);
 
             this.dispatchMessage(type, data.sub(it.offset, data.length - it.offset));
+
+        } else if (code == Protocol.PING) {
+            if (this.pingCallback != null) {
+                var currentTime = haxe.Timer.stamp() * 1000;
+                this.pingCallback(Math.round(currentTime - this.lastPingTime));
+                this.pingCallback = null;
+            }
         }
     }
 
@@ -235,7 +352,7 @@ class Room<T> {
         // } else if (this.onMessageHandlers['*'] != null) {
         //     this.onMessageHandlers.get(messageType)(type, message);
 
-        } else {
+        } else if (messageType.indexOf("__") != 0) {
             trace("onMessage not registered for type " + type);
         }
 
@@ -250,6 +367,78 @@ class Room<T> {
 
         } else {
             return "$" + Type.getClassName(Type.getClass(type));
+        }
+    }
+
+    //
+    // Reconnection logic
+    //
+    private function handleReconnection() {
+        var currentTime = Timer.stamp() * 1000;
+        if (currentTime - this.joinedAtTime < this.reconnection.minUptime) {
+            trace("[Colyseus reconnection]: Room has not been up for long enough for automatic reconnection. (min uptime: " + this.reconnection.minUptime + "ms)");
+            this.teardown();
+            this.onLeave.dispatch(CloseCode.ABNORMAL_CLOSURE);
+            return;
+        }
+
+        if (!this.reconnection.isReconnecting) {
+            this.reconnection.retryCount = 0;
+            this.reconnection.isReconnecting = true;
+        }
+
+        this.retryReconnection();
+    }
+
+    private function retryReconnection() {
+        this.reconnection.retryCount++;
+
+        var delay = Math.min(
+            this.reconnection.maxDelay,
+            Math.max(
+                this.reconnection.minDelay,
+                this.exponentialBackoff(this.reconnection.retryCount, this.reconnection.delay)
+            )
+        );
+
+        trace("[Colyseus reconnection]: will retry in " + (delay / 1000) + " seconds...");
+
+        // Wait before attempting reconnection
+        Timer.delay(function() {
+            try {
+                trace("[Colyseus reconnection]: Re-establishing sessionId '" + this.sessionId + "' with roomId '" + this.roomId + "'... (attempt " + this.reconnection.retryCount + " of " + this.reconnection.maxRetries + ")");
+
+                var tokenParts = this.reconnectionToken.split(":");
+                var reconnectToken = tokenParts.length > 1 ? tokenParts[1] : this.reconnectionToken;
+
+                this.connection.reconnect({
+                    reconnectionToken: reconnectToken,
+                    skipHandshake: true // we already applied the handshake on first join
+                });
+
+            } catch (e:Dynamic) {
+                trace("[Colyseus reconnection]: .reconnect() failed: " + e);
+
+                if (this.reconnection.retryCount < this.reconnection.maxRetries) {
+                    this.retryReconnection();
+                } else {
+                    trace("[Colyseus reconnection]: Failed to reconnect. Is your server running? Please check server logs.");
+                    this.reconnection.isReconnecting = false;
+                    this.teardown();
+                    this.onLeave.dispatch(CloseCode.ABNORMAL_CLOSURE);
+                }
+            }
+        }, Std.int(delay));
+    }
+
+    private function exponentialBackoff(attempt: Int, delay: Int): Float {
+        return Math.floor(Math.pow(2, attempt) * delay);
+    }
+
+    private function enqueueMessage(message: Bytes) {
+        this.reconnection.enqueuedMessages.push({ data: message });
+        if (this.reconnection.enqueuedMessages.length > this.reconnection.maxEnqueuedMessages) {
+            this.reconnection.enqueuedMessages.shift();
         }
     }
 }

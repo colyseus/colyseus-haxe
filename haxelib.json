@@ -4,12 +4,12 @@
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
   "description": "Colyseus Multiplayer SDK",
-  "version": "0.16.7",
+  "version": "0.17.0",
   "classPath": "src/",
   "releasenote": "schema callbacks: fix triggering onAdd on existing key",
   "contributors": ["endel"],
   "dependencies": {
-    "colyseus-websocket": "1.0.14",
+    "colyseus-websocket": "1.0.15",
     "tink_url": "0.5.0",
     "tink_http": "0.10.0"
   }
