@@ -51,7 +51,7 @@ class Decoder {
 				case 0xc5: return i.read(i.readUInt16());
 				case 0xc6: return i.read(i.readInt32 ());
 
-				// ext: undefined
+				// ext: undefined (fixext 1)
 				case 0xd4: {
 				  var type = i.readByte();
 				  if (type == 0x00) {
@@ -62,20 +62,51 @@ class Decoder {
 				  throw "MsgPack - unsupported extension type: "  + type;
 				}
 
-				// ext: Date
+				// ext: Timestamp 32 (fixext 4)
+				case 0xd6: {
+				  var type = i.readByte();
+				  if (type == 0xff) {
+					// Timestamp 32: seconds in 32-bit unsigned int
+					var seconds:UInt = i.readInt32();
+					return Date.fromTime(seconds * 1000.0);
+				  }
+				  throw "MsgPack - unsupported extension type: " + type;
+				}
+
+				// ext: Date / Timestamp 64 (fixext 8)
 				case 0xd7: {
 				  var type = i.readByte();
 				  if (type == 0x00) {
 					var high = i.readInt32() * Math.pow(2, 32);
 					var low: UInt = (i.readInt32());
-
-					// hi = this._view.getInt32(this._offset) * Math.pow(2, 32);
-					// lo = this._view.getUint32(this._offset + 4);
-					// this._offset += 8;
-
 					return Date.fromTime(high + low);
 				  }
+				  if (type == 0xff) {
+					// MessagePack Timestamp 64: nanoseconds in upper 30 bits, seconds in lower 34 bits
+					var data32:UInt = i.readInt32();
+					var data32_2:UInt = i.readInt32();
+					var nanoseconds = data32 >>> 2;
+					var seconds = ((data32 & 0x3) * Math.pow(2, 32)) + data32_2;
+					return Date.fromTime(seconds * 1000.0 + nanoseconds / 1000000.0);
+				  }
 				  throw "MsgPack - unsupported extension type: "  + type;
+				}
+
+				// ext: Timestamp 96 (ext 8 with 12 bytes)
+				case 0xc7: {
+				  var length = i.readByte();
+				  var type = i.readByte();
+				  if (type == 0xff && length == 12) {
+					// Timestamp 96: 4 bytes nanoseconds + 8 bytes signed seconds
+					var nanoseconds:UInt = i.readInt32();
+					var secondsHigh = i.readInt32();
+					var secondsLow:UInt = i.readInt32();
+					var seconds = secondsHigh * Math.pow(2, 32) + secondsLow;
+					return Date.fromTime(seconds * 1000.0 + nanoseconds / 1000000.0);
+				  }
+				  // Skip unknown extension data
+				  i.read(length);
+				  throw "MsgPack - unsupported extension type: " + type + " with length: " + length;
 				}
 
 				// floating point

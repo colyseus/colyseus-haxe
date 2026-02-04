@@ -1,9 +1,11 @@
 package io.colyseus;
 
+import tink.url.Query.QueryStringBuilder;
 import haxe.io.Bytes;
 import org.msgpack.MsgPack;
 import haxe.net.WebSocket;
 import haxe.net.WebSocket.ReadyState;
+import tink.Url;
 #if !haxe4
 #if neko
 import neko.vm.Thread;
@@ -16,6 +18,11 @@ import cpp.vm.Thread;
 import sys.thread.Thread;
 #end
 
+typedef ReconnectOptions = {
+	?reconnectionToken:String,
+	?skipHandshake:Bool
+};
+
 @:keep
 class Connection {
 	public var reconnectionEnabled:Bool = false;
@@ -24,10 +31,11 @@ class Connection {
 
 	@:getter(isOpen)
 	function get__isOpen():Bool {
-		return (this.ws.readyState == ReadyState.Open);
+		return (this.ws != null && this.ws.readyState == ReadyState.Open);
 	}
 
 	private var ws:WebSocket;
+	private var parsedUrl:Url;
 
 	// callbacks
 	public dynamic function onOpen():Void {}
@@ -41,6 +49,11 @@ class Connection {
 	private static var isRunnerInitialized:Bool = false;
 
 	public function new(url:String) {
+		this.parsedUrl = Url.parse(url);
+		this.createWebSocket(url);
+	}
+
+	private function createWebSocket(url:String) {
 		this.ws = WebSocket.create(url);
 		this.ws.onopen = function() {
 			this.onOpen();
@@ -51,7 +64,7 @@ class Connection {
 		}
 
 		this.ws.onclose = function(?e:Dynamic) {
-			this.onClose(e);
+            this.onClose(e);
 		}
 
 		this.ws.onerror = function(message) {
@@ -64,7 +77,7 @@ class Connection {
 				this.ws.process();
 
 				if (this.ws.readyState == ReadyState.Closed) {
-					trace("WebSocket connection has been closed, stopping the thread!");
+					// trace("WebSocket connection has been closed, stopping the thread!");
 					break;
 				}
 
@@ -72,6 +85,22 @@ class Connection {
 			}
 		});
 		#end
+	}
+
+	public function reconnect(?options:ReconnectOptions) {
+        var redirectUrl = Url.make({
+            hosts: [this.parsedUrl.host],
+            scheme: this.parsedUrl.scheme,
+            hash: this.parsedUrl.hash,
+            path: this.parsedUrl.path,
+            query: this.parsedUrl.query.with([
+				"reconnectionToken" => options.reconnectionToken,
+				"skipHandshake" => (options.skipHandshake != null && options.skipHandshake == true) ? "1" : "0",
+            ]),
+        });
+
+		// Create a new WebSocket connection
+		this.createWebSocket(redirectUrl.toString());
 	}
 
 	public function send(data:Bytes) {

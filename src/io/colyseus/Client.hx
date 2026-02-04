@@ -1,6 +1,8 @@
 package io.colyseus;
 
 import haxe.Timer;
+import haxe.io.Bytes;
+import haxe.io.BytesOutput;
 
 using io.colyseus.events.EventHandler;
 using io.colyseus.error.HttpException;
@@ -14,15 +16,24 @@ interface RoomAvailable {
     public var metadata: Dynamic;
 }
 
+typedef LatencyOptions = {
+    /** "ws" for WebSocket (default: "ws") */
+    ?protocol: String,
+    /** Number of pings to send (default: 1). Returns the average latency when > 1. */
+    ?pingCount: Int
+}
+
 class EndpointSettings {
 	public var hostname:String;
 	public var port:Int;
 	public var useSSL:Bool;
+    public var pathname:String;
 
-    public function new (hostname: String, port: Int, useSSL: Bool) {
+    public function new (hostname: String, port: Int, useSSL: Bool, ?pathname: String) {
         this.hostname = hostname;
         this.port = port;
         this.useSSL = useSSL;
+        this.pathname = pathname != null ? pathname : "";
     }
 }
 
@@ -41,11 +52,12 @@ class Client {
                 : (useSSL)
                     ? 443
                     : 80;
+            var pathname = url.path != null ? url.path : "";
 
-            this.settings = new EndpointSettings(url.host.name, port, useSSL);
+            this.settings = new EndpointSettings(url.host.name, port, useSSL, pathname);
 
         } else {
-            this.settings =  new EndpointSettings(endpointOrHostname, port, useSSL);
+            this.settings = new EndpointSettings(endpointOrHostname, port, useSSL);
         }
 
         this.http = new HTTP(this);
@@ -53,12 +65,22 @@ class Client {
     }
 
     @:generic
-    public function joinOrCreate<T>(roomName: String, options: Map<String, Dynamic>, stateClass: Class<T>, callback: (HttpException, Room<T>)->Void) {
+    public function joinOrCreate<T:Dynamic>(
+        roomName:String,
+        options:Map<String, Dynamic>,
+        stateClass:Class<T> = null,
+        callback:(HttpException, Room<T>) -> Void
+    ) {
         this.createMatchMakeRequest('joinOrCreate', roomName, options, stateClass, callback);
     }
 
     @:generic
-    public function create<T>(roomName: String, options: Map<String, Dynamic>, stateClass: Class<T>, callback: (HttpException, Room<T>)->Void) {
+    public function create<T>(
+        roomName:String,
+        options:Map<String, Dynamic>,
+        stateClass:Class<T>,
+        callback:(HttpException, Room<T>) -> Void
+    ) {
         this.createMatchMakeRequest('create', roomName, options, stateClass, callback);
     }
 
@@ -79,7 +101,11 @@ class Client {
     }
 
     @:generic
-    public function consumeSeatReservation<T>(response: Dynamic, stateClass: Class<T>, callback: (HttpException, Room<T>)->Void) {
+    public function consumeSeatReservation<T:Dynamic>(
+        response:Dynamic,
+        stateClass:Class<T> = null,
+        callback:(HttpException, Room<T>) -> Void
+    ) {
 
         // Prevents crashing upon .room being null. Can be caused if the server itself encounters an error making a room.
         if (response.error != null)
@@ -88,9 +114,9 @@ class Client {
 			return;
 		}
 
-        var room: Room<T> = new Room<T>(response.room.name, stateClass);
+        var room: Room<T> = new Room<T>(response.name, stateClass);
 
-        room.roomId = response.room.roomId;
+        room.roomId = response.roomId;
         room.sessionId = response.sessionId;
 
         //
@@ -123,43 +149,15 @@ class Client {
 			options.set("reconnectionToken", response.reconnectionToken);
         }
 
-        function reserveSeat() {
-            function devModeCloseCallBack() {
-                var retryCount = 0;
-                var maxRetryCount = 8;
-
-                function retryConnection () {
-                    retryCount++;
-                    reserveSeat();
-
-                    room.connection.onError = function(e) {
-                        if( retryCount <= maxRetryCount) {
-                            trace("[Colyseus devMode]: retrying... (" + retryCount + " out of " + maxRetryCount + ")");
-                            Timer.delay(retryConnection, 2000);
-                        } else {
-                            trace("[Colyseus devMode]: Failed to reconnect. Is your server running? Please check server logs.");
-                        }
-                    }
-
-                    room.connection.onOpen = function () {
-                        trace("[Colyseus devMode]: Successfully re-established connection with room " + room.roomId);
-                    }
-                }
-
-                Timer.delay(retryConnection, 2000);
-            }
-
-            room.connect(this.createConnection(response.room, options), room, response.devMode? devModeCloseCallBack: null);
-        }
-        reserveSeat();
+        room.connect(this.createConnection(response, options));
     }
 
     @:generic
-    private function createMatchMakeRequest<T>(
+    private function createMatchMakeRequest<T:Dynamic>(
         method: String,
         roomName: String,
         options: Map<String, Dynamic>,
-        stateClass: Class<T>,
+        stateClass: Class<T> = null,
         callback: (HttpException, Room<T>)->Void
     ) {
         this.http.post("matchmake/" + method + "/" + roomName, { body: cast options, }, function(err, response) {
@@ -196,6 +194,99 @@ class Client {
 		}
 
         return new Connection('${endpoint}/${room.processId}/${room.roomId}?${params.join('&')}');
+    }
+
+    /**
+     * Select the endpoint with the lowest latency.
+     * @param endpoints Array of endpoints to select from.
+     * @param latencyOptions Latency measurement options (protocol, pingCount).
+     * @param callback Callback with the client with the lowest latency.
+     */
+    public static function selectByLatency(
+        endpoints: Array<String>,
+        ?latencyOptions: LatencyOptions,
+        callback: (HttpException, Client) -> Void
+    ) {
+        var clients = endpoints.map(function(endpoint) return new Client(endpoint));
+        var latencies: Array<{index: Int, latency: Float}> = [];
+        var errors: Array<HttpException> = [];
+        var completed = 0;
+        var total = clients.length;
+
+        for (i in 0...clients.length) {
+            var index = i;
+            clients[index].getLatency(latencyOptions, function(err, latency) {
+                completed++;
+
+                if (err != null) {
+                    errors.push(err);
+                } else {
+                    var settings = clients[index].settings;
+                    trace('Endpoint Latency: ${latency}ms - ${settings.hostname}:${settings.port}${settings.pathname}');
+                    latencies.push({index: index, latency: latency});
+                }
+
+                // All requests completed
+                if (completed >= total) {
+                    if (latencies.length == 0) {
+                        callback(new HttpException(0, "All endpoints failed to respond"), null);
+                    } else {
+                        // Sort by latency and return the client with lowest latency
+                        latencies.sort(function(a, b) return Std.int(a.latency - b.latency));
+                        callback(null, clients[latencies[0].index]);
+                    }
+                }
+            });
+        }
+    }
+
+    /**
+     * Create a new connection with the server, and measure the latency.
+     * @param options Latency measurement options (protocol, pingCount).
+     * @param callback Callback with the measured latency in milliseconds.
+     */
+    public function getLatency(?options: LatencyOptions, callback: (HttpException, Float) -> Void) {
+        var protocol = options != null && options.protocol != null ? options.protocol : "ws";
+        var pingCount = options != null && options.pingCount != null ? options.pingCount : 1;
+
+        var latencies: Array<Float> = [];
+        var pingStart: Float = 0;
+
+        var wsEndpoint = this.http.buildHttpEndpoint("", "ws");
+        var conn = new Connection(wsEndpoint);
+
+        conn.onOpen = function() {
+            pingStart = Timer.stamp() * 1000; // Convert to milliseconds
+            var bytes = new BytesOutput();
+            bytes.writeByte(Protocol.PING);
+            conn.send(bytes.getBytes());
+        };
+
+        conn.onMessage = function(_: Bytes) {
+            latencies.push(Timer.stamp() * 1000 - pingStart);
+
+            if (latencies.length < pingCount) {
+                // Send another ping
+                pingStart = Timer.stamp() * 1000;
+
+                var bytes = new BytesOutput();
+                bytes.writeByte(Protocol.PING);
+                conn.send(bytes.getBytes());
+            } else {
+                // Done, calculate average and close
+                conn.close();
+                var sum: Float = 0;
+                for (l in latencies) {
+                    sum += l;
+                }
+                var average = sum / latencies.length;
+                callback(null, average);
+            }
+        };
+
+        conn.onError = function(message: String) {
+            callback(new HttpException(1006, 'Failed to get latency: ${message}'), 0);
+        };
     }
 
 }

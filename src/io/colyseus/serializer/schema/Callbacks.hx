@@ -7,7 +7,6 @@ import io.colyseus.serializer.schema.Schema.DataChange;
 import io.colyseus.serializer.schema.types.ISchemaCollection;
 
 class Callbacks {
-    @:generic
     public static function get<T>(room: Room<T>): SchemaCallbacks<T> {
         var serializer: SchemaSerializer<T> = cast(room.serializer);
         return new SchemaCallbacks<T>(serializer.decoder);
@@ -32,7 +31,6 @@ class Callbacks {
     }
 }
 
-@:generic
 class SchemaCallbacks<T> {
     private var decoder: Decoder<T>;
     private var isTriggering: Bool = false;
@@ -96,21 +94,10 @@ class SchemaCallbacks<T> {
     }
 
     public function onChange(
-        instanceOrFieldName: Dynamic,
-        callbackOrProperty: Dynamic,
-        ?callback:Dynamic->Dynamic->Void
+        instance: Dynamic,
+        callback:Void->Void
     ) {
-        var instance: IRef;
-        var fieldName: String;
-        if (Std.isOfType(instanceOrFieldName, String)) {
-            instance = cast this.decoder.state;
-            fieldName = cast instanceOrFieldName;
-            callback = cast callbackOrProperty;
-        } else {
-            instance = cast instanceOrFieldName;
-            fieldName = cast callbackOrProperty;
-        }
-        return addCallbackOrWaitCollectionAvailable(instance, fieldName, OPERATION.REPLACE, callback);
+        return addCallback(instance.__refId, OPERATION.REPLACE, callback);
     }
 
     public function onRemove(
@@ -194,13 +181,6 @@ class SchemaCallbacks<T> {
         isTriggering = false;
     }
 
-    public function triggerFieldCallbacks(callbacks:Map<String, Array<Dynamic>>, field:String, arg1: Dynamic, arg2: Dynamic) {
-        if (!callbacks.exists(field)) { return; }
-        isTriggering = true;
-        for (callback in callbacks[field]) { callback(arg1, arg2); }
-        isTriggering = false;
-    }
-
 	private function triggerChanges(allChanges:Array<DataChange>) {
 		var uniqueRefIds = new Map<Int, Bool>();
         var allCallbacks = decoder.refs.callbacks;
@@ -232,14 +212,24 @@ class SchemaCallbacks<T> {
 					triggerCallbacks0(callbacks, cast OPERATION.REPLACE);
 				}
 
-                triggerFieldCallbacks(callbacks, change.field, change.value, change.previousValue);
+                // trigger .listen() on property callbacks
+				if (callbacks.exists(change.field)) {
+					isTriggering = true;
+
+					for (callback in callbacks[change.field]) {
+						callback(change.value, change.previousValue);
+					}
+
+					isTriggering = false;
+				}
+
 			} else {
 				var container = (ref : ISchemaCollection);
 
 			    if ((change.op & cast OPERATION.DELETE) == OPERATION.DELETE) {
                     if (change.previousValue != null) {
                         // triger onRemove
-                        triggerCallbacks2(callbacks, cast OPERATION.DELETE, change.value, (change.dynamicIndex == null) ? change.field : change.dynamicIndex);
+                        triggerCallbacks2(callbacks, cast OPERATION.DELETE, change.previousValue, (change.dynamicIndex == null) ? change.field : change.dynamicIndex);
                     }
 
                     // Handle DELETE_AND_ADD operations

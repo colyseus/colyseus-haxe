@@ -105,11 +105,11 @@ class HTTP {
 		});
     }
 
-    public function buildHttpEndpoint(segments: String) {
+    public function buildHttpEndpoint(segments: String, ?protocol: String = "http") {
         if (segments.charAt(0) == "/") {
             segments = segments.substr(1);
         }
-        return '${(this.client.settings.useSSL) ? "https" : "http"}://${this.client.settings.hostname}${this.getEndpointPort()}/${segments}';
+        return '${protocol}${(this.client.settings.useSSL) ? "s" : ""}://${this.client.settings.hostname}${this.getEndpointPort()}/${segments}';
     }
 
     public function getEndpointPort() {
