@@ -40,13 +40,13 @@ haxelib run lime test project.xml html5
 
 ### Running the server
 
-The demo project uses the **SDK Test Server** from the main Colyseus monorepo. You can start the server by running the following commands:
+The demo project uses the **SDK Test Server**. You can start the server by running the following commands:
 
 ```
-git clone https://github.com/colyseus/colyseus.git
-cd colyseus
-pnpm install
-pnpm run sdk-test-server
+git clone https://github.com/colyseus/sdks-test-server
+cd sdks-test-server
+npm install
+npm start
 ```
 
 ## Development
