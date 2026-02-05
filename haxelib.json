@@ -4,9 +4,9 @@
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
   "description": "Colyseus Multiplayer SDK",
-  "version": "0.17.0",
+  "version": "0.17.1",
   "classPath": "src/",
-  "releasenote": "schema callbacks: fix triggering onAdd on existing key",
+  "releasenote": "auto-reconnection: trigger onLeave() after onDrop() in case of failure to reconnect",
   "contributors": ["endel"],
   "dependencies": {
     "colyseus-websocket": "1.0.15",

@@ -22,5 +22,6 @@ enum abstract CloseCode(Int) to Int {
     var CONSENTED = 4000;
     var SERVER_SHUTDOWN = 4001;
     var WITH_ERROR = 4002;
+    var FAILED_TO_RECONNECT = 4003;
     var MAY_TRY_RECONNECT = 4010;
 }

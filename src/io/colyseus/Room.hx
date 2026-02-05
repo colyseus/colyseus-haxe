@@ -91,6 +91,8 @@ class Room<T> {
         this.roomId = null;
         this.name = name;
         this.tmpStateClass = cls;
+
+        this.onLeave += (code: Int) -> this.teardown();
     }
 
     public function connect(connection: Connection) {
@@ -118,7 +120,6 @@ class Room<T> {
                 this.handleReconnection();
 
             } else {
-                this.teardown();
                 this.onLeave.dispatch(e.code);
             }
         }
@@ -140,7 +141,7 @@ class Room<T> {
             }
 
         } else {
-            this.onLeave.dispatch(0);
+            this.onLeave.dispatch(CloseCode.CONSENTED);
         }
     }
 
@@ -376,8 +377,7 @@ class Room<T> {
     private function handleReconnection() {
         var currentTime = Timer.stamp() * 1000;
         if (currentTime - this.joinedAtTime < this.reconnection.minUptime) {
-            trace("[Colyseus reconnection]: Room has not been up for long enough for automatic reconnection. (min uptime: " + this.reconnection.minUptime + "ms)");
-            this.teardown();
+            trace("[Colyseus reconnection]: ❌ Room has not been up for long enough for automatic reconnection. (min uptime: " + this.reconnection.minUptime + "ms)");
             this.onLeave.dispatch(CloseCode.ABNORMAL_CLOSURE);
             return;
         }
@@ -391,6 +391,14 @@ class Room<T> {
     }
 
     private function retryReconnection() {
+        if (this.reconnection.retryCount >= this.reconnection.maxRetries) {
+            // No more retries
+            trace("[Colyseus reconnection]: ❌ Reconnection failed after " + this.reconnection.maxRetries + " attempts.");
+            this.reconnection.isReconnecting = false;
+            this.onLeave.dispatch(CloseCode.FAILED_TO_RECONNECT);
+            return;
+        }
+
         this.reconnection.retryCount++;
 
         var delay = Math.min(
@@ -401,32 +409,23 @@ class Room<T> {
             )
         );
 
-        trace("[Colyseus reconnection]: will retry in " + (delay / 1000) + " seconds...");
+        trace("[Colyseus reconnection]: ⏳ will retry in " + (delay / 1000) + " seconds...");
 
         // Wait before attempting reconnection
         Timer.delay(function() {
+            trace("[Colyseus reconnection]: 🔄 Re-establishing sessionId '" + this.sessionId + "' with roomId '" + this.roomId + "'... (attempt " + this.reconnection.retryCount + " of " + this.reconnection.maxRetries + ")");
+
+            var tokenParts = this.reconnectionToken.split(":");
+            var reconnectToken = tokenParts.length > 1 ? tokenParts[1] : this.reconnectionToken;
+
             try {
-                trace("[Colyseus reconnection]: Re-establishing sessionId '" + this.sessionId + "' with roomId '" + this.roomId + "'... (attempt " + this.reconnection.retryCount + " of " + this.reconnection.maxRetries + ")");
-
-                var tokenParts = this.reconnectionToken.split(":");
-                var reconnectToken = tokenParts.length > 1 ? tokenParts[1] : this.reconnectionToken;
-
                 this.connection.reconnect({
                     reconnectionToken: reconnectToken,
                     skipHandshake: true // we already applied the handshake on first join
                 });
 
             } catch (e:Dynamic) {
-                trace("[Colyseus reconnection]: .reconnect() failed: " + e);
-
-                if (this.reconnection.retryCount < this.reconnection.maxRetries) {
-                    this.retryReconnection();
-                } else {
-                    trace("[Colyseus reconnection]: Failed to reconnect. Is your server running? Please check server logs.");
-                    this.reconnection.isReconnecting = false;
-                    this.teardown();
-                    this.onLeave.dispatch(CloseCode.ABNORMAL_CLOSURE);
-                }
+                this.retryReconnection();
             }
         }, Std.int(delay));
     }
