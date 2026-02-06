@@ -162,7 +162,7 @@ class SchemaCallbacks<T> {
 
         callbacks[key].push(callback);
 
-        return () -> callbacks[operationOrFieldName].remove(callback);
+        return () -> callbacks[key].remove(callback);
     }
 
     public function triggerCallbacks0(callbacks:Map<String, Array<Dynamic>>, op:Int) {
