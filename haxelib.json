@@ -4,9 +4,9 @@
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
   "description": "Colyseus Multiplayer SDK",
-  "version": "0.17.1",
+  "version": "0.17.2",
   "classPath": "src/",
-  "releasenote": "auto-reconnection: trigger onLeave() after onDrop() in case of failure to reconnect",
+  "releasenote": "fix allowing to remove attached state callbacks. https://github.com/colyseus/colyseus-haxe/pull/70",
   "contributors": ["endel"],
   "dependencies": {
     "colyseus-websocket": "1.0.15",
