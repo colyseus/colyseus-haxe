@@ -5,7 +5,7 @@ import haxe.macro.Context;
 import haxe.macro.Expr;
 import haxe.macro.Type;
 
-using ru.smartpref.ui.colyseus.SchemaTypeUtils;
+using io.colyseus.tools.SchemaTypeUtils;
 using tink.CoreApi;
 using tink.MacroApi;
 
