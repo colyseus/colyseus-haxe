@@ -179,7 +179,17 @@ class SchemaTypeUtils {
 	public static function buildEmptyStructExpr(
 		schemaType:Type
 	):Null<Expr> {
+		return buildStructExpr(schemaType, (_, info) ->
+			info.isSchemaCollection
+				? info.emptyValue
+				: macro new tink.state.State(${info.emptyValue})
+		);
+	}
 
+	public static function buildStructExpr(
+		schemaType:Type,
+		makeField:(sf:SchemaFieldInfo, info:FieldTypeInfo) -> Expr
+	):Null<Expr> {
 		var fields = extractSchemaFields(schemaType);
 		if (fields.length == 0) return null;
 
@@ -191,9 +201,7 @@ class SchemaTypeUtils {
 
 			objFields.push({
 				field: sf.name,
-				expr: info.isSchemaCollection
-					? info.emptyValue
-					: macro new tink.state.State(${info.emptyValue})
+				expr: makeField(sf, info)
 			});
 		}
 

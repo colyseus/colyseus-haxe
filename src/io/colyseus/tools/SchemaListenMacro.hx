@@ -5,7 +5,7 @@ import haxe.macro.Context;
 import haxe.macro.Expr;
 import haxe.macro.Type;
 
-using io.colyseus.tools.SchemaTypeUtils;
+using ru.smartpref.ui.colyseus.SchemaTypeUtils;
 using tink.CoreApi;
 using tink.MacroApi;
 
@@ -99,30 +99,8 @@ class SchemaListenMacro {
 
 				case FArraySchema(inner):
 					var targetField = SchemaTypeUtils.fieldExpr(ctx.target, sf.name);
-					var emptyExpr = SchemaTypeUtils.buildEmptyStructExpr(inner);
-					var innerFields = SchemaTypeUtils.extractSchemaFields(inner);
 					var rawCT = inner.toComplex();
-					var structFields:Array<ObjectField> = [];
-					for (f in innerFields) {
-						var info = SchemaTypeUtils.analyzeFieldType(f);
-						if (info == null) continue;
-
-						var rawF = SchemaTypeUtils.fieldExpr(macro __raw, f.name);
-						var f_innerType = SchemaTypeUtils.getSerializedInnerType(f.haxeType);
-						var expr:Expr = switch f.schemaTypeInfo.kind {
-							case "string" if (f_innerType != null):
-								var ct = f_innerType.toComplex();
-								macro new State((tink.Json.parse($rawF):$ct));
-							case "array": macro new tink.state.ObservableArray([]);
-							case "map": macro new tink.state.ObservableMap([]);
-							case "ref": macro null;
-							case _: macro new State($rawF);
-						};
-
-						structFields.push({field: f.name, expr: expr});
-					}
-
-					var structExpr:Expr = { expr: EObjectDecl(structFields), pos: Context.currentPos() };
+					var structExpr = buildStructFactoryExpr(inner);
 
 					result.push(macro {
 						// factory: raw -> fresh target instance
@@ -174,29 +152,8 @@ class SchemaListenMacro {
 
 				case FMapSchema(inner):
 					var targetField = SchemaTypeUtils.fieldExpr(ctx.target, sf.name);
-					var emptyExpr = SchemaTypeUtils.buildEmptyStructExpr(inner);
-					var innerFields = SchemaTypeUtils.extractSchemaFields(inner);
 					var rawCT = inner.toComplex();
-					var structFields:Array<ObjectField> = [];
-					for (f in innerFields) {
-						var info = SchemaTypeUtils.analyzeFieldType(f);
-						if (info == null) continue;
-
-						var rawF = SchemaTypeUtils.fieldExpr(macro __raw, f.name);
-						var f_innerType = SchemaTypeUtils.getSerializedInnerType(f.haxeType);
-						var expr:Expr = switch f.schemaTypeInfo.kind {
-							case "string" if (f_innerType != null):
-								var ct = f_innerType.toComplex();
-								macro new State((tink.Json.parse($rawF):$ct));
-							case "array": macro new tink.state.ObservableArray([]);
-							case "map": macro new tink.state.ObservableMap([]);
-							case "ref": macro null;
-							case _: macro new State($rawF);
-						};
-
-						structFields.push({field: f.name, expr: expr});
-					}
-					var structExpr:Expr = { expr: EObjectDecl(structFields), pos: Context.currentPos() };
+					var structExpr = buildStructFactoryExpr(inner);
 					//SchemaTypeUtils.writeExprToFile("DT", structExpr);
 
 					result.push(macro {
@@ -302,6 +259,21 @@ class SchemaListenMacro {
 		}
 
 		return result;
+	}
+
+	static function buildStructFactoryExpr(schemaType:Type):Expr {
+		return SchemaTypeUtils.buildStructExpr(schemaType, (sf, info) -> {
+			var rawF = SchemaTypeUtils.fieldExpr(macro __raw, sf.name);
+			if (info.isSchemaCollection == true)
+				info.emptyValue
+			else switch sf.schemaTypeInfo.kind {
+				case "ref": macro null;
+				case "string" if (SchemaTypeUtils.getSerializedInnerType(sf.haxeType) != null):
+					var ct = info.stateType;
+					macro new State((tink.Json.parse($rawF):$ct));
+				case _: macro new State($rawF);
+			};
+		});
 	}
 
 	static function classifyField(sf:SchemaTypeUtils.SchemaFieldInfo):FieldKind {
