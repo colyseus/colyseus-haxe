@@ -125,27 +125,27 @@ class SchemaListenMacro {
 							__rebuild();
 						}
 
-						// ---- additions ----
-						$cbExpr.onAdd($sourceExpr, $v{sf.name}, function(__item, __index) {
-							var __t = __make(__item);
-							$targetField.set(__index, cast __t);
-
-							$b{buildListeners({
-								cb: ctx.cb,
-								source: macro __item,
-								target: macro __t
-							}, inner, depth + 1)};
-						});
-
-						// listen for removals
-						$cbExpr.onRemove($sourceExpr, $v{sf.name}, function(__item, __index) {
-							$targetField.remove(__index);
-						});
-
 						// ---- schema rebuild ----
 						$cbExpr.listen($sourceExpr, $v{sf.name}, function(_, _) {
 							$targetField.clear();
 							__rebuild();
+
+							// ---- additions ----
+							$cbExpr.onAdd($sourceExpr, $v{sf.name}, function(__item, __index) {
+								var __t = __make(__item);
+								$targetField.set(__index, cast __t);
+
+								$b{buildListeners({
+									cb: ctx.cb,
+									source: macro __item,
+									target: macro __t
+								}, inner, depth + 1)};
+							});
+
+							// listen for removals
+							$cbExpr.onRemove($sourceExpr, $v{sf.name}, function(__item, __index) {
+								$targetField.remove(__index);
+							});
 						});
 						// NOTE: replacement of current items in ArraySchema<Schema> is not yet supported;
 					});
@@ -154,6 +154,7 @@ class SchemaListenMacro {
 					var targetField = SchemaTypeUtils.fieldExpr(ctx.target, sf.name);
 					var rawCT = inner.toComplex();
 					var structExpr = buildStructFactoryExpr(inner);
+
 					//SchemaTypeUtils.writeExprToFile("DT", structExpr);
 
 					result.push(macro {
@@ -178,27 +179,27 @@ class SchemaListenMacro {
 						// initial sync
 						__rebuild();
 
-						// ---- additions ----
-						$cbExpr.onAdd($sourceExpr, $v{sf.name}, function(__item, __k) {
-							var __t = __make(__item);
-							$targetField.set(__k, cast __t);
-
-							$b{buildListeners({
-								cb: ctx.cb,
-								source: macro __item,
-								target: macro __t
-							}, inner, depth + 1)};
-						});
-
-						// ---- removals ----
-						$cbExpr.onRemove($sourceExpr, $v{sf.name}, function(_, __k) {
-							$targetField.remove(__k);
-						});
-
 						// ---- schema rebuild ----
 						$cbExpr.listen($sourceExpr, $v{sf.name}, function(_, _) {
 							$targetField.clear();
 							__rebuild();
+
+							// ---- additions ----
+							$cbExpr.onAdd($sourceExpr, $v{sf.name}, function(__item, __k) {
+								var __t = __make(__item);
+								$targetField.set(__k, cast __t);
+
+								$b{buildListeners({
+									cb: ctx.cb,
+									source: macro __item,
+									target: macro __t
+								}, inner, depth + 1)};
+							});
+
+							// ---- removals ----
+							$cbExpr.onRemove($sourceExpr, $v{sf.name}, function(_, __k) {
+								$targetField.remove(__k);
+							});
 						});
 
 						// NOTE: replacement of current items in MapSchema<Schema> is not yet supported;
@@ -207,6 +208,7 @@ class SchemaListenMacro {
 				case FArrayPrimitive:
 					var targetField = SchemaTypeUtils.fieldExpr(ctx.target, sf.name);
 					var ct = SchemaTypeUtils.getCollectionElementOrSerialized(sf).toComplex();
+
 					result.push(macro {
 						function __rebuild() {
 							$targetField.clear();
@@ -214,18 +216,17 @@ class SchemaListenMacro {
 								$targetField.push(${parseIfJsonExpr(macro __item)});
 							}
 						}
-
 						// initial sync
 						__rebuild();
-
-						// rebuild on any change
-						$cbExpr.onChange($sourceField, function() {
-							__rebuild();
-						});
 
 						// schema re-init
 						$cbExpr.listen($sourceExpr, $v{sf.name}, function(_, _) {
 							__rebuild();
+
+							// rebuild on any change
+							$cbExpr.onChange($sourceField, function() {
+								__rebuild();
+							});
 						});
 
 						// NOTE: no need for fine grained onAdd/onRemove for ArraySchema<Primitive>, complete rebuild on change is enough
@@ -244,14 +245,14 @@ class SchemaListenMacro {
 						// initial sync
 						__rebuild();
 
-						// rebuild on any change
-						$cbExpr.onChange($sourceField, function() {
-							__rebuild();
-						});
-
 						// schema re-init
 						$cbExpr.listen($sourceExpr, $v{sf.name}, function(_, _) {
 							__rebuild();
+
+							// rebuild on any change
+							$cbExpr.onChange($sourceField, function() {
+								__rebuild();
+							});
 						});
 						// NOTE: no need for fine grained onAdd/onRemove for MapSchema<Primitive>, complete rebuild on change is enough
 					});
