@@ -34,6 +34,9 @@ class PlayerSchema extends Schema {
 class GameSchema extends Schema {
 	@:type("array", PlayerSchema)
 	public var players:ArraySchema<PlayerSchema> = new ArraySchema<PlayerSchema>();
+
+	@:type("boolean")
+	public var isFinished:Bool;
 }
 
 typedef PlayerAvatar = {
@@ -71,6 +74,11 @@ class MainExample {
 				trace('  turns ${item.turns.toArray()}');
 				trace('  inventory ${item.inventory.toMap()}');
 			});
+
+			// or just bind to individual field:
+			observables.isFinished.observe().bind(x -> if (x) trace("Game is finished!"));
+
+			// tink.state.State has many uses and handy methods, see full doc here: https://github.com/haxetink/tink_state
 		});
 	}
 }
