@@ -179,7 +179,7 @@ class SchemaListenMacro {
 						__rebuild();
 
 						// ---- additions ----
-						$cbExpr.onAdd($sourceField, function(__item, __k) {
+						$cbExpr.onAdd($sourceExpr, $v{sf.name}, function(__item, __k) {
 							var __t = __make(__item);
 							$targetField.set(__k, cast __t);
 
@@ -191,7 +191,7 @@ class SchemaListenMacro {
 						});
 
 						// ---- removals ----
-						$cbExpr.onRemove($sourceField, function(_, __k) {
+						$cbExpr.onRemove($sourceExpr, $v{sf.name}, function(_, __k) {
 							$targetField.remove(__k);
 						});
 
