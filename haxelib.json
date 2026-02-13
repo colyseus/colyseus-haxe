@@ -4,9 +4,9 @@
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
   "description": "Colyseus Multiplayer SDK",
-  "version": "0.17.2",
+  "version": "0.17.3",
   "classPath": "src/",
-  "releasenote": "fix allowing to remove attached state callbacks. https://github.com/colyseus/colyseus-haxe/pull/70",
+  "releasenote": "ArraySchema: avoid triggering a change for already existing items",
   "contributors": ["endel"],
   "dependencies": {
     "colyseus-websocket": "1.0.15",
