@@ -165,7 +165,7 @@ class SchemaListenMacro {
 
 						// ---- initialize existing items ----
 						function __rebuild() {
-							for (__k => __item in ($sourceField : SchemaTypeUtils.MapType<$rawCT>)) {
+							for (__k => __item in ($sourceField : io.colyseus.tools.SchemaTypeUtils.MapType<$rawCT>)) {
 								var __t = __make(__item);
 								$targetField.set(__k, cast __t);
 
@@ -237,7 +237,7 @@ class SchemaListenMacro {
 					result.push(macro {
 						function __rebuild() {
 							$targetField.clear();
-							for (__k => __item in ($sourceField : SchemaTypeUtils.MapType<$ct>)) {
+							for (__k => __item in ($sourceField : io.colyseus.tools.SchemaTypeUtils.MapType<$ct>)) {
 								$targetField.set(__k, ${parseIfJsonExpr(macro __item)});
 							}
 						}
