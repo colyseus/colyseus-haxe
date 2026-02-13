@@ -189,7 +189,7 @@ class Decoder<T> {
 
     public function decodeArraySchema(bytes: Bytes, it: It, ref: IArraySchema): Bool {
 		var operation = bytes.get(it.offset++);
-		var index:Int;
+		var index:Int = -1;
 
 		// Clear collection structure.
 		if (operation == OPERATION.CLEAR) {
@@ -207,7 +207,7 @@ class Decoder<T> {
 			ref.deleteByIndex(index);
 			allChanges.push({
 				refId: ref.__refId,
-				op: operation,
+				op: cast OPERATION.DELETE,
 				field: null,
 				dynamicIndex: index,
 				value: null,
@@ -220,7 +220,9 @@ class Decoder<T> {
             var item = refs.get(refId);
             if (item != null) {
                 index = ref.indexOf(item);
-            } else {
+            }
+            // fallback to use last index
+            if (index == -1 || item == null) {
                 index = ref.length;
             }
 
@@ -242,7 +244,7 @@ class Decoder<T> {
 
         var r = decodeValue(bytes, it, ref, index, fieldType, childType, operation);
 
-		if (r.value != null) {
+		if (r.value != null && r.value != r.previousValue) {
 			ref.setByIndex(index, cast r.value, operation);
 		}
 
