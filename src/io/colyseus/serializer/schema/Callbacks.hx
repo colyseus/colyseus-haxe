@@ -130,9 +130,15 @@ class SchemaCallbacks<T> {
         var removeCallback = () -> removeHandler();
         var collection: ISchemaCollection = Reflect.getProperty(instance, fieldName);
         if (collection == null || collection.__refId == 0) {
-            removeHandler = listen(instance, fieldName, (coll, _) -> {
-                removeHandler = _this.addCallback((coll : IRef).__refId, operation, callback);
+            var removePropertyCallback: Void->Void;
+            removePropertyCallback = listen(instance, fieldName, (coll, _) -> {
+                if (coll != null) {
+                    // Remove the property listener now that collection is available
+                    removePropertyCallback();
+                    removeHandler = _this.addCallback((coll : IRef).__refId, operation, callback);
+                }
             });
+            removeHandler = removePropertyCallback;
             return removeCallback;
         } else {
             if (operation == OPERATION.ADD && immediate && !this.isTriggering) {
