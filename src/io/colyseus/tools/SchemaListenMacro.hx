@@ -80,6 +80,10 @@ class SchemaListenMacro {
 				v -> macro $v;
 			};
 
+			// Generate unique temp names to avoid variable shadowing in nested schemas
+			var tName = tink.MacroApi.tempName("t");
+			var itemName = tink.MacroApi.tempName("item");
+
 			switch kind {
 				case FPrimitive | FStringSerialized:
 					var targetField = SchemaTypeUtils.fieldExpr(ctx.target, sf.name);
@@ -110,14 +114,14 @@ class SchemaListenMacro {
 
 						// ---- initialize existing items ----
 						function __rebuild() {
-							for (__item in ($sourceField.items : Array<$rawCT>)) {
-								var __t = __make(__item);
-								$targetField.push(cast __t);
+							for ($i{itemName} in ($sourceField.items : Array<$rawCT>)) {
+								var $tName = __make($i{itemName});
+								$targetField.push(cast $i{tName});
 
 								$b{buildListeners({
 									cb: ctx.cb,
-									source: macro __item,
-									target: macro __t
+									source: macro $i{itemName},
+									target: macro $i{tName}
 								}, inner, depth + 1)};
 							}
 						}
@@ -132,13 +136,13 @@ class SchemaListenMacro {
 
 							// ---- additions ----
 							$cbExpr.onAdd($sourceExpr, $v{sf.name}, function(__item, __index) {
-								var __t = __make(__item);
-								$targetField.set(__index, cast __t);
+								var $tName = __make(__item);
+								$targetField.set(__index, cast $i{tName});
 
 								$b{buildListeners({
 									cb: ctx.cb,
 									source: macro __item,
-									target: macro __t
+									target: macro $i{tName}
 								}, inner, depth + 1)};
 							});
 
@@ -165,14 +169,14 @@ class SchemaListenMacro {
 
 						// ---- initialize existing items ----
 						function __rebuild() {
-							for (__k => __item in ($sourceField : io.colyseus.tools.SchemaTypeUtils.MapType<$rawCT>)) {
-								var __t = __make(__item);
-								$targetField.set(__k, cast __t);
+							for (__k => $i{itemName} in ($sourceField : io.colyseus.tools.SchemaTypeUtils.MapType<$rawCT>)) {
+								var $tName = __make($i{itemName});
+								$targetField.set(__k, cast $i{tName});
 
 								$b{buildListeners({
 									cb: ctx.cb,
-									source: macro __item,
-									target: macro __t
+									source: macro $i{itemName},
+									target: macro $i{tName}
 								}, inner, depth + 1)};
 							}
 						}
@@ -186,13 +190,13 @@ class SchemaListenMacro {
 
 							// ---- additions ----
 							$cbExpr.onAdd($sourceExpr, $v{sf.name}, function(__item, __k) {
-								var __t = __make(__item);
-								$targetField.set(__k, cast __t);
+								var $tName = __make(__item);
+								$targetField.set(__k, cast $i{tName});
 
 								$b{buildListeners({
 									cb: ctx.cb,
 									source: macro __item,
-									target: macro __t
+									target: macro $i{tName}
 								}, inner, depth + 1)};
 							});
 
@@ -212,8 +216,8 @@ class SchemaListenMacro {
 					result.push(macro {
 						function __rebuild() {
 							$targetField.clear();
-							for (__item in ($sourceField.items : Array<$ct>)) {
-								$targetField.push(${parseIfJsonExpr(macro __item)});
+							for ($i{itemName} in ($sourceField.items : Array<$ct>)) {
+								$targetField.push(${parseIfJsonExpr(macro $i{itemName})});
 							}
 						}
 						// initial sync
@@ -237,8 +241,8 @@ class SchemaListenMacro {
 					result.push(macro {
 						function __rebuild() {
 							$targetField.clear();
-							for (__k => __item in ($sourceField : io.colyseus.tools.SchemaTypeUtils.MapType<$ct>)) {
-								$targetField.set(__k, ${parseIfJsonExpr(macro __item)});
+							for (__k => $i{itemName} in ($sourceField : io.colyseus.tools.SchemaTypeUtils.MapType<$ct>)) {
+								$targetField.set(__k, ${parseIfJsonExpr(macro $i{itemName})});
 							}
 						}
 
