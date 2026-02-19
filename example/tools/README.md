@@ -50,7 +50,7 @@ It is intended for developers building real-time applications who want fully rea
 ## Example Use Case
 The following command would generate the example code located in `MainExample`
 
-`haxe -cp src -main io.colyseus.tools.MainExample -js out/main.js -lib tink_json -lib tink_state -lib tink_http -lib colyseus-websocket -D no-deprecation-warnings -D js-es=6 -D debug_macro`
+`haxe -cp example -cp src -main tools.MainExample -js out/main.js -lib tink_json -lib tink_state -lib tink_http -lib colyseus-websocket -D no-deprecation-warnings -D js-es=6 -D debug_macro`
 
 Inspect the output:
 - `GameSchemaDebug` - generated fields
