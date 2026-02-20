@@ -4,9 +4,9 @@
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
   "description": "Colyseus Multiplayer SDK",
-  "version": "0.17.5",
+  "version": "0.17.6",
   "classPath": "src/",
-  "releasenote": "Add Reactive Schema Tools (thanks to @serjek)",
+  "releasenote": "Fix warning on schema callbacks https://github.com/colyseus/colyseus-haxe/pull/73",
   "contributors": ["endel"],
   "dependencies": {
     "colyseus-websocket": "1.0.15",
