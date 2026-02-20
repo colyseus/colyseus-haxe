@@ -1,9 +1,9 @@
 package io.colyseus.serializer.schema;
 
 import io.colyseus.serializer.SchemaSerializer;
-import io.colyseus.serializer.schema.types.IRef;
-import io.colyseus.serializer.schema.Schema.OPERATION;
 import io.colyseus.serializer.schema.Schema.DataChange;
+import io.colyseus.serializer.schema.Schema.OPERATION;
+import io.colyseus.serializer.schema.types.IRef;
 import io.colyseus.serializer.schema.types.ISchemaCollection;
 
 class Callbacks {
@@ -130,7 +130,7 @@ class SchemaCallbacks<T> {
         var removeCallback = () -> removeHandler();
         var collection: ISchemaCollection = Reflect.getProperty(instance, fieldName);
         if (collection == null || collection.__refId == 0) {
-            var removePropertyCallback: Void->Void;
+            var removePropertyCallback: Void->Void = () -> {};
             removePropertyCallback = listen(instance, fieldName, (coll, _) -> {
                 if (coll != null) {
                     // Remove the property listener now that collection is available
