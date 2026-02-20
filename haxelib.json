@@ -4,9 +4,9 @@
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
   "description": "Colyseus Multiplayer SDK",
-  "version": "0.17.4",
+  "version": "0.17.5",
   "classPath": "src/",
-  "releasenote": "Fix registering onAdd() callbacks when a collection becomes available.",
+  "releasenote": "Add Reactive Schema Tools (thanks to @serjek)",
   "contributors": ["endel"],
   "dependencies": {
     "colyseus-websocket": "1.0.15",
