@@ -80,19 +80,24 @@ class SchemaListenMacro {
 				v -> macro $v;
 			};
 
-			// Generate unique temp names to avoid variable shadowing in nested schemas
-			var tName = tink.MacroApi.tempName("t");
-			var itemName = tink.MacroApi.tempName("item");
-
 			switch kind {
 				case FPrimitive | FStringSerialized:
 					var targetField = SchemaTypeUtils.fieldExpr(ctx.target, sf.name);
+					var traceMsg = indent + sf.name + " = ";
 					// primitive listener
 					result.push(
-						macro $cbExpr.listen($sourceExpr, $v{sf.name}, (__v, _) -> $targetField.set(${parseIfJsonExpr(macro __v)}))
+						macro $cbExpr.listen($sourceExpr, $v{sf.name}, (__v, _) -> {
+							#if debug_macro
+							trace($v{traceMsg} + Std.string(__v));
+							#end
+							$targetField.set(${parseIfJsonExpr(macro __v)});
+						})
 					);
 				case FRef(inner):
 					var targetField = SchemaTypeUtils.fieldExprValue(ctx.target, sf.name);
+					#if debug_macro
+					result.push(macro trace($v{indent + sf.name + " (ref) ->"}));
+					#end
 					result = result.concat(
 						buildListeners({
 							cb: ctx.cb,
@@ -105,6 +110,9 @@ class SchemaListenMacro {
 					var targetField = SchemaTypeUtils.fieldExpr(ctx.target, sf.name);
 					var rawCT = inner.toComplex();
 					var structExpr = buildStructFactoryExpr(inner);
+					var traceRebuild = indent + sf.name + " (array<schema>) rebuild";
+					var traceAdd = indent + sf.name + " (array<schema>) add[";
+					var traceRemove = indent + sf.name + " (array<schema>) remove[";
 
 					result.push(macro {
 						// factory: raw -> fresh target instance
@@ -114,14 +122,17 @@ class SchemaListenMacro {
 
 						// ---- initialize existing items ----
 						function __rebuild() {
-							for ($i{itemName} in ($sourceField.items : Array<$rawCT>)) {
-								var $tName = __make($i{itemName});
-								$targetField.push(cast $i{tName});
+							#if debug_macro
+							trace($v{traceRebuild});
+							#end
+							for (__item in ($sourceField.items : Array<$rawCT>)) {
+								var __t = __make(__item);
+								$targetField.push(cast __t);
 
 								$b{buildListeners({
 									cb: ctx.cb,
-									source: macro $i{itemName},
-									target: macro $i{tName}
+									source: macro __item,
+									target: macro __t
 								}, inner, depth + 1)};
 							}
 						}
@@ -136,18 +147,24 @@ class SchemaListenMacro {
 
 							// ---- additions ----
 							$cbExpr.onAdd($sourceExpr, $v{sf.name}, function(__item, __index) {
-								var $tName = __make(__item);
-								$targetField.set(__index, cast $i{tName});
+								#if debug_macro
+								trace($v{traceAdd} + Std.string(__index) + "]");
+								#end
+								var __t = __make(__item);
+								$targetField.set(__index, cast __t);
 
 								$b{buildListeners({
 									cb: ctx.cb,
 									source: macro __item,
-									target: macro $i{tName}
+									target: macro __t
 								}, inner, depth + 1)};
 							});
 
 							// listen for removals
 							$cbExpr.onRemove($sourceExpr, $v{sf.name}, function(__item, __index) {
+								#if debug_macro
+								trace($v{traceRemove} + Std.string(__index) + "]");
+								#end
 								$targetField.remove(__index);
 							});
 						});
@@ -158,6 +175,9 @@ class SchemaListenMacro {
 					var targetField = SchemaTypeUtils.fieldExpr(ctx.target, sf.name);
 					var rawCT = inner.toComplex();
 					var structExpr = buildStructFactoryExpr(inner);
+					var traceRebuild = indent + sf.name + " (map<schema>) rebuild";
+					var traceAdd = indent + sf.name + " (map<schema>) add[";
+					var traceRemove = indent + sf.name + " (map<schema>) remove[";
 
 					//SchemaTypeUtils.writeExprToFile("DT", structExpr);
 
@@ -169,14 +189,17 @@ class SchemaListenMacro {
 
 						// ---- initialize existing items ----
 						function __rebuild() {
-							for (__k => $i{itemName} in ($sourceField : io.colyseus.tools.SchemaTypeUtils.MapType<$rawCT>)) {
-								var $tName = __make($i{itemName});
-								$targetField.set(__k, cast $i{tName});
+							#if debug_macro
+							trace($v{traceRebuild});
+							#end
+							for (__k => __item in ($sourceField : io.colyseus.tools.SchemaTypeUtils.MapType<$rawCT>)) {
+								var __t = __make(__item);
+								$targetField.set(__k, cast __t);
 
 								$b{buildListeners({
 									cb: ctx.cb,
-									source: macro $i{itemName},
-									target: macro $i{tName}
+									source: macro __item,
+									target: macro __t
 								}, inner, depth + 1)};
 							}
 						}
@@ -190,18 +213,24 @@ class SchemaListenMacro {
 
 							// ---- additions ----
 							$cbExpr.onAdd($sourceExpr, $v{sf.name}, function(__item, __k) {
-								var $tName = __make(__item);
-								$targetField.set(__k, cast $i{tName});
+								#if debug_macro
+								trace($v{traceAdd} + __k + "]");
+								#end
+								var __t = __make(__item);
+								$targetField.set(__k, cast __t);
 
 								$b{buildListeners({
 									cb: ctx.cb,
 									source: macro __item,
-									target: macro $i{tName}
+									target: macro __t
 								}, inner, depth + 1)};
 							});
 
 							// ---- removals ----
 							$cbExpr.onRemove($sourceExpr, $v{sf.name}, function(_, __k) {
+								#if debug_macro
+								trace($v{traceRemove} + __k + "]");
+								#end
 								$targetField.remove(__k);
 							});
 						});
@@ -212,12 +241,16 @@ class SchemaListenMacro {
 				case FArrayPrimitive:
 					var targetField = SchemaTypeUtils.fieldExpr(ctx.target, sf.name);
 					var ct = SchemaTypeUtils.getCollectionElementOrSerialized(sf).toComplex();
+					var traceRebuild = indent + sf.name + " (array<primitive>) rebuild";
 
 					result.push(macro {
 						function __rebuild() {
+							#if debug_macro
+							trace($v{traceRebuild});
+							#end
 							$targetField.clear();
-							for ($i{itemName} in ($sourceField.items : Array<$ct>)) {
-								$targetField.push(${parseIfJsonExpr(macro $i{itemName})});
+							for (__item in ($sourceField.items : Array<$ct>)) {
+								$targetField.push(${parseIfJsonExpr(macro __item)});
 							}
 						}
 						// initial sync
@@ -238,11 +271,16 @@ class SchemaListenMacro {
 				case FMapPrimitive:
 					var targetField = SchemaTypeUtils.fieldExpr(ctx.target, sf.name);
 					var ct = SchemaTypeUtils.getCollectionElementOrSerialized(sf).toComplex();
+					var traceRebuild = indent + sf.name + " (map<primitive>) rebuild";
+
 					result.push(macro {
 						function __rebuild() {
+							#if debug_macro
+							trace($v{traceRebuild});
+							#end
 							$targetField.clear();
-							for (__k => $i{itemName} in ($sourceField : io.colyseus.tools.SchemaTypeUtils.MapType<$ct>)) {
-								$targetField.set(__k, ${parseIfJsonExpr(macro $i{itemName})});
+							for (__k => __item in ($sourceField : io.colyseus.tools.SchemaTypeUtils.MapType<$ct>)) {
+								$targetField.set(__k, ${parseIfJsonExpr(macro __item)});
 							}
 						}
 
