@@ -4,9 +4,9 @@
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
   "description": "Colyseus Multiplayer SDK",
-  "version": "0.17.6",
+  "version": "0.17.7",
   "classPath": "src/",
-  "releasenote": "Fix warning on schema callbacks https://github.com/colyseus/colyseus-haxe/pull/73",
+  "releasenote": "Add room.reconnection.enabled flag.",
   "contributors": ["endel"],
   "dependencies": {
     "colyseus-websocket": "1.0.15",
