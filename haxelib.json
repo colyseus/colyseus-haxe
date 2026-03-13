@@ -4,9 +4,9 @@
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
   "description": "Colyseus Multiplayer SDK",
-  "version": "0.17.7",
+  "version": "0.17.8",
   "classPath": "src/",
-  "releasenote": "Add room.reconnection.enabled flag.",
+  "releasenote": "Fix onRemove callback not firing when registered alongside onAdd with deferred collection binding",
   "contributors": ["endel"],
   "dependencies": {
     "colyseus-websocket": "1.0.15",
