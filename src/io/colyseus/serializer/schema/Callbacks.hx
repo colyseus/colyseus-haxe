@@ -222,7 +222,8 @@ class SchemaCallbacks<T> {
 				if (callbacks.exists(change.field)) {
 					isTriggering = true;
 
-					for (callback in callbacks[change.field]) {
+					// iterate a copy — deferred listeners may remove themselves during iteration
+					for (callback in callbacks[change.field].copy()) {
 						callback(change.value, change.previousValue);
 					}
 
