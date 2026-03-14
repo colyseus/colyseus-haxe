@@ -46,7 +46,7 @@ jobs:
           sudo apt-get install -y libpng-dev libturbojpeg-dev libvorbis-dev libopenal-dev libsdl2-dev libmbedtls-dev libuv1-dev
           git clone --depth 1 https://github.com/HaxeFoundation/hashlink.git /tmp/hashlink
           cd /tmp/hashlink
-          make libhl
+          make
           sudo make install
 
       - name: Compile and run tests (hl)
