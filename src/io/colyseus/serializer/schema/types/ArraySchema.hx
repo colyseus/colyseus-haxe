@@ -20,6 +20,7 @@ class ArraySchemaImpl<T> implements IRef implements IArraySchema implements Arra
   public var _childType: Dynamic;
 
   public var items:Array<T> = new Array<T>();
+  var _deletedIndices:Map<Int, Bool> = new Map<Int, Bool>();
 
   public var length(get, null): Int;
   function get_length() { return this.items.length; }
@@ -42,9 +43,8 @@ class ArraySchemaImpl<T> implements IRef implements IArraySchema implements Arra
   }
 
   public function deleteByIndex(index: Int): Void {
-    if (index >= 0 && index < this.items.length) {
-      this.items.splice(index, 1);
-    }
+    this.items[index] = cast null;
+    this._deletedIndices.set(index, true);
   }
 
   public function new() {}
@@ -81,7 +81,15 @@ class ArraySchemaImpl<T> implements IRef implements IArraySchema implements Arra
   }
 
   public function __onDecodeEnd() {
-    this.items = this.items.filter(function(item) return item != null);
+    // Remove deleted items by index (descending to preserve indices)
+    var toRemove = [for (i in _deletedIndices.keys()) i];
+    toRemove.sort(function(a, b) return b - a);
+    for (i in toRemove) {
+      if (i >= 0 && i < items.length) {
+        items.splice(i, 1);
+      }
+    }
+    _deletedIndices.clear();
   }
 
   public function toString () {
