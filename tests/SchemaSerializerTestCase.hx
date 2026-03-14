@@ -138,7 +138,7 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
 
     public function testMapSchemaTypes() {
         var state = new MapSchemaTypes();
-        var decoder = new Decoder(state);
+        var decoder = new Decoder<MapSchemaTypes>(state);
 
         var callbacks = new SchemaCallbacks<MapSchemaTypes>(decoder);
 
@@ -370,7 +370,7 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
 
     public function testCallbacks() {
         var state = new CallbacksState();
-        var decoder = new Decoder(state);
+        var decoder = new Decoder<CallbacksState>(state);
         var callbacks = new SchemaCallbacks<CallbacksState>(decoder);
 
         var onListenContainer = 0;
