@@ -77,9 +77,10 @@ class Decoder {
 				case 0xd7: {
 				  var type = i.readByte();
 				  if (type == 0x00) {
-					var high = i.readInt32() * Math.pow(2, 32);
-					var low: UInt = (i.readInt32());
-					return Date.fromTime(high + low);
+					// Date: 8 bytes big-endian milliseconds timestamp
+					var high:Float = cast(i.readUInt16(), Float) * 65536.0 + cast(i.readUInt16(), Float);
+					var low:Float = cast(i.readUInt16(), Float) * 65536.0 + cast(i.readUInt16(), Float);
+					return Date.fromTime(high * 4294967296.0 + low);
 				  }
 				  if (type == 0xff) {
 					// MessagePack Timestamp 64: nanoseconds in upper 30 bits, seconds in lower 34 bits

@@ -11,10 +11,13 @@ class MsgpackTestCase extends haxe.unit.TestCase {
 		]));
 
         assertEquals("6jqxd7P7_", decoded.sessionId);
-        // Date parsing from msgpack ext type — may not work on all targets
-        if (decoded.room.createdAt != null) {
-            assertEquals(true, Std.isOfType(decoded.room.createdAt, Date));
-        }
+        assertEquals(true, Std.isOfType(decoded.room.createdAt, Date));
+
+        // Verify UTC timestamp (1601912823608 ms = 2020-10-05T15:47:03.608Z)
+        var date:Date = decoded.room.createdAt;
+        var ms = date.getTime();
+        // Allow 1-second tolerance for float precision across targets
+        assertEquals(true, Math.abs(ms - 1601912823608.0) < 1000);
     }
 
     public function testUndefined() {
