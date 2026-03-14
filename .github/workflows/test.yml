@@ -1,0 +1,58 @@
+name: Tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    name: Test (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [js, neko, hl]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: krdlab/setup-haxe@v1
+        with:
+          haxe-version: 4.3.6
+
+      - name: Install dependencies
+        run: |
+          haxelib install hx3compat --quiet
+          haxelib install tink_url --quiet
+          haxelib install tink_http --quiet
+          haxelib install colyseus-websocket --quiet
+          haxelib install hashlink --quiet
+          haxelib dev colyseus .
+
+      - name: Run tests (js)
+        if: matrix.target == 'js'
+        run: haxe hxml/test.js.hxml
+
+      - name: Run tests (neko)
+        if: matrix.target == 'neko'
+        run: haxe hxml/test.neko.hxml
+
+      - name: Compile to C (hl)
+        if: matrix.target == 'hl'
+        run: |
+          haxe hxml/test.hl.hxml
+          sudo apt-get install -y libhl-dev
+          cd tests/bin/hlc_test
+          cc -O2 -o ../hl_test_native -std=c11 \
+            -I /usr/include \
+            -I . \
+            main.c \
+            -lhl -lm -lpthread \
+            $(pkg-config --libs --cflags libfmt 2>/dev/null || echo "") \
+            -Wl,-rpath,/usr/lib
+
+      - name: Run tests (hl)
+        if: matrix.target == 'hl'
+        run: tests/bin/hl_test_native
