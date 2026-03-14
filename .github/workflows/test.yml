@@ -58,6 +58,9 @@ jobs:
             -I /usr/local/include -I . \
             main.c \
             -L /usr/local/lib -lhl -lm -lpthread -luv \
+            /usr/local/lib/fmt.hdll \
+            /usr/local/lib/ssl.hdll \
+            /usr/local/lib/uv.hdll \
             -Wl,-rpath,/usr/local/lib
           cd ..
           ./hl_test_native
