@@ -1,0 +1,70 @@
+name: Tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    name: Test (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [js, neko, hl, cpp]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: krdlab/setup-haxe@v1
+        with:
+          haxe-version: 4.3.6
+
+      - name: Install dependencies
+        run: |
+          haxelib install hx3compat --quiet
+          haxelib install tink_url --quiet
+          haxelib install tink_http --quiet
+          haxelib install colyseus-websocket --quiet
+          haxelib install hashlink --quiet
+          haxelib install hxcpp --quiet
+          haxelib dev colyseus .
+
+      - name: Run tests (js)
+        if: matrix.target == 'js'
+        run: haxe hxml/test.js.hxml
+
+      - name: Run tests (neko)
+        if: matrix.target == 'neko'
+        run: haxe hxml/test.neko.hxml
+
+      - name: Build HashLink from source (hl)
+        if: matrix.target == 'hl'
+        run: |
+          sudo apt-get install -y libpng-dev libturbojpeg-dev libvorbis-dev libopenal-dev libsdl2-dev libmbedtls-dev libuv1-dev
+          git clone --depth 1 https://github.com/HaxeFoundation/hashlink.git /tmp/hashlink
+          cd /tmp/hashlink
+          make
+          sudo make install
+
+      - name: Compile and run tests (hl)
+        if: matrix.target == 'hl'
+        run: |
+          haxe hxml/test.hl.hxml
+          cd tests/bin/hlc_test
+          cc -O2 -o ../hl_test_native -std=c11 \
+            -I /usr/local/include -I . \
+            main.c \
+            -L /usr/local/lib -lhl -lm -lpthread -luv \
+            /usr/local/lib/fmt.hdll \
+            /usr/local/lib/ssl.hdll \
+            /usr/local/lib/uv.hdll \
+            -Wl,-rpath,/usr/local/lib
+          cd ..
+          ./hl_test_native
+
+      - name: Run tests (cpp)
+        if: matrix.target == 'cpp'
+        run: haxe hxml/test.cpp.hxml

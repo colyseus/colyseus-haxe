@@ -1,16 +1,18 @@
 package io.colyseus.serializer.schema;
 
+import io.colyseus.serializer.schema.types.IRef;
 import io.colyseus.serializer.schema.types.ISchemaCollection;
 
 class ReferenceTracker {
 	public var refs:Map<Int, Dynamic> = new Map<Int, Dynamic>();
-	public var refCounts:Map<Int, Dynamic> = new Map<Int, Dynamic>();
+	public var refCounts:Map<Int, Int> = new Map<Int, Int>();
 	public var deletedRefs:Map<Int, Bool> = new Map<Int, Bool>();
 
-    // FIXME:
-    // - use function/delegate instead of Dynamic as value.
-    // - use Either<Int,String> as key
-	public var callbacks:Map<Int, Map<String, Array<Dynamic>>> = new Map<Int, Map<String, Array<Dynamic>>>();
+	// Typed callback storage — split by arity to avoid Dynamic closure calls on HL/C and hxcpp.
+	// callbacks0: Void->Void (onChange)
+	// callbacks2: Dynamic->Dynamic->Void (listen, onAdd, onRemove)
+	public var callbacks0:Map<Int, Map<String, Array<Void->Void>>> = new Map<Int, Map<String, Array<Void->Void>>>();
+	public var callbacks2:Map<Int, Map<String, Array<Dynamic->Dynamic->Void>>> = new Map<Int, Map<String, Array<Dynamic->Dynamic->Void>>>();
 
 	public function new() {}
 
@@ -91,7 +93,8 @@ class ReferenceTracker {
 
 				this.refs.remove(refId);
 				this.refCounts.remove(refId);
-				this.callbacks.remove(refId);
+				this.callbacks0.remove(refId);
+				this.callbacks2.remove(refId);
 			}
 		}
 
@@ -101,7 +104,8 @@ class ReferenceTracker {
 	public function clear() {
 		this.refs.clear();
 		this.refCounts.clear();
-        this.callbacks.clear();
+        this.callbacks0.clear();
+        this.callbacks2.clear();
 		this.deletedRefs.clear();
 	}
 }

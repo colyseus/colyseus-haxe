@@ -4,9 +4,9 @@
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
   "description": "Colyseus Multiplayer SDK",
-  "version": "0.17.8",
+  "version": "0.17.9",
   "classPath": "src/",
-  "releasenote": "Fix onRemove callback not firing when registered alongside onAdd with deferred collection binding",
+  "releasenote": "HL/C native target support: typed callback storage, Dynamic-to-String cast fixes in Decoder/ArraySchema, onChange overloads",
   "contributors": ["endel"],
   "dependencies": {
     "colyseus-websocket": "1.0.15",
