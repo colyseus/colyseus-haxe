@@ -71,6 +71,8 @@ class SchemaCallbacks<T> {
 
     #if sys
     private function processPendingChanges() {
+        if (_pendingChanges.length == 0) return;
+
         _mutex.acquire();
         var batches = _pendingChanges;
         _pendingChanges = [];
