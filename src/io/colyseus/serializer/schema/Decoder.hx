@@ -114,7 +114,7 @@ class Decoder<T> {
 		var fieldName:String = ref._indexes.get(fieldIndex);
 		if (fieldName == null) { return false; }
 
-		var fieldType:Dynamic = ref._types.get(fieldIndex);
+		var fieldType:String = ref._types.get(fieldIndex);
 		var childType:Dynamic = ref._childTypes.get(fieldIndex);
 
 		var r = decodeValue(bytes, it, ref, fieldIndex, fieldType, childType, operation);
@@ -155,13 +155,13 @@ class Decoder<T> {
 			dynamicIndex = ref.getIndex(fieldIndex);
 		}
 
-		var fieldType:Dynamic = null;
+		var fieldType:String = null;
 		var childType:Dynamic = null;
 
 		var collectionChildType = (ref : ISchemaCollection)._childType;
 		var isPrimitiveFieldType = Std.isOfType(collectionChildType, String);
 
-		fieldType = (isPrimitiveFieldType) ? collectionChildType : "ref";
+		fieldType = (isPrimitiveFieldType) ? cast(collectionChildType, String) : "ref";
 
 		if (!isPrimitiveFieldType) {
 			childType = collectionChildType;
@@ -230,13 +230,13 @@ class Decoder<T> {
             index = Decode.number(bytes, it);
         }
 
-		var fieldType:Dynamic = null;
+		var fieldType:String = null;
 		var childType:Dynamic = null;
 
         var collectionChildType = ref._childType;
         var isPrimitiveFieldType = Std.isOfType(collectionChildType, String);
 
-        fieldType = (isPrimitiveFieldType) ? collectionChildType : "ref";
+        fieldType = (isPrimitiveFieldType) ? cast(collectionChildType, String) : "ref";
 
         if (!isPrimitiveFieldType) {
             childType = collectionChildType;
@@ -342,8 +342,8 @@ class Decoder<T> {
 						allChanges.push({
 							refId: previousValue.__refId,
 							op: cast OPERATION.DELETE,
-							field: cast index,
-							dynamicIndex: cast index,
+							field: Std.string(index),
+							dynamicIndex: index,
 							value: null,
 							previousValue: item
 						});
