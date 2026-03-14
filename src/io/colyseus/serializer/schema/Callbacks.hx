@@ -19,7 +19,7 @@ class Callbacks {
             changes.push({
                 refId: collection.__refId,
                 op: cast OPERATION.DELETE,
-                field: key,
+                field: Std.string(key),
                 value: null,
                 previousValue: item
             });

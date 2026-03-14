@@ -42,7 +42,9 @@ class ArraySchemaImpl<T> implements IRef implements IArraySchema implements Arra
   }
 
   public function deleteByIndex(index: Int): Void {
-    this.items[index] = null;
+    if (index >= 0 && index < this.items.length) {
+      this.items.splice(index, 1);
+    }
   }
 
   public function new() {}

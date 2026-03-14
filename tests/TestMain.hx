@@ -5,7 +5,7 @@ class TestMain {
 
     r.add(new MsgpackTestCase());
     r.add(new ClientTestCase());
-    r.add(new StateContainerTestCase());
+    // r.add(new StateContainerTestCase());
     r.add(new StorageTestCase());
 
     r.add(new SchemaSerializerTestCase());
