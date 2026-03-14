@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [js, neko, hl]
+        target: [js, neko, hl, cpp]
 
     steps:
       - uses: actions/checkout@v4
@@ -29,6 +29,7 @@ jobs:
           haxelib install tink_http --quiet
           haxelib install colyseus-websocket --quiet
           haxelib install hashlink --quiet
+          haxelib install hxcpp --quiet
           haxelib dev colyseus .
 
       - name: Run tests (js)
@@ -56,3 +57,7 @@ jobs:
       - name: Run tests (hl)
         if: matrix.target == 'hl'
         run: tests/bin/hl_test_native
+
+      - name: Run tests (cpp)
+        if: matrix.target == 'cpp'
+        run: haxe hxml/test.cpp.hxml
