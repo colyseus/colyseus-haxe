@@ -9,7 +9,11 @@ import io.colyseus.serializer.schema.types.ISchemaCollection;
 class Callbacks {
     public static function get<T>(room: Room<T>): SchemaCallbacks<T> {
         var serializer: SchemaSerializer<T> = cast(room.serializer);
-        return new SchemaCallbacks<T>(serializer.decoder);
+        var callbacks = new SchemaCallbacks<T>(serializer.decoder);
+        // When used with a Room, enable main-thread callback processing
+        // on sys targets (websocket runs on a separate thread).
+        callbacks.enableMainLoopProcessing();
+        return callbacks;
     }
 
     public static function removeChildRefs(collection: ISchemaCollection, changes: Array<DataChange>, refs: ReferenceTracker) {
@@ -36,10 +40,47 @@ class SchemaCallbacks<T> {
     private var decoder: Decoder<T>;
     private var isTriggering: Bool = false;
 
+    #if sys
+    private var _pendingChanges:Array<Array<DataChange>> = [];
+    private var _mutex = new sys.thread.Mutex();
+    private var _mainLoopEntry:haxe.MainLoop.MainLoopEntry = null;
+    #end
+
     public function new (decoder: Decoder<T>) {
         this.decoder = decoder;
         this.decoder.triggerChanges = (changes: Array<DataChange>) -> this.triggerChanges(changes);
     }
+
+    /**
+     * Enable thread-safe callback processing via haxe.MainLoop.
+     * On sys targets, callbacks from the websocket thread are queued
+     * and fired on the main thread. Call this after Callbacks.get(room).
+     */
+    public function enableMainLoopProcessing() {
+        #if sys
+        this.decoder.triggerChanges = (changes: Array<DataChange>) -> {
+            _mutex.acquire();
+            _pendingChanges.push(changes);
+            _mutex.release();
+        };
+        if (_mainLoopEntry == null) {
+            _mainLoopEntry = haxe.MainLoop.add(() -> processPendingChanges());
+        }
+        #end
+    }
+
+    #if sys
+    private function processPendingChanges() {
+        _mutex.acquire();
+        var batches = _pendingChanges;
+        _pendingChanges = [];
+        _mutex.release();
+
+        for (changes in batches) {
+            triggerChanges(changes);
+        }
+    }
+    #end
 
 	public function listen(
         instanceOrFieldName: Dynamic,
