@@ -11,7 +11,14 @@ class TestMain {
     r.add(new SchemaSerializerTestCase());
     // r.add(new AuthTestCase());
 
-    r.run();
+    var success = r.run();
+    if (!success) {
+      #if sys
+      Sys.exit(1);
+      #elseif js
+      untyped __js__("process.exit(1)");
+      #end
+    }
   }
 
 }
