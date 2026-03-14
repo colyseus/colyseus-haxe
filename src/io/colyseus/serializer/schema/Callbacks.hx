@@ -62,13 +62,16 @@ class SchemaCallbacks<T> {
 
         var existing = Reflect.getProperty(instance, fieldName);
         if (
-            existing != null && Std.isOfType(existing, IRef) && existing.__refId != 0 &&
+            existing != null && Std.isOfType(existing, IRef) &&
             immediate == true && !this.isTriggering
         ) {
-            callback(existing, null);
+            var existingRef:IRef = cast existing;
+            if (existingRef.__refId != 0) {
+                callback(existing, null);
+            }
         }
 
-		return addCallback(instance.__refId, fieldName, callback);
+		return addCallback2(instance.__refId, fieldName, callback);
 	}
 
     public function onAdd(
@@ -97,7 +100,7 @@ class SchemaCallbacks<T> {
         instance: Dynamic,
         callback:Void->Void
     ) {
-        return addCallback(instance.__refId, OPERATION.REPLACE, callback);
+        return addCallback0(instance.__refId, "#" + cast(OPERATION.REPLACE, Int), callback);
     }
 
     public function onRemove(
@@ -135,7 +138,7 @@ class SchemaCallbacks<T> {
                 if (coll != null) {
                     // Remove the property listener now that collection is available
                     removePropertyCallback();
-                    removeHandler = _this.addCallback((coll : IRef).__refId, operation, callback);
+                    removeHandler = _this.addCallback2((coll : IRef).__refId, "#" + cast(operation, Int), callback);
                 }
             });
             removeHandler = removePropertyCallback;
@@ -146,84 +149,95 @@ class SchemaCallbacks<T> {
                     callback(value, key);
                 }
             }
-            return addCallback(collection.__refId, operation, callback);
+            return addCallback2(collection.__refId, "#" + cast(operation, Int), callback);
         }
     }
 
-	public function addCallback(refId: Int, operationOrFieldName:Dynamic, callback:Dynamic) {
-        var key = (Std.isOfType(operationOrFieldName, String))
-            ? operationOrFieldName
-            : "#" + operationOrFieldName;
-
-        var callbacks = this.decoder.refs.callbacks.get(refId);
-        if (callbacks == null) {
-            callbacks = new Map<String, Array<Dynamic>>();
-            this.decoder.refs.callbacks[refId] = callbacks;
+    // 0-arg callbacks (onChange)
+	public function addCallback0(refId: Int, key: String, callback: Void->Void) {
+        var callbackMap = this.decoder.refs.callbacks0.get(refId);
+        if (callbackMap == null) {
+            callbackMap = new Map<String, Array<Void->Void>>();
+            this.decoder.refs.callbacks0[refId] = callbackMap;
         }
-
-        // initialize list of callbacks
-        if (callbacks.get(key) == null) {
-			callbacks.set(key, new Array<Dynamic>());
+        if (callbackMap.get(key) == null) {
+			callbackMap.set(key, new Array<Void->Void>());
         }
-
-        callbacks[key].push(callback);
-
-        return () -> callbacks[key].remove(callback);
+        callbackMap[key].push(callback);
+        return () -> callbackMap[key].remove(callback);
     }
 
-    public function triggerCallbacks0(callbacks:Map<String, Array<Dynamic>>, op:Int) {
+    // 2-arg callbacks (listen, onAdd, onRemove)
+    public function addCallback2(refId: Int, key: String, callback: Dynamic->Dynamic->Void) {
+        var callbackMap = this.decoder.refs.callbacks2.get(refId);
+        if (callbackMap == null) {
+            callbackMap = new Map<String, Array<Dynamic->Dynamic->Void>>();
+            this.decoder.refs.callbacks2[refId] = callbackMap;
+        }
+        if (callbackMap.get(key) == null) {
+			callbackMap.set(key, new Array<Dynamic->Dynamic->Void>());
+        }
+        callbackMap[key].push(callback);
+        return () -> callbackMap[key].remove(callback);
+    }
+
+    public function triggerCallbacks0(callbacks0: Map<String, Array<Void->Void>>, op: Int) {
         var key = "#" + op;
-        if (!callbacks.exists(key)) { return; }
+        if (!callbacks0.exists(key)) { return; }
         isTriggering = true;
-        for (callback in callbacks[key]) { callback(); }
+        for (callback in callbacks0[key]) { callback(); }
         isTriggering = false;
     }
 
-    public function triggerCallbacks2(callbacks:Map<String, Array<Dynamic>>, op:Int, arg1: Dynamic, arg2: Dynamic) {
+    public function triggerCallbacks2(callbacks2: Map<String, Array<Dynamic->Dynamic->Void>>, op: Int, arg1: Dynamic, arg2: Dynamic) {
         var key = "#" + op;
-        if (!callbacks.exists(key)) { return; }
+        if (!callbacks2.exists(key)) { return; }
         isTriggering = true;
-        for (callback in callbacks[key]) { callback(arg1, arg2); }
+        for (callback in callbacks2[key]) { callback(arg1, arg2); }
         isTriggering = false;
     }
 
 	private function triggerChanges(allChanges:Array<DataChange>) {
 		var uniqueRefIds = new Map<Int, Bool>();
-        var allCallbacks = decoder.refs.callbacks;
+        var allCallbacks0 = decoder.refs.callbacks0;
+        var allCallbacks2 = decoder.refs.callbacks2;
 
 		for (change in allChanges) {
 			var refId = change.refId;
 			var ref = this.decoder.refs.get(refId);
 			var isSchema = Std.isOfType(ref, Schema);
-			var callbacks = allCallbacks.get(refId);
+			var cbs0 = allCallbacks0.get(refId);
+			var cbs2 = allCallbacks2.get(refId);
 
 			// no callbacks defined, skip this structure!
-			if (callbacks == null) { continue; }
+			if (cbs0 == null && cbs2 == null) { continue; }
 
 			//
 			// trigger onRemove on child structure.
 			//
 			if (((change.op & cast OPERATION.DELETE) == OPERATION.DELETE)
 				&& Std.isOfType(change.previousValue, Schema)) {
-                // TODO: get DELETE callbacks for this instance, and check if exists
-                var deleteCallbacks: Map<String, Array<Dynamic>> = allCallbacks.get((change.previousValue : Schema).__refId);
-                if (deleteCallbacks != null) {
-                    triggerCallbacks0(deleteCallbacks, cast OPERATION.DELETE);
+                var deleteCbs0 = allCallbacks0.get((change.previousValue : Schema).__refId);
+                if (deleteCbs0 != null) {
+                    triggerCallbacks0(deleteCbs0, cast OPERATION.DELETE);
                 }
 			}
 
 			if (isSchema) {
 				if (!uniqueRefIds.exists(refId)) {
 					// trigger onChange
-					triggerCallbacks0(callbacks, cast OPERATION.REPLACE);
+					if (cbs0 != null) {
+						triggerCallbacks0(cbs0, cast OPERATION.REPLACE);
+					}
 				}
 
                 // trigger .listen() on property callbacks
-				if (callbacks.exists(change.field)) {
+				if (cbs2 != null && cbs2.exists(change.field)) {
 					isTriggering = true;
 
 					// iterate a copy — deferred listeners may remove themselves during iteration
-					for (callback in callbacks[change.field].copy()) {
+					var fieldCallbacks:Array<Dynamic->Dynamic->Void> = cbs2[change.field];
+					for (callback in fieldCallbacks.copy()) {
 						callback(change.value, change.previousValue);
 					}
 
@@ -231,26 +245,26 @@ class SchemaCallbacks<T> {
 				}
 
 			} else {
-				var container = (ref : ISchemaCollection);
+				if (cbs2 != null) {
+					if ((change.op & cast OPERATION.DELETE) == OPERATION.DELETE) {
+						if (change.previousValue != null) {
+							// trigger onRemove
+							triggerCallbacks2(cbs2, cast OPERATION.DELETE, change.previousValue, (change.dynamicIndex == null) ? change.field : change.dynamicIndex);
+						}
 
-			    if ((change.op & cast OPERATION.DELETE) == OPERATION.DELETE) {
-                    if (change.previousValue != null) {
-                        // triger onRemove
-                        triggerCallbacks2(callbacks, cast OPERATION.DELETE, change.previousValue, (change.dynamicIndex == null) ? change.field : change.dynamicIndex);
-                    }
+						// Handle DELETE_AND_ADD operations
+						if (((change.op & cast OPERATION.ADD) == OPERATION.ADD)) {
+							triggerCallbacks2(cbs2, cast OPERATION.ADD, change.value, (change.dynamicIndex == null) ? change.field : change.dynamicIndex);
+						}
 
-                    // Handle DELETE_AND_ADD operations
-                    if (((change.op & cast OPERATION.ADD) == OPERATION.ADD)) {
-                        triggerCallbacks2(callbacks, cast OPERATION.ADD, change.value, (change.dynamicIndex == null) ? change.field : change.dynamicIndex);
-                    }
+					} else if ((change.op & cast OPERATION.ADD) == OPERATION.ADD && change.previousValue != change.value) {
+						// trigger onAdd
+						triggerCallbacks2(cbs2, cast OPERATION.ADD, change.value, (change.dynamicIndex == null) ? change.field : change.dynamicIndex);
+					}
 
-                } else if ((change.op & cast OPERATION.ADD) == OPERATION.ADD && change.previousValue != change.value) {
-                    // triger onAdd
-                    triggerCallbacks2(callbacks, cast OPERATION.ADD, change.value, (change.dynamicIndex == null) ? change.field : change.dynamicIndex);
-                }
-
-				if (change.value != change.previousValue) {
-                    triggerCallbacks2(callbacks, cast OPERATION.REPLACE, change.value, (change.dynamicIndex == null) ? change.field : change.dynamicIndex);
+					if (change.value != change.previousValue) {
+						triggerCallbacks2(cbs2, cast OPERATION.REPLACE, change.value, (change.dynamicIndex == null) ? change.field : change.dynamicIndex);
+					}
 				}
 			}
 
