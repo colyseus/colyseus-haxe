@@ -31,6 +31,7 @@ class Callbacks {
     }
 }
 
+@:generic
 class SchemaCallbacks<T> {
     private var decoder: Decoder<T>;
     private var isTriggering: Bool = false;
@@ -97,10 +98,28 @@ class SchemaCallbacks<T> {
     }
 
     public function onChange(
-        instance: Dynamic,
-        callback:Void->Void
+        instanceOrFieldName: Dynamic,
+        callbackOrFieldName: Dynamic,
+        ?callback: Dynamic->Dynamic->Void
     ) {
-        return addCallback0(instance.__refId, "#" + cast(OPERATION.REPLACE, Int), callback);
+        if (callback != null) {
+            // 3-arg form: onChange(instance, "field", (value, key) -> ...)
+            // Registers as REPLACE on a collection
+            var instance: IRef = cast instanceOrFieldName;
+            var fieldName: String = cast callbackOrFieldName;
+            return addCallbackOrWaitCollectionAvailable(instance, fieldName, OPERATION.REPLACE, callback);
+        } else if (Std.isOfType(instanceOrFieldName, String)) {
+            // 2-arg shorthand: onChange("field", (value, key) -> ...)
+            var fieldName: String = cast instanceOrFieldName;
+            var cb2: Dynamic->Dynamic->Void = cast callbackOrFieldName;
+            var instance: IRef = cast this.decoder.state;
+            return addCallbackOrWaitCollectionAvailable(instance, fieldName, OPERATION.REPLACE, cb2);
+        } else {
+            // 2-arg form: onChange(instance, () -> ...)
+            var instance: IRef = cast instanceOrFieldName;
+            var cb0: Void->Void = cast callbackOrFieldName;
+            return addCallback0(instance.__refId, "#" + cast(OPERATION.REPLACE, Int), cb0);
+        }
     }
 
     public function onRemove(
