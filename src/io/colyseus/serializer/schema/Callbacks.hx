@@ -43,7 +43,7 @@ class SchemaCallbacks<T> {
     #if sys
     private var _pendingChanges:Array<Array<DataChange>> = [];
     private var _mutex = new sys.thread.Mutex();
-    private var _mainLoopEntry:haxe.MainLoop.MainLoopEntry = null;
+    private var _mainLoopRegistered:Bool = false;
     #end
 
     public function new (decoder: Decoder<T>) {
@@ -63,8 +63,9 @@ class SchemaCallbacks<T> {
             _pendingChanges.push(changes);
             _mutex.release();
         };
-        if (_mainLoopEntry == null) {
-            _mainLoopEntry = haxe.MainLoop.add(() -> processPendingChanges());
+        if (!_mainLoopRegistered) {
+            _mainLoopRegistered = true;
+            haxe.MainLoop.add(() -> processPendingChanges());
         }
         #end
     }
