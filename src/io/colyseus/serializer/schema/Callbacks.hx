@@ -308,6 +308,10 @@ class SchemaCallbacks<T> {
 				}
 
 			} else {
+				// trigger onChange (Void->Void) on collection — once per unique collection per patch
+				if (cbs0 != null && !uniqueRefIds.exists(refId)) {
+					triggerCallbacks0(cbs0, cast OPERATION.REPLACE);
+				}
 				if (cbs2 != null) {
 					if ((change.op & cast OPERATION.DELETE) == OPERATION.DELETE) {
 						if (change.previousValue != null) {
