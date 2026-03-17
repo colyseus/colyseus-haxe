@@ -24,6 +24,8 @@ typedef EnqueuedMessage = {
 };
 
 typedef ReconnectionOptions = {
+    /** Whether automatic reconnection is enabled. Set to false to disable. */
+    var enabled: Bool;
     /** The maximum number of reconnection attempts. */
     var maxRetries: Int;
     /** The minimum delay between reconnection attempts (ms). */
@@ -75,6 +77,7 @@ class Room<T> {
 
     // reconnection logic
     public var reconnection: ReconnectionOptions = {
+        enabled: true,
         retryCount: 0,
         maxRetries: 15,
         delay: 100,
@@ -117,7 +120,7 @@ class Room<T> {
                 e.code == CloseCode.MAY_TRY_RECONNECT
             ) {
                 this.onDrop.dispatch(e.code);
-                this.handleReconnection();
+                this.handleReconnection(e.code);
 
             } else {
                 this.onLeave.dispatch(e.code);
@@ -374,7 +377,12 @@ class Room<T> {
     //
     // Reconnection logic
     //
-    private function handleReconnection() {
+    private function handleReconnection(code: Int) {
+        if (!this.reconnection.enabled) {
+            this.onLeave.dispatch(code);
+            return;
+        }
+
         var currentTime = Timer.stamp() * 1000;
         if (currentTime - this.joinedAtTime < this.reconnection.minUptime) {
             trace("[Colyseus reconnection]: ❌ Room has not been up for long enough for automatic reconnection. (min uptime: " + this.reconnection.minUptime + "ms)");
