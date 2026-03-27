@@ -435,6 +435,106 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
         assertEquals(13, onItemChange);
     }
 
+    public function testOnChangeVoidCallbackOnPrimitiveCollections() {
+        // Test that onChange(collection, () -> ...) fires for primitive collections.
+        // Regression test for: onChange with Void->Void was silently dropped on
+        // collections because triggerChanges only fired callbacks0 for Schema refs.
+
+        // --- ArraySchema of primitives ---
+        var arrayState = new ArraySchemaTypes();
+        var arrayDecoder = new Decoder(arrayState);
+        var arrayCallbacks = new SchemaCallbacks<ArraySchemaTypes>(arrayDecoder);
+
+        // Decode initial state to populate collections
+        var arrayInitBytes = [ 128, 1, 129, 2, 130, 3, 131, 4, 255, 1, 128, 0, 5, 128, 1, 6, 255, 2, 128, 0, 0, 128, 1, 10, 128, 2, 20, 128, 3, 205, 192, 13, 255, 3, 128, 0, 163, 111, 110, 101, 128, 1, 163, 116, 119, 111, 128, 2, 165, 116, 104, 114, 101, 101, 255, 4, 128, 0, 232, 3, 0, 0, 128, 1, 192, 13, 0, 0, 128, 2, 72, 244, 255, 255, 255, 5, 128, 100, 129, 208, 156, 255, 6, 128, 100, 129, 208, 156 ];
+        arrayDecoder.decode(getBytes(arrayInitBytes));
+
+        // Register Void->Void onChange on primitive array collections
+        var arrayNumbersChanged = 0;
+        var arrayStringsChanged = 0;
+        var arrayInt32Changed = 0;
+
+        arrayCallbacks.onChange(arrayState.arrayOfNumbers, () -> arrayNumbersChanged++);
+        arrayCallbacks.onChange(arrayState.arrayOfStrings, () -> arrayStringsChanged++);
+        arrayCallbacks.onChange(arrayState.arrayOfInt32, () -> arrayInt32Changed++);
+
+        // Decode a mutation that removes items from collections
+        var arrayPopBytes = [ 255, 1, 64, 1, 255, 2, 64, 3, 64, 2, 64, 1, 255, 4, 64, 2, 64, 1, 255, 3, 64, 2, 64, 1 ];
+        arrayDecoder.decode(getBytes(arrayPopBytes));
+
+        assertEquals(1, arrayNumbersChanged);
+        assertEquals(1, arrayStringsChanged);
+        assertEquals(1, arrayInt32Changed);
+
+        // --- MapSchema of primitives ---
+        var mapState = new MapSchemaTypes();
+        var mapDecoder = new Decoder<MapSchemaTypes>(mapState);
+        var mapCallbacks = new SchemaCallbacks<MapSchemaTypes>(mapDecoder);
+
+        // Decode initial state to populate map collections
+        var mapInitBytes = [128, 1, 129, 2, 130, 3, 131, 4, 255, 1, 128, 0, 163, 111, 110, 101, 5, 128, 1, 163, 116, 119, 111, 6, 128, 2, 165, 116, 104, 114, 101, 101, 7, 255, 2, 128, 0, 163, 111, 110, 101, 1, 128, 1, 163, 116, 119, 111, 2, 128, 2, 165, 116, 104, 114, 101, 101, 205, 192, 13, 255, 3, 128, 0, 163, 111, 110, 101, 163, 79, 110, 101, 128, 1, 163, 116, 119, 111, 163, 84, 119, 111, 128, 2, 165, 116, 104, 114, 101, 101, 165, 84, 104, 114, 101, 101, 255, 4, 128, 0, 163, 111, 110, 101, 192, 13, 0, 0, 128, 1, 163, 116, 119, 111, 24, 252, 255, 255, 128, 2, 165, 116, 104, 114, 101, 101, 208, 7, 0, 0, 255, 5, 128, 100, 129, 204, 200, 255, 6, 128, 205, 44, 1, 129, 205, 144, 1, 255, 7, 128, 205, 244, 1, 129, 205, 88, 2];
+        mapDecoder.decode(getBytes(mapInitBytes));
+
+        // Register Void->Void onChange on primitive map collections
+        var mapNumbersChanged = 0;
+        var mapStringsChanged = 0;
+        var mapInt32Changed = 0;
+
+        mapCallbacks.onChange(mapState.mapOfNumbers, () -> mapNumbersChanged++);
+        mapCallbacks.onChange(mapState.mapOfStrings, () -> mapStringsChanged++);
+        mapCallbacks.onChange(mapState.mapOfInt32, () -> mapInt32Changed++);
+
+        // Decode a mutation that deletes items from maps
+        var mapDeleteBytes = [255, 2, 64, 1, 64, 2, 255, 1, 64, 1, 64, 2, 255, 3, 64, 1, 64, 2, 255, 4, 64, 1, 64, 2];
+        mapDecoder.decode(getBytes(mapDeleteBytes));
+
+        assertEquals(1, mapNumbersChanged);
+        assertEquals(1, mapStringsChanged);
+        assertEquals(1, mapInt32Changed);
+    }
+
+    public function testIsTriggeringPreventsDoubleCallbacks() {
+        // Regression test for the isTriggering guard in triggerCallbacks2.
+        //
+        // When an onAdd handler registers a nested onAdd on a child collection,
+        // addCallbackOrWaitCollectionAvailable checks `immediate && !isTriggering`.
+        // Since triggerCallbacks2 sets isTriggering=true before invoking callbacks,
+        // the nested registration skips the "immediate" path and only the normal
+        // triggerChanges dispatch fires — preventing double callbacks.
+        //
+        // Without isTriggering: each item callback would fire TWICE per item
+        // (once from immediate, once from triggerChanges) → 12 instead of 6.
+
+        var state = new CallbacksState();
+        var decoder = new Decoder<CallbacksState>(state);
+        var callbacks = new SchemaCallbacks<CallbacksState>(decoder);
+
+        // Decode initial state: container with empty playersMap
+        decoder.decode(getBytes([ 128, 1, 255, 1, 128, 2, 255, 2 ]));
+
+        var onItemAdd = 0;
+        var onPlayerAdd = 0;
+
+        // Register onAdd directly on the container's playersMap.
+        // When a player is added, the nested onAdd on player.items runs while
+        // isTriggering=true (set by triggerCallbacks2), so the immediate path
+        // in addCallbackOrWaitCollectionAvailable is correctly skipped.
+        callbacks.onAdd(state.container, "playersMap", (player, key) -> {
+            onPlayerAdd++;
+
+            callbacks.onAdd(player, "items", (item, k) -> {
+                onItemAdd++;
+            });
+        });
+
+        // Decode: adds 2 players, each with 3 items, in a single patch.
+        decoder.decode(getBytes([ 255, 1, 255, 2, 128, 0, 163, 111, 110, 101, 3, 128, 1, 163, 116, 119, 111, 9, 255, 2, 255, 3, 128, 4, 129, 5, 255, 4, 128, 1, 129, 2, 130, 3, 255, 5, 128, 0, 166, 105, 116, 101, 109, 45, 49, 6, 128, 1, 166, 105, 116, 101, 109, 45, 50, 7, 128, 2, 166, 105, 116, 101, 109, 45, 51, 8, 255, 6, 128, 166, 73, 116, 101, 109, 32, 49, 129, 1, 255, 7, 128, 166, 73, 116, 101, 109, 32, 50, 129, 2, 255, 8, 128, 166, 73, 116, 101, 109, 32, 51, 129, 3, 255, 9, 128, 10, 129, 11, 255, 10, 128, 1, 129, 2, 130, 3, 255, 11, 128, 0, 166, 105, 116, 101, 109, 45, 49, 12, 128, 1, 166, 105, 116, 101, 109, 45, 50, 13, 128, 2, 166, 105, 116, 101, 109, 45, 51, 14, 255, 12, 128, 166, 73, 116, 101, 109, 32, 49, 129, 1, 255, 13, 128, 166, 73, 116, 101, 109, 32, 50, 129, 2, 255, 14, 128, 166, 73, 116, 101, 109, 32, 51, 129, 3 ]));
+
+        assertEquals(2, onPlayerAdd);
+        // 2 players x 3 items = 6 (no double-fire)
+        assertEquals(6, onItemAdd);
+    }
+
 
 }
 
