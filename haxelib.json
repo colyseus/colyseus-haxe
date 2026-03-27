@@ -4,9 +4,9 @@
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
   "description": "Colyseus Multiplayer SDK",
-  "version": "0.17.10",
+  "version": "0.17.11",
   "classPath": "src/",
-  "releasenote": "Transparent main-thread callback processing on sys targets via haxe.MainLoop",
+  "releasenote": "Fix onChange(collection, Void->Void) callback not firing for collections",
   "contributors": ["endel"],
   "dependencies": {
     "colyseus-websocket": "1.0.15",
