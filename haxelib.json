@@ -4,9 +4,9 @@
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
   "description": "Colyseus Multiplayer SDK",
-  "version": "0.17.11",
+  "version": "0.17.12",
   "classPath": "src/",
-  "releasenote": "Fix onChange(collection, Void->Void) callback not firing for collections",
+  "releasenote": "Fix getLatency()/selectByLatency() hanging on unresponsive endpoints (#941)",
   "contributors": ["endel"],
   "dependencies": {
     "colyseus-websocket": "1.0.15",

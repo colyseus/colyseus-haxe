@@ -20,7 +20,12 @@ typedef LatencyOptions = {
     /** "ws" for WebSocket (default: "ws") */
     ?protocol: String,
     /** Number of pings to send (default: 1). Returns the average latency when > 1. */
-    ?pingCount: Int
+    ?pingCount: Int,
+    /**
+     * Milliseconds to wait for the measurement before failing (default: 1500).
+     * Bounds unreachable/blackholed endpoints so they can't stall selection.
+     */
+    ?timeout: Int
 }
 
 class EndpointSettings {
@@ -199,7 +204,7 @@ class Client {
     /**
      * Select the endpoint with the lowest latency.
      * @param endpoints Array of endpoints to select from.
-     * @param latencyOptions Latency measurement options (protocol, pingCount).
+     * @param latencyOptions Latency measurement options (protocol, pingCount, timeout) — forwarded to each getLatency() call.
      * @param callback Callback with the client with the lowest latency.
      */
     public static function selectByLatency(
@@ -242,18 +247,39 @@ class Client {
 
     /**
      * Create a new connection with the server, and measure the latency.
-     * @param options Latency measurement options (protocol, pingCount).
+     *
+     * Always invokes `callback` exactly once: with the (average) latency, or with
+     * an error on connection failure, server-side close before all pongs arrive, or timeout.
+     *
+     * @param options Latency measurement options (protocol, pingCount, timeout).
      * @param callback Callback with the measured latency in milliseconds.
      */
     public function getLatency(?options: LatencyOptions, callback: (HttpException, Float) -> Void) {
         var protocol = options != null && options.protocol != null ? options.protocol : "ws";
         var pingCount = options != null && options.pingCount != null ? options.pingCount : 1;
+        var timeout = options != null && options.timeout != null ? options.timeout : 1500;
 
         var latencies: Array<Float> = [];
         var pingStart: Float = 0;
 
         var wsEndpoint = this.http.buildHttpEndpoint("", "ws");
         var conn = new Connection(wsEndpoint);
+
+        var settled = false;
+        var timeoutTimer: Timer = null;
+
+        // run exactly once — guards against late events (our own close() firing onClose, error+close races)
+        function settle(err: HttpException, latency: Float) {
+            if (settled) return;
+            settled = true;
+            if (timeoutTimer != null) timeoutTimer.stop();
+            conn.close();
+            callback(err, latency);
+        }
+
+        function fail(message: String) {
+            settle(new HttpException(1006, 'Failed to get latency: ${message}'), 0);
+        }
 
         conn.onOpen = function() {
             pingStart = Timer.stamp() * 1000; // Convert to milliseconds
@@ -273,20 +299,28 @@ class Client {
                 bytes.writeByte(Protocol.PING);
                 conn.send(bytes.getBytes());
             } else {
-                // Done, calculate average and close
-                conn.close();
+                // Done, calculate average
                 var sum: Float = 0;
                 for (l in latencies) {
                     sum += l;
                 }
-                var average = sum / latencies.length;
-                callback(null, average);
+                settle(null, sum / latencies.length);
             }
         };
 
-        conn.onError = function(message: String) {
-            callback(new HttpException(1006, 'Failed to get latency: ${message}'), 0);
+        // server closed the socket before all pongs arrived (a clean close fires onClose, not onError)
+        conn.onClose = function(_: Dynamic) {
+            fail("connection closed");
         };
+
+        conn.onError = function(message: String) {
+            fail(message);
+        };
+
+        // bound blackholed/unreachable hosts so a single endpoint can't stall selectByLatency
+        timeoutTimer = Timer.delay(function() {
+            fail('timed out after ${timeout}ms');
+        }, timeout);
     }
 
 }
