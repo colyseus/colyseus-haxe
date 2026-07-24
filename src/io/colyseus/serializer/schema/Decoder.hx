@@ -203,7 +203,17 @@ class Decoder<T> {
 		} else if (operation == OPERATION.DELETE_BY_REFID) {
 			var refId = Decode.number(bytes, it);
 			var item = refs.get(refId);
+
+			// stale DELETE — refId unknown to this decoder (mid-tick joiner)
+			if (item == null) { return true; }
+
+			// ref-count decrement — must run even when the item is absent from
+			// THIS array (view churn); this branch never reaches decodeValue()
+			refs.remove(refId);
+
 			index = ref.indexOf(item);
+			if (index == -1) { return true; }
+
 			ref.deleteByIndex(index);
 			allChanges.push({
 				refId: ref.__refId,

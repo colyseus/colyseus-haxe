@@ -30,8 +30,10 @@ class ArraySchemaImpl<T> implements IRef implements IArraySchema implements Arra
   }
 
   public function setByIndex(index: Int, value: Dynamic, operation: OPERATION): Void {
-    if (index == 0 && operation == OPERATION.ADD && this.items.length > 0) {
-        this.items.insert(0, value);
+    // strict ADD only: MOVE_AND_ADD/DELETE_AND_ADD/ADD_BY_REFID must not insert
+    if (operation == OPERATION.ADD && this.items[index] != null) {
+        // ADD at an occupied index = insert: shift existing items up.
+        this.items.insert(index, value);
 
     } else if (operation == OPERATION.DELETE_AND_MOVE) {
         this.items.splice(index, 1);

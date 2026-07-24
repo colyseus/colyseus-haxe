@@ -157,6 +157,8 @@ enum abstract OPERATION(Int) from Int
 
   // ArraySchema operations
   var REVERSE = 15;
+  var MOVE = 32;
+  var MOVE_AND_ADD = 160;
   var DELETE_BY_REFID = 33;
   var ADD_BY_REFID = 129;
 }
