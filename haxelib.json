@@ -4,9 +4,9 @@
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
   "description": "Colyseus Multiplayer SDK",
-  "version": "0.17.12",
+  "version": "0.17.13",
   "classPath": "src/",
-  "releasenote": "Fix getLatency()/selectByLatency() hanging on unresponsive endpoints (#941)",
+  "releasenote": "Fix Content-Length for UTF-8 request bodies on native targets (#79)",
   "contributors": ["endel"],
   "dependencies": {
     "colyseus-websocket": "1.0.15",

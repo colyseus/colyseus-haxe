@@ -47,7 +47,8 @@ class HTTP {
                 body = haxe.Json.stringify(options.body);
             }
 			headers.push(new HeaderField(HeaderName.CONTENT_TYPE, 'application/json'));
-			headers.push(new HeaderField(HeaderName.CONTENT_LENGTH, body.length));
+			// UTF-8 byte length — String.length is chars, mismatching what's written to the socket (#79)
+			headers.push(new HeaderField(HeaderName.CONTENT_LENGTH, haxe.io.Bytes.ofString(body).length));
         }
 
         if (options != null && options.headers != null) {
