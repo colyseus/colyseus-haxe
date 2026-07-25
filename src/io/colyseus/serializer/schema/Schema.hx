@@ -77,6 +77,10 @@ class Decorator {
           case EConst(CString(exp)):
             exprs.push(macro $p{["this", "_childTypes"]}.set($v{index}, $v{exp}));
             // exprs.push(macro $p{["this", "_childPrimitiveTypes"]}.set($v{index}, $v{exp}));
+
+          case EObjectDecl(_):
+            // options object — e.g. @:type("quantized", {min: 0., max: 1., bits: 16, mode: 0})
+            exprs.push(macro $p{["this", "_childTypes"]}.set($v{index}, ${f.meta.params[1]}));
           default:
         }
       }

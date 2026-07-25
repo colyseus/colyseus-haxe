@@ -478,6 +478,16 @@ class Decoder<T> {
                 ));
             }
 
+		} else if (fieldType == "quantized") {
+			// childType is the @:type options object; descriptor() caches resolution on it
+			var desc = Quantize.descriptor(childType);
+			var q: Float = (desc.bits == 8)
+				? Decode.uint8(bytes, it)
+				: (desc.bits == 16)
+					? Decode.uint16(bytes, it)
+					: Decode.uint32(bytes, it);
+			value = Quantize.dequantize(desc, q);
+
 		} else if (childType == null) {
 			value = Decode.decodePrimitiveType(fieldType, bytes, it);
 
