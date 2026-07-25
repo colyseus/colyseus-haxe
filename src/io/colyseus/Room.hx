@@ -56,6 +56,12 @@ typedef ReconnectionOptions = {
     var enqueuedMessages: Array<EnqueuedMessage>;
     /** Whether the room is currently reconnecting. */
     var isReconnecting: Bool;
+    /**
+     * Computes the delay (ms) before a retry, from (attempt, initial delay).
+     * Defaults to exponential backoff; the result is still clamped to
+     * [minDelay, maxDelay]. Replace to customize the retry curve.
+     */
+    var backoff: (Int, Int) -> Float;
 };
 
 class Room<T> {
@@ -103,7 +109,8 @@ class Room<T> {
         minUptime: 5000,
         maxEnqueuedMessages: 10,
         enqueuedMessages: [],
-        isReconnecting: false
+        isReconnecting: false,
+        backoff: Room.exponentialBackoff
     };
     private var joinedAtTime: Float = 0;
 
@@ -538,7 +545,7 @@ class Room<T> {
             this.reconnection.maxDelay,
             Math.max(
                 this.reconnection.minDelay,
-                this.exponentialBackoff(this.reconnection.retryCount, this.reconnection.delay)
+                this.reconnection.backoff(this.reconnection.retryCount, this.reconnection.delay)
             )
         );
 
@@ -563,7 +570,8 @@ class Room<T> {
         }, Std.int(delay));
     }
 
-    private function exponentialBackoff(attempt: Int, delay: Int): Float {
+    /** Default backoff curve for `reconnection.backoff`. */
+    public static function exponentialBackoff(attempt: Int, delay: Int): Float {
         return Math.floor(Math.pow(2, attempt) * delay);
     }
 
