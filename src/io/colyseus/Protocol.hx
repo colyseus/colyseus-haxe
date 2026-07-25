@@ -71,6 +71,24 @@ enum abstract HandshakeSection(Int) to Int {
     var INPUT_OPTIONS = 2;
 }
 
+/**
+ * Bit flags in the leading byte of the INPUT_OPTIONS handshake section.
+ * Some flags imply a trailing varint in the section payload, appended in
+ * bit order.
+ */
+enum abstract InputFlags(Int) to Int {
+    /** Reliable inputs carry the SNAPSHOT-timeline stamp (renderTime). */
+    var RENDER_TIME = 1;
+    /** A `[tickRate varint]` (Hz) follows — the server's fixed step rate. */
+    var FIXED_TIMESTEP = 2;
+    /** A `[patchRate varint]` (ms) follows — the state-patch interval. */
+    var PATCH_RATE = 4;
+    /** A `[subSteps varint]` follows — physics sub-steps per input tick. */
+    var SUB_STEPS = 8;
+    /** Reliable inputs carry the RECKON-timeline stamp (reckonTime). */
+    var RECKON_TIME = 16;
+}
+
 enum abstract CloseCode(Int) to Int {
     var NORMAL_CLOSURE = 1000;
     var GOING_AWAY = 1001;
