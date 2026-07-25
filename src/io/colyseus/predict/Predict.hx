@@ -140,14 +140,16 @@ class Predict {
 					(value: Dynamic, _previous: Dynamic) -> handler(value), immediate);
 				return () -> { off(); };
 			},
+			// neko Dynamic dispatch needs EXACT argument counts — pass every
+			// optional parameter explicitly
 			onAdd: (collection, handler) -> {
 				var off: Dynamic = callbacks.onAdd(collection,
-					(value: Dynamic, key: Dynamic) -> handler(value, key));
+					(value: Dynamic, key: Dynamic) -> handler(value, key), null, null);
 				return () -> { off(); };
 			},
 			onRemove: (collection, handler) -> {
 				var off: Dynamic = callbacks.onRemove(collection,
-					(value: Dynamic, key: Dynamic) -> handler(value, key));
+					(value: Dynamic, key: Dynamic) -> handler(value, key), null);
 				return () -> { off(); };
 			},
 		}, clock);
