@@ -9,6 +9,7 @@ class TestMain {
     r.add(new StorageTestCase());
 
     r.add(new SchemaSerializerTestCase());
+    r.add(new RoomProtocolTestCase());
     // r.add(new AuthTestCase());
 
     var success = r.run();

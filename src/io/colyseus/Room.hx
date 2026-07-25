@@ -11,6 +11,11 @@ import io.colyseus.serializer.FossilDeltaSerializer;
 import io.colyseus.serializer.schema.Schema.It;
 import io.colyseus.serializer.schema.Schema.SPEC;
 import io.colyseus.serializer.schema.encoding.Decode;
+import io.colyseus.serializer.schema.encoding.Encode;
+
+import io.colyseus.Protocol.ProtocolMasks;
+import io.colyseus.Protocol.ProtocolModifier;
+import io.colyseus.Protocol.ResponseStatus;
 
 using io.colyseus.Protocol.CloseCode;
 using io.colyseus.events.EventHandler;
@@ -21,6 +26,13 @@ import org.msgpack.MsgPack;
 
 typedef EnqueuedMessage = {
     data: Bytes
+};
+
+typedef PendingRequest = {
+    /** Called once with the decoded reply outcome: (ok, payload, faulted). */
+    var onReply: (Bool, Dynamic, Bool) -> Void;
+    /** Called when the connection closes before a reply arrives. */
+    @:optional var onClose: (String) -> Void;
 };
 
 typedef ReconnectionOptions = {
@@ -75,6 +87,11 @@ class Room<T> {
     private var lastPingTime: Float = 0;
     private var pingCallback: Null<Float->Void> = null;
 
+    // request/response (ROOM_REQUEST / ROOM_RESPONSE) correlation state
+    public static var defaultRequestTimeout: Int = 10000;
+    private var pendingRequests = new Map<Int, PendingRequest>();
+    private var nextRequestId: Int = 0;
+
     // reconnection logic
     public var reconnection: ReconnectionOptions = {
         enabled: true,
@@ -107,6 +124,9 @@ class Room<T> {
         }
 
 		this.connection.onClose = function(e:Dynamic) {
+            // in-flight requests can't be answered on a closed socket
+            this.rejectAllPendingRequests("connection closed before a response was received.");
+
             if (this.joinedAtTime == 0) {
                 trace("Room connection was closed unexpectedly (" + e.code + "): " + e.reason);
                 this.onError.dispatch(e.code, e.reason);
@@ -148,27 +168,20 @@ class Room<T> {
         }
     }
 
-    public function send(type: Dynamic, ?message: Dynamic) {
-        var bytesToSend = new BytesOutput();
-        bytesToSend.writeByte(Protocol.ROOM_DATA);
-
+    /** Writes a message type (short string as fixstr, or numeric code). */
+    private function writeMessageType(out: BytesOutput, type: Dynamic) {
         if (Std.isOfType(type, String)) {
             var encodedType = Bytes.ofString(type);
-            bytesToSend.writeByte(encodedType.length | 0xa0);
-            bytesToSend.writeBytes(encodedType, 0, encodedType.length);
+            out.writeByte(encodedType.length | 0xa0);
+            out.writeBytes(encodedType, 0, encodedType.length);
 
         } else {
-            bytesToSend.writeByte(type);
+            out.writeByte(type);
         }
+    }
 
-        if (message != null) {
-            var encodedMessage = MsgPack.encode(message);
-            bytesToSend.writeBytes(encodedMessage, 0, encodedMessage.length);
-        }
-
-        var data = bytesToSend.getBytes();
-
-        // If connection is not open, buffer the message
+    /** Transmits `data`, or buffers it while the connection is not open. */
+    private function sendOrEnqueue(data: Bytes) {
         if (!this.connection._isOpen) {
             this.enqueueMessage(data);
         } else {
@@ -176,29 +189,99 @@ class Room<T> {
         }
     }
 
+    public function send(type: Dynamic, ?message: Dynamic) {
+        var bytesToSend = new BytesOutput();
+        bytesToSend.writeByte(Protocol.ROOM_DATA);
+        this.writeMessageType(bytesToSend, type);
+
+        if (message != null) {
+            var encodedMessage = MsgPack.encode(message);
+            bytesToSend.writeBytes(encodedMessage, 0, encodedMessage.length);
+        }
+
+        this.sendOrEnqueue(bytesToSend.getBytes());
+    }
+
     public function sendBytes(type: Dynamic, ?bytes: Dynamic) {
         var bytesToSend = new BytesOutput();
         bytesToSend.writeByte(Protocol.ROOM_DATA_BYTES);
-
-        if (Std.isOfType(type, String)) {
-            var encodedType = Bytes.ofString(type);
-            bytesToSend.writeByte(encodedType.length | 0xa0);
-            bytesToSend.writeBytes(encodedType, 0, encodedType.length);
-
-        } else {
-            bytesToSend.writeByte(type);
-        }
-
+        this.writeMessageType(bytesToSend, type);
         bytesToSend.writeBytes(bytes, 0, bytes.length);
 
-        var data = bytesToSend.getBytes();
+        this.sendOrEnqueue(bytesToSend.getBytes());
+    }
 
-        // If connection is not open, buffer the message
-        if (!this.connection._isOpen) {
-            this.enqueueMessage(data);
-        } else {
-            this.connection.send(data);
+    /**
+     * Send a message and await the server's reply — the value the server
+     * returns from its matching `onMessage(type, ...)` handler.
+     *
+     * The callback receives `(response, error)`; exactly one is non-null.
+     * `error` is set when the handler rejects (the authored reason) or
+     * throws (`{name, message, code?}`), when the connection closes first,
+     * or when no reply arrives within `timeoutMs`
+     * (default: `Room.defaultRequestTimeout`).
+     */
+    public function request(type: Dynamic, ?payload: Dynamic, callback: (Dynamic, Dynamic) -> Void, ?timeoutMs: Int) {
+        if (this.connection == null || !this.connection._isOpen) {
+            callback(null, 'cannot send request "$type": connection is not open.');
+            return;
         }
+
+        // the timer lives in this closure — the pending registry stays
+        // unaware of timeouts; the reply callback and onClose both clear it
+        var timer: Timer = null;
+        var stopTimer = () -> { if (timer != null) { timer.stop(); timer = null; } };
+
+        var requestId = this.sendRequest(type, payload,
+            (ok, replyPayload, _) -> {
+                stopTimer();
+                if (ok) { callback(replyPayload, null); }
+                else { callback(null, replyPayload); }
+            },
+            (reason) -> {
+                stopTimer();
+                callback(null, reason);
+            });
+
+        var ms = (timeoutMs != null) ? timeoutMs : defaultRequestTimeout;
+        timer = Timer.delay(() -> {
+            this.pendingRequests.remove(requestId);
+            callback(null, 'request "$type" timed out after ${ms}ms.');
+        }, ms);
+    }
+
+    /**
+     * Low-level round-trip primitive: registers `onReply` (called once with
+     * the decoded outcome when the server replies) and transmits a
+     * ROOM_REQUEST frame. `request()` wraps it with a timeout. Returns the
+     * request id.
+     */
+    private function sendRequest(type: Dynamic, payload: Dynamic, onReply: (Bool, Dynamic, Bool) -> Void, ?onClose: (String) -> Void): Int {
+        var requestId = this.nextRequestId;
+        this.nextRequestId = (this.nextRequestId + 1) & 0x7FFFFFFF; // keep positive
+
+        var bytesToSend = new BytesOutput();
+        bytesToSend.writeByte(Protocol.ROOM_REQUEST);
+        Encode.uint(bytesToSend, requestId);
+        this.writeMessageType(bytesToSend, type);
+
+        if (payload != null) {
+            var encodedPayload = MsgPack.encode(payload);
+            bytesToSend.writeBytes(encodedPayload, 0, encodedPayload.length);
+        }
+
+        // reliable + offline: buffer so it flushes on (re)connect
+        this.sendOrEnqueue(bytesToSend.getBytes());
+
+        this.pendingRequests.set(requestId, { onReply: onReply, onClose: onClose });
+        return requestId;
+    }
+
+    private function rejectAllPendingRequests(reason: String) {
+        for (entry in this.pendingRequests) {
+            if (entry.onClose != null) { entry.onClose(reason); }
+        }
+        this.pendingRequests.clear();
     }
 
     public function ping(callback: Float->Void) {
@@ -238,8 +321,20 @@ class Room<T> {
     }
 
     private function onMessageCallback(data: Bytes) {
-        var code = data.get(0);
         var it:It = {offset: 1};
+
+        // Strip modifier bits (bits 5..7) so the dispatch below stays
+        // modifier-agnostic; consume any modifier-attached prefix bytes here.
+        var rawByte = data.get(0);
+        var code = rawByte & ProtocolMasks.CODE;
+
+        if ((rawByte & ProtocolModifier.TIMED) != 0) {
+            // [uint32 sNow][uint32 inputSeq] — server time (ms since room
+            // start) + last PROCESSED input seq. Consumed here; feeds the
+            // room clock + input ack once the input layer is ported.
+            Decode.uint32(data, it);
+            Decode.uint32(data, it);
+        }
 
         if (code == Protocol.JOIN_ROOM) {
             var reconnectionToken = data.getString(it.offset + 1, data.get(it.offset));
@@ -261,9 +356,23 @@ class Room<T> {
                 }
             }
 
-            // Apply handshake on first join (no need to do this on reconnect)
-            if (data.length > it.offset && this.serializer != null) {
-                this.serializer.handshake(data, it.offset);
+            // State reflection is length-prefixed: the schema handshake must
+            // not read past it into the trailing tagged-section bytes. A
+            // zero length means reconnect (the serializer already has state).
+            var stateReflectionLen: Int = Decode.number(data, it);
+            if (stateReflectionLen > 0 && this.serializer != null) {
+                this.serializer.handshake(data.sub(0, it.offset + stateReflectionLen), it.offset);
+            }
+            it.offset += stateReflectionLen;
+
+            // Trailing tagged sections: [tag byte][length varint][payload].
+            // Unknown tags are skipped via length (forward-compatible).
+            // INPUT_REFLECTION / INPUT_OPTIONS are consumed by the input
+            // layer once ported.
+            while (it.offset < data.length) {
+                it.offset++; // tag (see HandshakeSection)
+                var sectionLen: Int = Decode.number(data, it);
+                it.offset += sectionLen;
             }
 
             if (this.joinedAtTime == 0) {
@@ -305,10 +414,10 @@ class Room<T> {
             this.leave();
 
         } else if (code == Protocol.ROOM_STATE) {
-            this.setState(data.sub(it.offset, data.length - 1));
+            this.setState(data.sub(it.offset, data.length - it.offset));
 
         } else if (code == Protocol.ROOM_STATE_PATCH) {
-            this.patch(data.sub(it.offset, data.length - 1));
+            this.patch(data.sub(it.offset, data.length - it.offset));
 
         } else if (code == Protocol.ROOM_DATA) {
             var type = (SPEC.stringCheck(data, it))
@@ -327,6 +436,22 @@ class Room<T> {
                 : Decode.number(data, it);
 
             this.dispatchMessage(type, data.sub(it.offset, data.length - it.offset));
+
+        } else if (code == Protocol.ROOM_RESPONSE) {
+            // reply to a pending request()
+            var requestId: Int = Decode.number(data, it);
+            var status = data.get(it.offset++);
+            var payload: Dynamic = (data.length > it.offset)
+                ? MsgPack.decode(data.sub(it.offset, data.length - it.offset))
+                : null;
+
+            var entry = this.pendingRequests.get(requestId);
+            // already answered (e.g. timed out) or unknown id — ignore
+            if (entry != null) {
+                this.pendingRequests.remove(requestId);
+                // the ONE place the wire's three statuses collapse to (ok, payload, faulted):
+                entry.onReply(status == ResponseStatus.OK, payload, status == ResponseStatus.ERROR);
+            }
 
         } else if (code == Protocol.PING) {
             if (this.pingCallback != null) {
