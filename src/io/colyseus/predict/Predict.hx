@@ -196,8 +196,13 @@ class Predict {
 
 	// --- Attach -----------------------------------------------------------
 
-	/** Track one numeric field for smoothing. Returns an untrack function. */
-	public function track(instance: Dynamic, field: String, ?options: PredictFieldOptions): Void -> Void {
+	/**
+	 * Track one numeric field for smoothing. Returns an untrack function.
+	 * Internal primitive under `attach` — PORTING.md strips track/untrack/
+	 * trackStepped from the published surface.
+	 */
+	@:noCompletion
+	private function track(instance: Dynamic, field: String, ?options: PredictFieldOptions): Void -> Void {
 		var refId: Int = (instance : Schema).__refId;
 		var perRef = this.slotsByRef.get(refId);
 		if (perRef == null) {
@@ -234,7 +239,8 @@ class Predict {
 	}
 
 	/** Dead-reckon fields of an instance with a step SHARED with the server. */
-	public function trackReckon(instance: Dynamic, options: ReckonOptions): Void -> Void {
+	@:noCompletion
+	private function trackStepped(instance: Dynamic, options: ReckonOptions): Void -> Void {
 		var refId: Int = (instance : Schema).__refId;
 		var schema: Schema = cast instance;
 		var scratch: Dynamic = Type.createInstance(Type.getClass(instance), []);
@@ -246,7 +252,7 @@ class Predict {
 			// FULL copy of the entity so the shared step can read descriptors it
 			// never attached (a bot's `kind`). Dropping strings makes step
 			// functions that branch on one silently take the default branch — and
-			// attachAllReckon gives the caller no live instance to fall back on.
+			// an attach-all reckon gives the caller no live instance to fall back on.
 			if (t != "ref" && t != "array" && t != "map") {
 				copyFields.push(schema._indexes.get(i));
 			}
@@ -314,26 +320,53 @@ class Predict {
 	}
 
 	/**
-	 * Attach prediction to every child of a root-level collection: wires
-	 * onAdd -> track(fields) and onRemove -> detach. Returns a detacher.
+	 * Attach prediction to ONE instance from a declarative config. Returns a
+	 * detacher.
+	 *
+	 * Two shapes, mirroring the reference:
+	 *
+	 * ```haxe
+	 * // per-field smoothing; each field picks its own mode
+	 * predict.attach(boss, { x: "lerp", yaw: { mode: "damped", angle: true } });
+	 *
+	 * // dead reckoning, one step shared with the server across `fields`
+	 * predict.attach(bot, { mode: "reckon", fields: ["x", "y"], step: patrol });
+	 * ```
+	 *
+	 * `Dynamic` because the config is a union the type system can't spell here:
+	 * a per-field map whose values are either a mode string or a full
+	 * `PredictFieldOptions`, or the reckon shape.
+	 *
+	 * Fields the instance's schema doesn't declare are DROPPED, not an error:
+	 * one config can cover a heterogeneous collection, and a field that isn't
+	 * there would otherwise subscribe to nothing (or read garbage from the
+	 * reckon scratch).
 	 */
-	public function attachAll(collection: String, fields: Array<String>, ?options: PredictFieldOptions): Void -> Void {
-		return this.attachEach(collection, (child) -> {
-			for (f in fields) { this.track(child, f, options); }
-		});
+	public function attach(instance: Dynamic, config: Dynamic): Void -> Void {
+		if (Reflect.field(config, "mode") == "reckon") {
+			return this.trackStepped(instance, config);
+		}
+		var offs: Array<Void -> Void> = [];
+		for (field in Reflect.fields(config)) {
+			if (Reflect.getProperty(instance, field) == null) { continue; }
+			var spec: Dynamic = Reflect.field(config, field);
+			var opts: PredictFieldOptions =
+				Std.isOfType(spec, String) ? { mode: cast spec } : cast spec;
+			offs.push(this.track(instance, field, opts));
+		}
+		return () -> { for (off in offs) off(); };
 	}
 
 	/**
-	 * The reckon twin of `attachAll`: forward-simulate every child of a
-	 * collection with the shared step instead of smoothing it toward the past.
-	 * Same add/remove wiring, so a collection whose members come and go needs no
-	 * bookkeeping from the caller.
+	 * Attach prediction to every child of a root-level collection: wires
+	 * onAdd -> attach(child, config) and onRemove -> detach. Same config shapes
+	 * as `attach`, reckon included — there is no separate reckon flavour.
 	 */
-	public function attachAllReckon(collection: String, options: ReckonOptions): Void -> Void {
-		return this.attachEach(collection, (child) -> { this.trackReckon(child, options); });
+	public function attachAll(collection: String, config: Dynamic): Void -> Void {
+		return this.attachEach(collection, (child) -> { this.attach(child, config); });
 	}
 
-	/** Shared add/remove wiring behind both attachAll flavours. */
+	/** Shared add/remove wiring behind the attach-all path. */
 	private function attachEach(collection: String, attach: Dynamic -> Void): Void -> Void {
 		var tracked: Array<Dynamic> = [];
 		var addOff = this.callbacks.onAdd(collection, (child, _key) -> {
