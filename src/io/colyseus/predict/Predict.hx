@@ -4,6 +4,7 @@ import io.colyseus.RoomClock;
 import io.colyseus.predict.Reconciler;
 import io.colyseus.predict.PredictedEventChannel;
 import io.colyseus.predict.PredictedSpawns;
+import io.colyseus.predict.SimReconciler.SimReconcilerOptions;
 
 import io.colyseus.serializer.schema.Schema;
 
@@ -387,6 +388,19 @@ class Predict {
 				}
 			}
 		}
+	}
+
+	/**
+	 * Spawn a driven `SimReconciler` — the composite face, for a world of parts
+	 * rather than one entity's fields.
+	 */
+	public function makeSimReconciler<W, I>(opts: SimReconcilerOptions<W, I>): SimReconciler<W, I> {
+		if (opts.clock == null) { opts.clock = this.clock; }
+		this.bindRenderDelay(opts.input);
+		var recon = new SimReconciler<W, I>(opts);
+		this.adoptFixedStep(recon.stepMs);
+		this.driven.push(recon);
+		return recon;
 	}
 
 	/** Spawn a driven `PredictedEventChannel`. */
