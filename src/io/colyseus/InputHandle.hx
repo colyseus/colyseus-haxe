@@ -67,6 +67,22 @@ class InputHandle {
 	public var sentCount(default, null): Int = 0;
 	/** Sent but not yet acked (`sentCount − lastProcessed`). */
 	public var pendingCount(get, never): Int;
+
+	/**
+	 * How far in the PAST this client draws remote entities, in ms. A
+	 * lag-compensating server rewinds its targets by this much plus half the RTT,
+	 * so it reads the world at the instant you actually saw — get it wrong and
+	 * every shot misses by exactly the difference. `predict.makeReconciler()`
+	 * binds it from the lerp delay you already attached with; set it yourself
+	 * only to override.
+	 */
+	public function renderDelay(): Float {
+		return this._renderDelay;
+	}
+
+	public function setRenderDelay(ms: Float): Void {
+		this._renderDelay = (ms > 0) ? ms : 0;
+	}
 	function get_pendingCount() return sentCount - lastProcessed;
 	/** Capacity (in seqs) of the replay ring backing `at()`. */
 	public var replayBufferSize(default, null): Int;

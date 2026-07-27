@@ -121,6 +121,8 @@ class Predict {
 	private var slotsByRef: Map<Int, Map<String, Slot>> = new Map();
 	private var simsByRef: Map<Int, SimState> = new Map();
 	private var driven: Array<Dynamic> = [];
+	// Every attachAll* detacher, so dispose can unhook what the caller never held.
+	private var attachments: Array<Void -> Void> = [];
 
 	// room-wide fixed-step accumulator (send budget)
 	private var fixedStepMs: Null<Float> = null;
@@ -286,21 +288,66 @@ class Predict {
 	 * onAdd -> track(fields) and onRemove -> detach. Returns a detacher.
 	 */
 	public function attachAll(collection: String, fields: Array<String>, ?options: PredictFieldOptions): Void -> Void {
+		return this.attachEach(collection, (child) -> {
+			for (f in fields) { this.track(child, f, options); }
+		});
+	}
+
+	/**
+	 * The reckon twin of `attachAll`: forward-simulate every child of a
+	 * collection with the shared step instead of smoothing it toward the past.
+	 * Same add/remove wiring, so a collection whose members come and go needs no
+	 * bookkeeping from the caller.
+	 */
+	public function attachAllReckon(collection: String, options: ReckonOptions): Void -> Void {
+		return this.attachEach(collection, (child) -> { this.trackReckon(child, options); });
+	}
+
+	/** Shared add/remove wiring behind both attachAll flavours. */
+	private function attachEach(collection: String, attach: Dynamic -> Void): Void -> Void {
 		var tracked: Array<Dynamic> = [];
 		var addOff = this.callbacks.onAdd(collection, (child, _key) -> {
-			for (f in fields) { this.track(child, f, options); }
+			attach(child);
 			tracked.push(child);
 		});
 		var removeOff = this.callbacks.onRemove(collection, (child, _key) -> {
 			tracked.remove(child);
 			this.detach(child);
 		});
-		return () -> {
+		var off = () -> {
 			if (addOff != null) { addOff(); }
 			if (removeOff != null) { removeOff(); }
 			for (child in tracked) { this.detach(child); }
 			tracked = [];
 		};
+		this.attachments.push(off);
+		return off;
+	}
+
+	/**
+	 * Release everything this Predict registered: tracked fields, reckon sims,
+	 * attachAll wiring, and every driven child.
+	 *
+	 * This matters more than it looks. Callbacks live on the ROOM, so a Predict
+	 * that outlives its owner keeps firing handlers into freed state — attach and
+	 * detach are not symmetric unless someone closes the loop, and the attachAll
+	 * detachers are held here, not by the caller. This is that loop; call it when
+	 * the screen using this goes away.
+	 */
+	public function dispose(): Void {
+		for (off in this.attachments) { off(); }
+		this.attachments = [];
+		for (perRef in this.slotsByRef) {
+			for (slot in perRef) { if (slot.detach != null) { slot.detach(); } }
+		}
+		this.slotsByRef = new Map();
+		this.simsByRef = new Map();
+		for (child in this.driven) {
+			var d: Dynamic = child;
+			d.dispose();
+		}
+		this.driven = [];
+		this.fixedStepMs = null;
 	}
 
 	// --- Factories --------------------------------------------------------
@@ -308,10 +355,33 @@ class Predict {
 	/** Spawn a driven `Reconciler` (clock injected, fixed step adopted). */
 	public function makeReconciler(instance: Schema, opts: ReconcilerOptions): Reconciler {
 		if (opts.clock == null) { opts.clock = this.clock; }
+		this.bindRenderDelay(opts.input);
 		var recon = new Reconciler(instance, opts);
 		this.adoptFixedStep(recon.stepMs);
 		this.driven.push(recon);
 		return recon;
+	}
+
+	/**
+	 * Tell the input handle how far in the past this client draws, taken from
+	 * the lerp delay already attached here.
+	 *
+	 * Worth doing automatically because the failure is silent and expensive: a
+	 * lag-compensating server rewinds to `serverNow - (renderDelay + rtt/2)`, so
+	 * leaving renderDelay at zero makes every rewound read land one full
+	 * render-delay early, and shots miss by exactly that much with nothing in the
+	 * logs to say so. An explicit `renderDelay` on `room.input()` still wins.
+	 */
+	private function bindRenderDelay(input: Dynamic): Void {
+		if (input == null || input.renderDelay() > 0) { return; }
+		for (perRef in this.slotsByRef) {
+			for (slot in perRef) {
+				if (slot.mode == "lerp" && slot.delay > 0) {
+					input.setRenderDelay(slot.delay);
+					return;
+				}
+			}
+		}
 	}
 
 	/** Spawn a driven `PredictedEventChannel`. */
