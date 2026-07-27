@@ -217,7 +217,12 @@ class Predict {
 		var i = 0;
 		while (schema._indexes.exists(i)) {
 			var t = schema._types.get(i);
-			if (t != "ref" && t != "array" && t != "map" && t != "string") {
+			// Every primitive, strings included: the scratch is documented as a
+			// FULL copy of the entity so the shared step can read descriptors it
+			// never attached (a bot's `kind`). Dropping strings makes step
+			// functions that branch on one silently take the default branch — and
+			// attachAllReckon gives the caller no live instance to fall back on.
+			if (t != "ref" && t != "array" && t != "map") {
 				copyFields.push(schema._indexes.get(i));
 			}
 			i++;
