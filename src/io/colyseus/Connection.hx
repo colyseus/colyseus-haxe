@@ -103,7 +103,12 @@ class Connection {
 		this.createWebSocket(redirectUrl.toString());
 	}
 
-	public function send(data:Bytes) {
+	/**
+	 * Dynamic for the same reason `onMessage` is: it is the OUTBOUND seam. A
+	 * decorator (a latency simulator, a recorder) captures this and reassigns it,
+	 * which puts it in front of the socket rather than beside it.
+	 */
+	public dynamic function send(data:Bytes) {
 		return this.ws.sendBytes(data);
 	}
 
