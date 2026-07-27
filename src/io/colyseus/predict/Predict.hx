@@ -1,6 +1,9 @@
 package io.colyseus.predict;
 
+import io.colyseus.Room;
 import io.colyseus.RoomClock;
+import io.colyseus.serializer.SchemaSerializer;
+import io.colyseus.serializer.schema.Callbacks.SchemaCallbacks;
 import io.colyseus.predict.Reconciler;
 import io.colyseus.predict.PredictedEventChannel;
 import io.colyseus.predict.PredictedSpawns;
@@ -136,6 +139,22 @@ class Predict {
 	 * of the specialized callbacks class — every specialization has the same
 	 * Dynamic-typed listen/onAdd/onRemove surface consumed here.
 	 */
+	/**
+	 * The one-liner every caller wants: a Predict over a room's callbacks and
+	 * clock — the same two collaborators every time, and no decision the caller
+	 * is better placed to make.
+	 *
+	 * Uses the IMMEDIATE callbacks flavour (`new SchemaCallbacks(decoder)`)
+	 * rather than `Callbacks.get(room)`. The latter defers onto Heaps' MainLoop,
+	 * which never drains on a headless sys target — prediction would then see no
+	 * callbacks at all, and silently, since nothing errors. Prediction is driven
+	 * from the caller's own `tick`, so deferring buys it nothing anyway.
+	 */
+	public static function forRoom<T>(room: Room<T>): Predict {
+		var serializer: SchemaSerializer<T> = cast room.serializer;
+		return create(new SchemaCallbacks<T>(serializer.decoder), room.clock);
+	}
+
 	public static function create(callbacks: Dynamic, clock: RoomClock): Predict {
 		return new Predict({
 			listen: (instance, field, handler, immediate) -> {
@@ -359,7 +378,7 @@ class Predict {
 	// --- Factories --------------------------------------------------------
 
 	/** Spawn a driven `Reconciler` (clock injected, fixed step adopted). */
-	public function makeReconciler(instance: Schema, opts: ReconcilerOptions): Reconciler {
+	public function reconciler(instance: Schema, opts: ReconcilerOptions): Reconciler {
 		if (opts.clock == null) { opts.clock = this.clock; }
 		this.bindRenderDelay(opts.input);
 		var recon = new Reconciler(instance, opts);
@@ -394,7 +413,7 @@ class Predict {
 	 * Spawn a driven `SimReconciler` — the composite face, for a world of parts
 	 * rather than one entity's fields.
 	 */
-	public function makeSimReconciler<W, I>(opts: SimReconcilerOptions<W, I>): SimReconciler<W, I> {
+	public function sim<W, I>(opts: SimReconcilerOptions<W, I>): SimReconciler<W, I> {
 		if (opts.clock == null) { opts.clock = this.clock; }
 		this.bindRenderDelay(opts.input);
 		var recon = new SimReconciler<W, I>(opts);

@@ -72,7 +72,7 @@ class InputHandle {
 	 * How far in the PAST this client draws remote entities, in ms. A
 	 * lag-compensating server rewinds its targets by this much plus half the RTT,
 	 * so it reads the world at the instant you actually saw — get it wrong and
-	 * every shot misses by exactly the difference. `predict.makeReconciler()`
+	 * every shot misses by exactly the difference. `predict.reconciler()`
 	 * binds it from the lerp delay you already attached with; set it yourself
 	 * only to override.
 	 */
