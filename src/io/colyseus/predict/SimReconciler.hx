@@ -1,5 +1,6 @@
 package io.colyseus.predict;
 
+import io.colyseus.predict.RollbackController.BoundRegistration;
 import io.colyseus.predict.RollbackController.RollbackOptions;
 import io.colyseus.predict.RollbackController.StepContext;
 import io.colyseus.serializer.schema.Schema;
@@ -48,11 +49,14 @@ typedef SimReconcilerOptions<W, I> = {
 
 /** A bound field: its source, the mirror that replaced it, and its poses. */
 private class Bound {
+	/** World field this entry came from — the prefix of its pose keys. */
+	public var name: String;
 	public var source: Schema;
 	public var mirror: Schema;
 	public var fields: Array<String> = [];
 
-	public function new(source: Schema, mirror: Schema) {
+	public function new(name: String, source: Schema, mirror: Schema) {
+		this.name = name;
 		this.source = source;
 		this.mirror = mirror;
 	}
@@ -119,7 +123,7 @@ class SimReconciler<W, I> extends RollbackController {
 		// Same as the flat face: the predicted state is a same-class schema
 		// mirror, so a step writes `w.paddle.vy = …` against a real instance.
 		var mirror: Schema = Type.createInstance(Type.getClass(source), []);
-		var b = new Bound(source, mirror);
+		var b = new Bound(name, source, mirror);
 
 		var i = 0;
 		while (source._indexes.exists(i)) {
@@ -172,7 +176,7 @@ class SimReconciler<W, I> extends RollbackController {
 	 * interpolated between the two latest steps plus the decaying correction
 	 * offset. NaN for an unknown key.
 	 */
-	public function value(poseKey: String): Float {
+	public override function value(poseKey: String): Float {
 		var current = readPose(poseKey);
 		if (Math.isNaN(current)) { return Math.NaN; }
 		var smoothed = current + this.getError(poseKey);
@@ -184,6 +188,29 @@ class SimReconciler<W, I> extends RollbackController {
 	/** Every pose key this world exposes — useful when one reads NaN. */
 	public function poseKeys(): Array<String> {
 		return poseKeyList;
+	}
+
+	/**
+	 * Composite face: each bound field keeps its ORIGINAL decoded instance as the
+	 * source (not the mirror that replaced it), so `predict.value(state.puck,
+	 * "x")` resolves without the caller ever naming "puck.x".
+	 */
+	public override function boundRegistrations(): Array<BoundRegistration> {
+		var out: Array<BoundRegistration> = [];
+		for (b in bound) {
+			var fields = [], keys = [];
+			for (f in b.fields) {
+				var key = b.name + "." + f;
+				if (poseOf.exists(key) && isNumeric(Reflect.getProperty(b.mirror, f))) {
+					fields.push(f);
+					keys.push(key);
+				}
+			}
+			if (fields.length > 0) {
+				out.push({ source: b.source, fields: fields, poseKeys: keys });
+			}
+		}
+		return out;
 	}
 
 	// --- RollbackController hooks -----------------------------------------

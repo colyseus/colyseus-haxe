@@ -79,6 +79,11 @@ private class Slot {
 	public var ringHead: Int = 0;
 	public var ringCount: Int = 0;
 	public var detach: Void -> Void;
+	/** mode "bound" only: the controller owning this field, and its pose key. */
+	public var ctrl: RollbackController;
+	public var poseKey: String;
+	/** mode "bound" only: the passive slot displaced here, restored on dispose. */
+	public var stash: Slot;
 	public function new() {}
 }
 
@@ -383,8 +388,59 @@ class Predict {
 		this.bindRenderDelay(opts.input);
 		var recon = new Reconciler(instance, opts);
 		this.adoptFixedStep(recon.stepMs);
+		this.installBoundOverlay(recon);
 		this.driven.push(recon);
 		return recon;
+	}
+
+	/**
+	 * Route `value(instance, field)` at every field a controller predicts, so ONE
+	 * read idiom covers the whole render layer: passively-smoothed remotes and
+	 * controller-owned entities alike, with the caller never naming a pose key.
+	 *
+	 * Any passive slot already on that field is STASHED, not dropped — its
+	 * listener keeps sampling, and dispose() puts it back.
+	 */
+	private function installBoundOverlay(ctrl: RollbackController): Void {
+		var regs = ctrl.boundRegistrations();
+		if (regs.length == 0) { return; }
+		var touched: Array<{ perRef: Map<String, Slot>, field: String }> = [];
+		for (reg in regs) {
+			if (reg.source == null) { continue; }
+			var refId = (reg.source : Schema).__refId;
+			var perRef = this.slotsByRef.get(refId);
+			if (perRef == null) {
+				perRef = new Map();
+				this.slotsByRef.set(refId, perRef);
+			}
+			for (k in 0...reg.fields.length) {
+				var field = reg.fields[k];
+				var stash = perRef.get(field);
+				if (stash != null && stash.mode == "bound") {
+					trace('colyseus.predict: "$field" is already bound to a controller — '
+						+ "the newer registration wins.");
+					stash = stash.stash;
+				}
+				var slot = new Slot();
+				slot.field = field;
+				slot.instance = reg.source;
+				slot.mode = "bound";
+				slot.ctrl = ctrl;
+				slot.poseKey = reg.poseKeys[k];
+				slot.stash = stash;
+				perRef.set(field, slot);
+				touched.push({ perRef: perRef, field: field });
+			}
+		}
+		ctrl.onDisposed(() -> {
+			for (t in touched) {
+				var slot = t.perRef.get(t.field);
+				if (slot != null && slot.mode == "bound") {
+					if (slot.stash != null) { t.perRef.set(t.field, slot.stash); }
+					else { t.perRef.remove(t.field); }
+				}
+			}
+		});
 	}
 
 	/**
@@ -418,6 +474,7 @@ class Predict {
 		this.bindRenderDelay(opts.input);
 		var recon = new SimReconciler<W, I>(opts);
 		this.adoptFixedStep(recon.stepMs);
+		this.installBoundOverlay(recon);
 		this.driven.push(recon);
 		return recon;
 	}
@@ -576,6 +633,9 @@ class Predict {
 		var slot = (perRef != null) ? perRef.get(field) : null;
 		if (slot == null) { return toNumber(Reflect.getProperty(instance, field)); }
 		return switch (slot.mode) {
+			// Controller-owned: a reconciler claimed this field, so the pose comes
+			// from its rollback rather than a smoothing curve over the server stream.
+			case "bound": slot.ctrl.value(slot.poseKey);
 			case "lerp": this.computeLerp(slot);
 			case "damped": this.computeDamped(slot);
 			case "extrapolate": this.computeExtrapolate(slot);

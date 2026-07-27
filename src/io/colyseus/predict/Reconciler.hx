@@ -154,13 +154,26 @@ class Reconciler extends RollbackController {
 	 * steps plus the decaying correction offset. Numeric fields only; others
 	 * return the current value.
 	 */
-	public function value(field: String): Float {
+	public override function value(field: String): Float {
 		var current: Dynamic = Reflect.getProperty(this.state, field);
 		if (!isNumeric(current)) { return asScalar(current); }
 		var smoothed: Float = cast(current, Float) + this.getError(field);
 		var p = this.prev.get(field);
 		if (p == null) { p = smoothed; }
 		return p + (smoothed - p) * this.renderAlpha();
+	}
+
+	/**
+	 * Flat face: the pose key IS the field name, so the two lists match — kept
+	 * separate to share one overlay path with the composite face.
+	 */
+	public override function boundRegistrations(): Array<BoundRegistration> {
+		if (this.numericFields.length == 0) { return []; }
+		return [{
+			source: this.instance,
+			fields: this.numericFields,
+			poseKeys: this.numericFields,
+		}];
 	}
 
 	// --- RollbackController hooks -----------------------------------------

@@ -12,6 +12,17 @@ interface PredictSink {
 }
 
 /**
+ * One controller-owned instance and the pose keys its numeric fields map to.
+ * `fields[i]` is read back as `poseKeys[i]` — the two differ only on the
+ * composite face, where a key is "<worldKey>.<field>".
+ */
+typedef BoundRegistration = {
+	var source: Dynamic;
+	var fields: Array<String>;
+	var poseKeys: Array<String>;
+};
+
+/**
  * Per-step context handed to a reconciler's step (port of
  * `predict/rollback.ts` StepContext). One fixed dt drives both sides of the
  * rollback. The instance is REUSED across steps.
@@ -104,6 +115,20 @@ typedef RollbackOptions = {
  * false), `refreshRender` (no-op), `markDirty` (no-op).
  */
 class RollbackController {
+	/**
+	 * Rendered pose for one key. Overridden by both faces — `Reconciler` keys by
+	 * schema field, `SimReconciler` by "<worldKey>.<field>". Declared here so the
+	 * bound overlay can read a pose without knowing which face it holds.
+	 */
+	public function value(key: String): Float { return Math.NaN; }
+
+	/**
+	 * What `Predict.value(instance, field)` needs to reach this controller's
+	 * poses: the ORIGINAL decoded instance per bound entry (not the mirror), its
+	 * numeric fields, and the pose key each maps to. Empty when nothing is bound.
+	 */
+	public function boundRegistrations(): Array<BoundRegistration> { return []; }
+
 	/** Per-numeric-field correction injected by the most recent reconcile. */
 	public var lastCorrection(default, null): Map<String, Float> = new Map();
 	/** Max |lastCorrection| across fields. */
