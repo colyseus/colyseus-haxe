@@ -522,14 +522,72 @@ class Predict {
 	/**
 	 * Spawn a driven `PredictedSpawns` store wired to a root-level
 	 * collection's add/remove stream.
+	 *
+	 * With `fields`, the store also owns the collection's MOTION (no separate
+	 * `attachAll` needed): confirmed entities are dead-reckoned with the same
+	 * `step` that advances pending locals, and `store.value(entry, field)` is
+	 * one read path across the whole life of the entity.
 	 */
 	public function spawns(collection: String, opts: SpawnsOptions): PredictedSpawns {
 		var store = new PredictedSpawns(opts, this.clock);
-		var addOff = this.callbacks.onAdd(collection, (server, _key) -> store.handleAdd(server));
-		var removeOff = this.callbacks.onRemove(collection, (server, _key) -> store.handleRemove(server));
+
+		// Reckon wiring (`fields` + `step`): every confirmed entity gets a
+		// reckon attach whose horizon is snapshot age PLUS the entry's measured
+		// input lead — 0 for a foreign entity (server-present, same as an
+		// attachAll reckon), the exact per-spawn uplink for an owned one (see
+		// spawnTime). An owned projectile thus keeps flying the shooter's
+		// timeline through the handoff.
+		var reckon = (opts != null && opts.fields != null && opts.step != null);
+		// keyed by refId, like simsByRef — Dynamic is not a valid Map key here
+		var untrack: Map<Int, Void -> Void> = reckon ? new Map() : null;
+		var clock = this.clock;
+		var step = reckon ? opts.step : null;
+
+		var addOff = this.callbacks.onAdd(collection, (server, _key) -> {
+			store.handleAdd(server);
+			if (!reckon || untrack.exists((server : Schema).__refId)) { return; } // decoder re-fire
+			// AFTER handleAdd: the lead is only measured once the entry collapses.
+			var entry = store.entryFor(server);
+			var lead = (entry != null) ? entry.leadMs : 0.0;
+			var off = this.trackStepped(server, {
+				fields: opts.fields,
+				step: (scratch, dt, _elapsed) -> step(scratch, dt),
+				// 0, not the reckon default 20: a deterministic constant-step
+				// projectile rebases exactly, so smoothing only adds lag.
+				smoothing: (opts.smoothing != null) ? opts.smoothing : 0,
+				substep: opts.substep,
+			});
+			this.bindForward(server, () -> {
+				if (clock == null) { return Math.max(0, lead); }
+				var stamp = clock.lastServerTime();
+				var age = (stamp > 0) ? Math.max(0, clock.serverNow() - stamp) : 0;
+				return Math.max(0, age + lead);
+			});
+			untrack.set((server : Schema).__refId, off);
+		});
+
+		var removeOff = this.callbacks.onRemove(collection, (server, _key) -> {
+			if (untrack != null) {
+				var refId = (server : Schema).__refId;
+				var off = untrack.get(refId);
+				if (off != null) { off(); }
+				untrack.remove(refId);
+			}
+			store.handleRemove(server);
+		});
+
+		if (reckon) {
+			// route store.value() confirmed reads through the reckon slots
+			store.bindReader((server, field) -> this.value(server, field));
+		}
+
 		store.onDisposedInternal = () -> {
 			if (addOff != null) { addOff(); }
 			if (removeOff != null) { removeOff(); }
+			if (untrack != null) {
+				for (off in untrack) { off(); }
+				untrack.clear();
+			}
 		};
 		this.driven.push(store);
 		return store;

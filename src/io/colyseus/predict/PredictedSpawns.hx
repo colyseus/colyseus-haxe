@@ -19,6 +19,23 @@ typedef SpawnsOptions = {
 	@:optional var ttl: Float -> Float;
 	/** Invoked when a prediction is dropped as a mispredict. */
 	@:optional var onReject: (local: Dynamic, id: Int) -> Void;
+
+	/**
+	 * Dead-reckon confirmed entities on these fields, using the same `step`
+	 * that advances pending locals. Each confirmed entity gets a reckon slot
+	 * (readable via `predict.value()` or, uniformly across the handoff, the
+	 * store's `value()`): foreign entities forward to server-present (snapshot
+	 * age); owned ones additionally forward by the entry's measured input lead
+	 * when `spawnTime` is set.
+	 */
+	@:optional var fields: Array<String>;
+
+	/** Reckon smoothing for confirmed entities. Default 0 — a deterministic
+	    constant-step projectile rebases exactly, so smoothing only adds lag. */
+	@:optional var smoothing: Null<Float>;
+
+	/** Reckon substep in ms. Smaller = more accurate bounces. Default 16. */
+	@:optional var substep: Null<Float>;
 }
 
 /** A merged logical entity — one per logical spawn. Key sprites on `id`. */
@@ -177,6 +194,33 @@ class PredictedSpawns implements DrivenChild {
 		for (entry in this.order) { if (entry.server == server) { return entry; } }
 		return null;
 	}
+
+	/**
+	 * Unified field read across the predicted → authoritative handoff: pending
+	 * entries read the stepped local, confirmed entries read the authoritative
+	 * instance through the bound reader — `predict.value()` (reckoned,
+	 * lead-aware) when created via `predict.spawns(...)` with `fields`, a raw
+	 * field read otherwise. Render from this and the handoff is invisible: same
+	 * id, same timeline, one code path.
+	 */
+	public function value(entry: SpawnEntry, field: String): Float {
+		if (entry.server != null) { return this.readServer(entry.server, field); }
+		if (entry.local == null) { return Math.NaN; }
+		var v: Dynamic = Reflect.getProperty(entry.local, field);
+		return (v == null) ? Math.NaN : cast(v, Float);
+	}
+
+	/** Route confirmed-entry `value()` reads (wired by `predict.spawns` to its
+	    reckon slots; standalone stores keep the raw default). */
+	public function bindReader(read: (server: Dynamic, field: String) -> Float): Void {
+		this.readServer = read;
+	}
+
+	private var readServer: (server: Dynamic, field: String) -> Float =
+		(server, field) -> {
+			var v: Dynamic = Reflect.getProperty(server, field);
+			return (v == null) ? Math.NaN : cast(v, Float);
+		};
 
 	public function alive(id: Int): Bool {
 		return this.entryById(id) != null;
