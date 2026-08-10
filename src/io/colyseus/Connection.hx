@@ -64,6 +64,10 @@ class Connection {
 		}
 
 		this.ws.onclose = function(?e:Dynamic) {
+			if (this.forceCloseCode != null) {
+				e = { code: this.forceCloseCode };
+				this.forceCloseCode = null;
+			}
             this.onClose(e);
 		}
 
@@ -112,7 +116,17 @@ class Connection {
 		return this.ws.sendBytes(data);
 	}
 
-	public function close() {
+	/**
+	 * The ws lib cannot send a close code, so a LOCAL close would reach
+	 * onClose without one and the room would read it as a plain leave. A drop
+	 * test needs its own kill classified as reconnectable: stash the code and
+	 * report it from the onclose dispatch (mirrors the Lua SDK's
+	 * `_force_close_code`).
+	 */
+	public var forceCloseCode: Null<Int> = null;
+
+	public function close(?code: Int) {
+		this.forceCloseCode = code;
 		this.ws.close();
 	}
 }
