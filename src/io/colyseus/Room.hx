@@ -633,23 +633,36 @@ class Room<T> {
 
         trace("[Colyseus reconnection]: ⏳ will retry in " + (delay / 1000) + " seconds...");
 
-        // Wait before attempting reconnection
-        Timer.delay(function() {
-            trace("[Colyseus reconnection]: 🔄 Re-establishing sessionId '" + this.sessionId + "' with roomId '" + this.roomId + "'... (attempt " + this.reconnection.retryCount + " of " + this.reconnection.maxRetries + ")");
+        // Wait before attempting reconnection.
+        #if sys
+        // haxe.Timer schedules on the CURRENT thread's event loop, and this
+        // runs on the ws process thread — which has none, so the callback
+        // would never fire. A dedicated wait thread mirrors the C SDK's
+        // reconnection worker instead.
+        sys.thread.Thread.create(() -> {
+            Sys.sleep(delay / 1000);
+            this.attemptReconnect();
+        });
+        #else
+        Timer.delay(this.attemptReconnect, Std.int(delay));
+        #end
+    }
 
-            var tokenParts = this.reconnectionToken.split(":");
-            var reconnectToken = tokenParts.length > 1 ? tokenParts[1] : this.reconnectionToken;
+    private function attemptReconnect() {
+        trace("[Colyseus reconnection]: 🔄 Re-establishing sessionId '" + this.sessionId + "' with roomId '" + this.roomId + "'... (attempt " + this.reconnection.retryCount + " of " + this.reconnection.maxRetries + ")");
 
-            try {
-                this.connection.reconnect({
-                    reconnectionToken: reconnectToken,
-                    skipHandshake: true // we already applied the handshake on first join
-                });
+        var tokenParts = this.reconnectionToken.split(":");
+        var reconnectToken = tokenParts.length > 1 ? tokenParts[1] : this.reconnectionToken;
 
-            } catch (e:Dynamic) {
-                this.retryReconnection();
-            }
-        }, Std.int(delay));
+        try {
+            this.connection.reconnect({
+                reconnectionToken: reconnectToken,
+                skipHandshake: true // we already applied the handshake on first join
+            });
+
+        } catch (e:Dynamic) {
+            this.retryReconnection();
+        }
     }
 
     /** Default backoff curve for `reconnection.backoff`. */
