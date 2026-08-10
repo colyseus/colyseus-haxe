@@ -75,9 +75,13 @@ private class Bound {
  * short-circuit and always adopts, so the reference expects a little float noise
  * in the correction rather than an exact zero.
  *
- * NOT ported (see PORTING.md): the custom `pose`/`interpolate` overlays that give
- * OPAQUE parts render smoothing, and the boundRegistrations hook into
- * Predict.value — read poses through `value()`.
+ * Bound fields register into `predict.value()`, so the render layer reads them
+ * the same way it reads any other entity — `predict.value(state.puck, "x")` —
+ * and the "field.schemaField" pose key stays an internal detail.
+ *
+ * NOT ported (see PORTING.md): the custom `pose`/`interpolate` overlays that
+ * give OPAQUE parts render smoothing. Those have no decoded instance to key on,
+ * so `value(poseKey)` remains the only way to read them.
  */
 class SimReconciler<W, I> extends RollbackController {
 	/**
