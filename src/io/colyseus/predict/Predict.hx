@@ -613,8 +613,13 @@ class Predict {
 	 * Call once per render frame. Returns the SEND BUDGET: how many fixed
 	 * input steps are due — send exactly that many inputs, then read render
 	 * values. 0 until a reconciler advertises the step.
+	 *
+	 * `now` is a monotonic ms reading; omit it to read the SDK clock, which is
+	 * what the JS reference does with its `performance.now()` default. Omitting
+	 * it keeps the caller off a platform clock of its own.
 	 */
-	public function tick(now: Float): Int {
+	public function tick(?now: Float): Int {
+		if (now == null) { now = RoomClock.getNow(); }
 		this.renderTime = now;
 
 		var steps = 0;

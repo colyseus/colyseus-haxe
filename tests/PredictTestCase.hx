@@ -174,11 +174,13 @@ class PredictTestCase extends haxe.unit.TestCase {
 		var predict = Predict.create(callbacks, clock);
 		var ent = decoder.state;
 
-		predict.track(ent, "a", { mode: "lerp" });
-		predict.track(ent, "b", { mode: "damped" });
-		predict.track(ent, "c", { mode: "extrapolate", damping: 0 });
-		predict.track(ent, "d", { mode: "raw" });
-		predict.track(ent, "yaw", { mode: "lerp", angle: true });
+		predict.attach(ent, {
+			a: { mode: "lerp" },
+			b: { mode: "damped" },
+			c: { mode: "extrapolate", damping: 0 },
+			d: { mode: "raw" },
+			yaw: { mode: "lerp", angle: true },
+		});
 
 		var patch = (sNow: Float, bytes: Array<Int>) -> {
 			this.now = sNow;
@@ -213,6 +215,24 @@ class PredictTestCase extends haxe.unit.TestCase {
 		assertEquals(40.0, predict.value(ent, "a"));
 	}
 
+	public function testTickDefaultsToTheClock() {
+		var state = new PassiveEnt();
+		var decoder = new Decoder(state);
+		var callbacks: SchemaCallbacks<PassiveEnt> = new SchemaCallbacks<PassiveEnt>(decoder);
+		var predict = Predict.create(callbacks, new RoomClock());
+		@:privateAccess predict.adoptFixedStep(50);
+
+		// The render time is what pins `now` to an axis; the send budget only
+		// sees deltas, so a constant offset would cancel out of it unnoticed.
+		this.now = 1234;
+		assertEquals(0, predict.tick());        // first frame has no delta
+		assertEquals(1234.0, @:privateAccess predict.renderTime);
+
+		this.now = 1334;
+		assertEquals(2, predict.tick());        // 100ms of a 50ms step
+		assertEquals(1334.0, @:privateAccess predict.renderTime);
+	}
+
 	public function testReckonValueAt() {
 		var state = new ReckonBall();
 		var decoder = new Decoder(state);
@@ -221,7 +241,8 @@ class PredictTestCase extends haxe.unit.TestCase {
 		var predict = Predict.create(callbacks, clock);
 		var ball = decoder.state;
 
-		predict.trackReckon(ball, {
+		predict.attach(ball, {
+			mode: "reckon",
 			fields: ["x"],
 			step: (s, dt, _elapsed) -> { s.x += s.vx * dt; },
 			smoothing: 0,   // raw projection
