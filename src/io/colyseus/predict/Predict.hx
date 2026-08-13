@@ -155,7 +155,7 @@ class Predict {
 	 * callbacks at all, and silently, since nothing errors. Prediction is driven
 	 * from the caller's own `tick`, so deferring buys it nothing anyway.
 	 */
-	public static function forRoom<T>(room: Room<T>): Predict {
+	public static function get<T>(room: Room<T>): Predict {
 		var serializer: SchemaSerializer<T> = cast room.serializer;
 		return create(new SchemaCallbacks<T>(serializer.decoder), room.clock);
 	}
