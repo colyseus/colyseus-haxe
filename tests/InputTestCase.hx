@@ -380,4 +380,13 @@ class InputTestCase extends haxe.unit.TestCase {
         @:privateAccess room.onMessageCallback(getBytes([143, 238, 2, 0, 0, 0, 0, 0, 0]));
         assertEquals(750.0, room.clock.lastServerTime());
     }
+
+    public function testRoomInputUnreliableModeIsRejected() {
+        // No datagram transport in this SDK yet — mode "unreliable" must fail
+        // loudly at construction rather than silently ride the reliable channel.
+        var room = new Room<P0State>("phase0", P0State);
+        var threw = false;
+        try room.input({ type: MoveInput, mode: "unreliable" }) catch (e: Dynamic) threw = true;
+        assertTrue(threw);
+    }
 }

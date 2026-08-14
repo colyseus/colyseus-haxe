@@ -18,7 +18,8 @@ typedef InputOptions = {
 	 * the server's `defineInput()` schema).
 	 */
 	var type: Class<Dynamic>;
-	/** "reliable" (default) or "unreliable". */
+	/** "reliable" (default). "unreliable" is rejected for now — it needs a
+	 *  WebTransport datagram channel, which this SDK does not have. */
 	@:optional var mode: String;
 	/** Unreliable-mode redundancy ring size (default 3). */
 	@:optional var historySize: Int;

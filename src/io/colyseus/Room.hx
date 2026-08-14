@@ -342,6 +342,12 @@ class Room<T> {
                 "(this SDK cannot synthesize a class from the server's input reflection).";
         }
 
+        if (options.mode == "unreliable") {
+            throw "room.input(): mode \"unreliable\" is not supported yet — it needs a "
+                + "WebTransport datagram channel, and this SDK connects over WebSocket only. "
+                + "Use mode \"reliable\".";
+        }
+
         var instance: Schema = cast Type.createInstance(options.type, []);
         var encoder = new InputEncoder(instance, options.mode, options.historySize);
         this.inputHandle = @:privateAccess new InputHandle(instance, encoder, {
