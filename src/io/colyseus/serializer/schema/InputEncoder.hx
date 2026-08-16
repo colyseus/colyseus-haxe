@@ -21,6 +21,12 @@ import io.colyseus.serializer.schema.encoding.Encode;
  *   no-change tick still pushes an empty carry-forward slot.
  */
 class InputEncoder {
+	// A field op packs as `operation | index`, so index 63 would emit 255 — the
+	// byte a decoder reads as SWITCH_TO_STRUCTURE. The server rejects the 64th
+	// field where the schema is defined; mirror it here, since this encoder
+	// assembles the op byte itself.
+	static inline var MAX_FIELDS: Int = 63;
+
 	public var instance(default, null): Schema;
 	public var mode(default, null): String;
 	public var historySize(default, null): Int;
@@ -54,6 +60,11 @@ class InputEncoder {
 
 		this._fieldIndexes = [];
 		for (index in instance._indexes.keys()) {
+			if (index >= MAX_FIELDS) {
+				throw "InputEncoder: field '" + instance._indexes.get(index) + "' is at index " + index +
+					"; a Schema may only have " + MAX_FIELDS + " fields.";
+			}
+
 			var fieldType = instance._types.get(index);
 			if (fieldType == "ref" || fieldType == "array" || fieldType == "map") {
 				throw "InputEncoder: non-primitive field '" + instance._indexes.get(index) + "' is not supported.";
