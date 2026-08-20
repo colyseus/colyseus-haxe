@@ -30,9 +30,10 @@ typedef SpawnsOptions = {
 	 */
 	@:optional var fields: Array<String>;
 
-	/** Reckon smoothing for confirmed entities. Default 0 — a deterministic
-	    constant-step projectile rebases exactly, so smoothing only adds lag. */
-	@:optional var smoothing: Null<Float>;
+	/** Reckon smoothing time constant (ms) for confirmed entities. Default 0
+	    — a deterministic constant-step projectile rebases exactly, so
+	    smoothing only adds lag. */
+	@:optional var smoothMs: Null<Float>;
 
 	/** Reckon substep in ms. Smaller = more accurate bounces. Default 16. */
 	@:optional var substep: Null<Float>;

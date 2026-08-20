@@ -75,7 +75,7 @@ class PredictTestCase extends haxe.unit.TestCase {
 				s.vx += cmd.ax * ctx.dt;
 				s.x += s.vx * ctx.dt;
 			},
-			smoothing: 0,
+			smoothMs: 0,
 			stepMs: 50,
 		});
 		var state: ReconState = cast me.state;
@@ -138,7 +138,7 @@ class PredictTestCase extends haxe.unit.TestCase {
 				});
 				s.x += cmd.ax + ((bonus != null) ? (bonus : Float) : 0.0);
 			},
-			smoothing: 0,
+			smoothMs: 0,
 			stepMs: 50,
 		});
 		var state: ReconState = cast me.state;
@@ -177,7 +177,7 @@ class PredictTestCase extends haxe.unit.TestCase {
 		predict.attach(ent, {
 			a: { mode: "lerp" },
 			b: { mode: "damped" },
-			c: { mode: "extrapolate", damping: 0 },
+			c: { mode: "extrapolate", smoothMs: 0 },
 			d: { mode: "raw" },
 			yaw: { mode: "lerp", angle: true },
 		});
@@ -245,7 +245,7 @@ class PredictTestCase extends haxe.unit.TestCase {
 			mode: "reckon",
 			fields: ["x"],
 			step: (s, dt, _elapsed) -> { s.x += s.vx * dt; },
-			smoothing: 0,   // raw projection
+			smoothMs: 0,   // raw projection
 			substep: 10,
 		});
 

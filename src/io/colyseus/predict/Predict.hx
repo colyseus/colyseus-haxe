@@ -34,8 +34,15 @@ typedef PredictFieldOptions = {
 	@:optional var mode: String;
 	/** Lerp render-time lag (ms); default 100. */
 	@:optional var delay: Null<Float>;
-	/** Damped/extrapolate spring (1/s); default 15. 0 on extrapolate = raw projection. */
-	@:optional var damping: Null<Float>;
+	/** Output-smoothing time constant, in milliseconds. 0 = off (snap / raw
+	    projection / exact interpolation). Roughly the extra display lag the
+	    smoothing adds: a steady mover trails its target by ≈ speed × smoothMs;
+	    corrections fade ~63% per smoothMs, ~95% by 3×. Damped uses it as the
+	    chase rate toward the latest value, extrapolate as its
+	    predict-then-smooth blend, and lerp as an optional DISPLAY-ONLY output
+	    spring on the interpolated result. Null = the mode default: 50 on
+	    damped/extrapolate, 0 on lerp (spring off — exact interpolation). */
+	@:optional var smoothMs: Null<Float>;
 	/** Extrapolate overshoot cap (ms); default 200. */
 	@:optional var maxExtrapolate: Null<Float>;
 	/** Arrival-grid snap (ms); 0 off. */
@@ -53,8 +60,9 @@ typedef ReckonOptions = {
 	    place by dt seconds; elapsedMs is the absolute server-time at the end
 	    of the substep. */
 	var step: (scratch: Dynamic, dtSeconds: Float, elapsedMs: Float) -> Void;
-	/** Offset-decay smoothing (1/s); default 20. 0 = raw projection. */
-	@:optional var smoothing: Null<Float>;
+	/** Predict-then-smooth time constant (ms) — see
+	    `PredictFieldOptions.smoothMs`. Default 50. 0 = raw projection. */
+	@:optional var smoothMs: Null<Float>;
 	/** Substep length (ms); default 16. */
 	@:optional var substep: Null<Float>;
 	/** Rebase discontinuities beyond this pop. 0 off. */
@@ -66,7 +74,8 @@ private class Slot {
 	public var instance: Dynamic;
 	public var mode: String;
 	public var delay: Float;
-	public var damping: Float;
+	/** Null = unset — the mode default resolves at the read site. */
+	public var smoothMs: Null<Float>;
 	public var maxExtrapolate: Float;
 	public var tickInterval: Float;
 	public var snap: Float;
@@ -74,6 +83,8 @@ private class Slot {
 	public var v1: Float = 0;
 	public var auxV: Float = 0;
 	public var auxT: Float = 0;
+	/** Previous frame's RAW lerp output — the target slope for the output spring's FOH step. */
+	public var lerpPrev: Float = 0;
 	public var ringT: Array<Float>;
 	public var ringV: Array<Float>;
 	public var ringHead: Int = 0;
@@ -92,7 +103,7 @@ private class SimState {
 	public var scratch: Dynamic;
 	public var fields: Array<String>;
 	public var step: (Dynamic, Float, Float) -> Void;
-	public var smoothing: Float;
+	public var smoothMs: Float;
 	public var substep: Float;
 	public var snap: Float;
 	public var smoothed: Array<Float>;
@@ -122,6 +133,8 @@ class Predict {
 	private static inline var GAP_RESUME_PATCH_MULT = 1.5;
 	private static inline var GAP_RESUME_MAX_MS = 250.0;
 	private static inline var MAX_STEPS_PER_FRAME = 5;
+	/** smoothMs fallback for damped/extrapolate (lerp's spring defaults 0). */
+	private static inline var DEFAULT_SMOOTH_MS = 50.0;
 
 	private var callbacks: PredictCallbacks;
 	private var clock: RoomClock;
@@ -221,7 +234,7 @@ class Predict {
 		slot.instance = instance;
 		slot.mode = (options != null && options.mode != null) ? options.mode : "lerp";
 		slot.delay = (options != null && options.delay != null) ? options.delay : 100;
-		slot.damping = (options != null && options.damping != null) ? options.damping : 15;
+		slot.smoothMs = (options != null) ? options.smoothMs : null;
 		slot.maxExtrapolate = (options != null && options.maxExtrapolate != null) ? options.maxExtrapolate : 200;
 		slot.tickInterval = (options != null && options.tickInterval != null) ? options.tickInterval : 0;
 		slot.snap = (options != null && options.snap != null) ? options.snap : 0;
@@ -229,6 +242,8 @@ class Predict {
 		var initial = toNumber(Reflect.getProperty(instance, field));
 		slot.v1 = initial;
 		slot.auxV = initial;
+		slot.lerpPrev = initial;
+		slot.auxT = RoomClock.getNow();
 		slot.ringT = [for (_ in 0...RING_CAP) 0.0];
 		slot.ringV = [for (_ in 0...RING_CAP) 0.0];
 		perRef.set(field, slot);
@@ -264,7 +279,7 @@ class Predict {
 		sim.scratch = scratch;
 		sim.fields = options.fields;
 		sim.step = options.step;
-		sim.smoothing = (options.smoothing != null) ? options.smoothing : 20;
+		sim.smoothMs = (options.smoothMs != null) ? options.smoothMs : DEFAULT_SMOOTH_MS;
 		sim.substep = (options.substep != null && options.substep > 0) ? options.substep : 16;
 		sim.snap = (options.snap != null) ? options.snap : 0;
 		sim.smoothed = [for (k in 0...n) toNumber(Reflect.getProperty(instance, options.fields[k]))];
@@ -552,9 +567,9 @@ class Predict {
 			var off = this.trackStepped(server, {
 				fields: opts.fields,
 				step: (scratch, dt, _elapsed) -> step(scratch, dt),
-				// 0, not the reckon default 20: a deterministic constant-step
+				// 0, not the reckon default 50: a deterministic constant-step
 				// projectile rebases exactly, so smoothing only adds lag.
-				smoothing: (opts.smoothing != null) ? opts.smoothing : 0,
+				smoothMs: (opts.smoothMs != null) ? opts.smoothMs : 0,
 				substep: opts.substep,
 			});
 			this.bindForward(server, () -> {
@@ -679,6 +694,7 @@ class Predict {
 			head = 0;
 			count = 0;
 			slot.auxV = current;
+			slot.lerpPrev = current;   // lerp's output spring pops too
 		}
 
 		var lastT1 = (count == 0)
@@ -771,13 +787,45 @@ class Predict {
 		var dtFrame = now - slot.auxT;
 		slot.auxT = now;
 		if (dtFrame > 0) {
-			var k = 1 - Math.exp(-slot.damping * dtFrame / 1000);
+			var tau: Float = (slot.smoothMs != null) ? slot.smoothMs : DEFAULT_SMOOTH_MS;
+			var k = (tau > 0) ? 1 - Math.exp(-dtFrame / tau) : 1;   // 0 = snap
 			slot.auxV += (slot.v1 - slot.auxV) * k;
 		}
 		return slot.auxV;
 	}
 
 	private function computeLerp(slot: Slot): Float {
+		var raw = this.computeLerpRaw(slot);
+		var tau: Float = (slot.smoothMs != null) ? slot.smoothMs : 0;   // lerp's output spring defaults OFF
+		var now = this.renderTime;
+		if (tau <= 0) {
+			// Spring off (the default) — pin the state to the raw output so a
+			// runtime smoothMs enable starts from here instead of gliding in
+			// from wherever the spring last rested.
+			slot.auxV = raw;
+			slot.lerpPrev = raw;
+			slot.auxT = now;
+			return raw;
+		}
+		var dt = now - slot.auxT;
+		if (dt <= 0) { return slot.auxV; }   // same-frame re-read
+		// Exact first-order-hold step for a linearly-varying target (τ = smoothMs):
+		//   y(dt) = u1 − s·τ + (y0 − u0 + s·τ)·e^(−dt/τ),  s = (u1 − u0)/dt
+		// Frame-rate independent: a steady mover renders with a constant s·τ
+		// trail at any fps (a per-frame EMA's trail varies with frame rate).
+		var u0 = slot.lerpPrev;
+		var y0 = slot.auxV;
+		var kdt = dt / tau;
+		var trail = (raw - u0) / kdt;
+		var y = raw - trail + (y0 - u0 + trail) * Math.exp(-kdt);
+		slot.auxV = y;
+		slot.lerpPrev = raw;
+		slot.auxT = now;
+		return y;
+	}
+
+	/** The undamped interpolant — `computeLerp` minus the output spring. */
+	private function computeLerpRaw(slot: Slot): Float {
 		var count = slot.ringCount;
 		if (count == 0) { return slot.v1; }
 		var head = slot.ringHead;
@@ -841,13 +889,14 @@ class Predict {
 
 		var lastT = slot.auxT;
 		slot.auxT = now;
-		if (slot.damping <= 0) {
+		var tau: Float = (slot.smoothMs != null) ? slot.smoothMs : DEFAULT_SMOOTH_MS;
+		if (tau <= 0) {
 			slot.auxV = raw;
 			return raw;
 		}
 		var dtFrame = now - lastT;
 		if (dtFrame > 0) {
-			var k = 1 - Math.exp(-slot.damping * dtFrame / 1000);
+			var k = 1 - Math.exp(-dtFrame / tau);
 			slot.auxV += (raw - slot.auxV) * k;
 		}
 		return slot.auxV;
@@ -902,7 +951,7 @@ class Predict {
 		this.advance(sim, forward, sim.out, present);
 
 		var first = sim.lastApplyTime == Math.NEGATIVE_INFINITY;
-		if (first || sim.smoothing <= 0) {
+		if (first || sim.smoothMs <= 0) {
 			for (k in 0...n) {
 				sim.offset[k] = 0;
 				sim.smoothed[k] = sim.out[k];
@@ -920,7 +969,7 @@ class Predict {
 					sim.frameVel[k] = (sim.out[k] - sim.outPrev[k]) / dtMs;
 				}
 			}
-			var decay = Math.exp(-sim.smoothing * dtMs / 1000);
+			var decay = Math.exp(-dtMs / sim.smoothMs);
 			for (k in 0...n) {
 				sim.offset[k] *= decay;
 				sim.smoothed[k] = sim.out[k] + sim.offset[k];
@@ -928,7 +977,7 @@ class Predict {
 		} else {
 			// no clock — plain EMA chase
 			var dtMs = Math.max(0, Math.min(now - sim.lastApplyTime, 100));
-			var k2 = 1 - Math.exp(-sim.smoothing * dtMs / 1000);
+			var k2 = 1 - Math.exp(-dtMs / sim.smoothMs);
 			for (k in 0...n) {
 				sim.smoothed[k] += (sim.out[k] - sim.smoothed[k]) * k2;
 			}

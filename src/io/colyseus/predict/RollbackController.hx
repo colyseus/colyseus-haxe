@@ -90,9 +90,9 @@ typedef RollbackOptions = {
 	var input: InputHandle;
 	/** Resolves reckonTime's unstamped fallback (serverNow). */
 	@:optional var clock: RoomClock;
-	/** Error-decay spring (1/s); 0 = hard snap; null = the server's
-	    correction cadence (1000/patchRate) else 20. */
-	@:optional var smoothing: Null<Float>;
+	/** Error-decay time constant (ms); 0 = hard snap; null = the server's
+	    correction cadence (one patch interval) else 50. */
+	@:optional var smoothMs: Null<Float>;
 	/** Teleport threshold — corrections beyond it POP. 0 = off. */
 	@:optional var snap: Null<Float>;
 	@:optional var stepMs: Null<Float>;
@@ -164,7 +164,7 @@ class RollbackController {
 	// per-seq memo store: seq -> (key -> value)
 	private var memos: Map<Int, Map<String, Dynamic>> = new Map();
 
-	private var smoothing: Float;
+	private var smoothMs: Float;
 	private var snapThreshold: Float;
 	private var input: InputHandle;
 	private var onReconcileHook: Int -> Void;
@@ -177,9 +177,9 @@ class RollbackController {
 		if (opts.input == null) { throw "RollbackController: input handle required"; }
 		this.input = opts.input;
 		this.clock = opts.clock;
-		this.smoothing = (opts.smoothing != null)
-			? opts.smoothing
-			: ((this.input.patchRate != null && this.input.patchRate > 0) ? 1000.0 / this.input.patchRate : 20);
+		this.smoothMs = (opts.smoothMs != null)
+			? opts.smoothMs
+			: ((this.input.patchRate != null && this.input.patchRate > 0) ? this.input.patchRate : 50);
 		this.snapThreshold = (opts.snap != null) ? opts.snap : 0;
 
 		var stepMs: Null<Float> = (opts.stepMs != null) ? opts.stepMs : this.input.stepMs;
@@ -255,7 +255,7 @@ class RollbackController {
 		this.markDirty();
 
 		if (dt <= 0) { return; }
-		var k = (this.smoothing <= 0) ? 1 : 1 - Math.exp(-this.smoothing * dt / 1000);
+		var k = (this.smoothMs <= 0) ? 1 : 1 - Math.exp(-dt / this.smoothMs);
 		for (f in this.smoothedFields()) {
 			this.error.set(f, this.getError(f) * (1 - k));
 		}
@@ -330,7 +330,7 @@ class RollbackController {
 		this.predictedSeq = this.input.sentCount;
 
 		// error rebase: what the player SAW minus the corrected result
-		var hard = this.smoothing <= 0;
+		var hard = this.smoothMs <= 0;
 		var mag: Float = 0;
 		for (f in fields) {
 			var correction = this.renderedBefore.get(f) - this.readCurrent(f);
