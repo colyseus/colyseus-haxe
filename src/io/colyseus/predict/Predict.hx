@@ -1,6 +1,7 @@
 package io.colyseus.predict;
 
 import io.colyseus.Room;
+import io.colyseus.InputHandle;
 import io.colyseus.RoomClock;
 import io.colyseus.serializer.SchemaSerializer;
 import io.colyseus.serializer.schema.Callbacks.SchemaCallbacks;
@@ -797,7 +798,7 @@ class Predict {
 	 * render-delay early, and shots miss by exactly that much with nothing in the
 	 * logs to say so. An explicit `renderDelay` on `room.input()` still wins.
 	 */
-	private function bindRenderDelay(input: Dynamic): Void {
+	private function bindRenderDelay(input: InputHandle): Void {
 		if (input == null || input.renderDelay() > 0) { return; }
 		for (perRef in this.slotsByRef) {
 			for (slot in perRef) {
