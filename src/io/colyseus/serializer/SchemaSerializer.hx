@@ -4,7 +4,6 @@ import io.colyseus.serializer.schema.Decoder;
 import io.colyseus.serializer.schema.Reflection;
 import haxe.io.Bytes;
 
-@:generic
 class SchemaSerializer<T> implements Serializer {
 	public var decoder:Decoder<T>;
 

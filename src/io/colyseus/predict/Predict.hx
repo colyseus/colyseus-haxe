@@ -274,12 +274,6 @@ class Predict {
 	private var warnedEmpty: Map<String, Bool> = new Map();
 
 	/**
-	 * Adapt the SDK's `SchemaCallbacks<T>` (from `Callbacks.get(room)`).
-	 * Typed `Dynamic` because `@:generic` erases the parametric relationship
-	 * of the specialized callbacks class — every specialization has the same
-	 * Dynamic-typed listen/onAdd/onRemove surface consumed here.
-	 */
-	/**
 	 * The one-liner every caller wants: a Predict over a room's callbacks and
 	 * clock — the same two collaborators every time, and no decision the caller
 	 * is better placed to make.
@@ -303,7 +297,15 @@ class Predict {
 		return create(new SchemaCallbacks<T>(serializer.decoder), room.clock, opts);
 	}
 
-	public static function create(callbacks: Dynamic, clock: RoomClock, ?opts: PredictGetOptions): Predict {
+	/**
+	 * Adapt the SDK's `SchemaCallbacks<T>` (from `Callbacks.get(room)`) to the
+	 * engine-level face this consumes.
+	 *
+	 * `T` is only a constraint — prediction reaches listen/onAdd/onRemove, none
+	 * of which mention the state type — but naming it keeps any callbacks
+	 * acceptable without claiming the state type IS Dynamic.
+	 */
+	public static function create<T>(callbacks: SchemaCallbacks<T>, clock: RoomClock, ?opts: PredictGetOptions): Predict {
 		return new Predict({
 			listen: (instance, field, handler, immediate) -> {
 				var off: Dynamic = callbacks.listen(instance, field,

@@ -18,7 +18,6 @@ typedef DecodedValue = { value : Dynamic, previousValue : Dynamic };
 // keys + array indexes kept in separate domains — no Dynamic-keyed sets).
 typedef ResyncVisited = { keys: Map<String, Bool>, indexes: Map<Int, Bool> };
 
-@:generic
 class Decoder<T> {
 	public var state:T;
 	public var context:TypeContext = new TypeContext();

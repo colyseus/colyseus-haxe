@@ -36,7 +36,6 @@ class Callbacks {
 }
 
 @:keep // consumed dynamically by io.colyseus.predict.Predict.create — DCE can't see those call sites
-@:generic
 class SchemaCallbacks<T> {
     private var decoder: Decoder<T>;
     private var isTriggering: Bool = false;
