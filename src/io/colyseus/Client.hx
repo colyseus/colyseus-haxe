@@ -125,28 +125,28 @@ class Client {
         room.sessionId = response.sessionId;
 
         //
-        // WORKAROUND: declare onError/onJoin first, so we can use its references to remove the listeners
-        // FIXME: EventHandler must implement a .once() method to remove the listener after the first call
+        // Whichever of these settles the join wins: `once` retires the one that
+        // fired, and it retires its sibling by hand. Declared up front so each
+        // closure can name the other.
+        //
+        // TODO: the SIBLING removal compares function references, which may not
+        // hold on native targets + devMode. The self-removal no longer does.
         //
         var onError:(Int, String) -> Void = null;
         var onJoin:() -> Void = null;
 
         onError = function(code: Int, message: String) {
-            // TODO: this may not work on native targets + devMode
-            room.onError -= onError;
             room.onJoin -= onJoin;
             callback(new HttpException(code, message), null);
         };
 
         onJoin = function() {
-            // TODO: this may not work on native targets + devMode
             room.onError -= onError;
-            room.onJoin -= onJoin;
             callback(null, room);
         };
 
-        room.onError += onError;
-        room.onJoin += onJoin;
+        room.onError.once(onError);
+        room.onJoin.once(onJoin);
 
         var options = ["sessionId" => room.sessionId];
 
