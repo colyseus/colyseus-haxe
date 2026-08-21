@@ -824,9 +824,15 @@ class Predict {
 		return recon;
 	}
 
-	/** Spawn a driven `PredictedEventChannel`. */
-	public function defineEvent(opts: EventChannelOptions): PredictedEventChannel {
-		var channel = new PredictedEventChannel(opts, this.clock);
+	/**
+	 * Spawn a driven `PredictedEventChannel`.
+	 *
+	 * The payload type comes from the callbacks — annotate the first one's
+	 * parameter (`onPredict: (h:HitBy) -> …`) to bind it; see
+	 * `EventChannelOptions` for why annotating the variable does not.
+	 */
+	public function defineEvent<T>(opts: EventChannelOptions<T>): PredictedEventChannel<T> {
+		var channel = new PredictedEventChannel<T>(opts, this.clock);
 		this.driven.push(channel);
 		return channel;
 	}

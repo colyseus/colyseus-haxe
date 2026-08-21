@@ -2,28 +2,51 @@ package io.colyseus.predict;
 
 import io.colyseus.RoomClock;
 import io.colyseus.predict.Predict.DrivenChild;
+import io.colyseus.predict.RollbackController;
 import io.colyseus.predict.RollbackController.PredictSink;
 
-/** Options for `PredictedEventChannel`. */
-typedef EventChannelOptions = {
+/**
+ * Options for `PredictedEventChannel`. `T` is the payload type; leave it to
+ * inference for an untyped channel, or bind it by annotating the FIRST
+ * callback's parameter:
+ *
+ * ```haxe
+ * var hits = predict.defineEvent({
+ *     label: "hit", cooldownMs: 250,
+ *     onPredict: (h:HitBy) -> flash(h.who),   // binds T
+ *     onReject: (h) -> unflash(h.who),        // h is a HitBy from here on
+ * });
+ * hits.predict({ who: "a", amount: 1 });      // checked against HitBy
+ * ```
+ *
+ * Annotating only the VARIABLE (`var hits:PredictedEventChannel<HitBy> = …`)
+ * does not bind it: Haxe types the argument before the expected type reaches
+ * it, so the callbacks pin `T` structurally first and the annotation then
+ * fails to unify. Annotate a parameter, or the options literal
+ * (`({…} : EventChannelOptions<HitBy>)`).
+ */
+typedef EventChannelOptions<T> = {
 	/** The optimistic feedback — fires the moment the event is predicted. */
-	@:optional var onPredict: Dynamic -> Void;
+	@:optional var onPredict: T -> Void;
 	/** The prediction was wrong — undo the optimistic feedback. */
-	@:optional var onReject: Dynamic -> Void;
+	@:optional var onReject: T -> Void;
 	/** The server agreed (fired by `confirm`, once per settled entry). */
-	@:optional var onConfirm: Dynamic -> Void;
+	@:optional var onConfirm: T -> Void;
 	/** A confirm settled NOTHING — the signal arrived unpredicted. */
-	@:optional var onUnpredicted: Dynamic -> Void;
+	@:optional var onUnpredicted: T -> Void;
 	/** Entry identity — payloads mapping to the same value dedupe while
 	    pending. Null: string/number payloads key themselves; other payloads
 	    share one anonymous slot. */
-	@:optional var uniqueBy: Dynamic -> Dynamic;
+	@:optional var uniqueBy: T -> Dynamic;
 	/** Sim-born settlement deadline in input ticks (default 10). */
 	@:optional var graceTicks: Null<Int>;
 	/** UI-born eviction window (ms); null = max(2·rtt, 600). */
 	@:optional var ttlMs: Null<Float>;
 	/** Min gap (ms) between onPredict fires; null = off. */
 	@:optional var cooldownMs: Null<Float>;
+	/** Diagnostic name. Nothing resolves by it — it only names this channel
+	    in warnings, which starts to matter once a room has several. */
+	@:optional var label: String;
 }
 
 private class EventEntry {
@@ -42,7 +65,7 @@ private class EventEntry {
  * (`predict(payload)`); settlement: `confirm()` on the authoritative signal,
  * sim-born grace-tick auto-reject, UI-born wall-clock TTL.
  */
-class PredictedEventChannel implements PredictSink implements DrivenChild {
+class PredictedEventChannel<T> implements PredictSink<T> implements DrivenChild {
 	public var dead(default, null): Bool = false;
 	public var pendingCount(get, never): Int;
 	function get_pendingCount() return this.entries.length;
@@ -50,13 +73,14 @@ class PredictedEventChannel implements PredictSink implements DrivenChild {
 	// one anonymous slot for payloads with no derivable key
 	private static var SINGLETON_KEY: Dynamic = {};
 
-	private var opts: EventChannelOptions;
+	private var opts: EventChannelOptions<T>;
 	private var clock: RoomClock;
 	// pending entries in insertion order (settle-all order); few at a time
 	private var entries: Array<EventEntry> = [];
 	private var cooldownUntil: Float = Math.NEGATIVE_INFINITY;
+	private var warnedReplayPredict: Bool = false;
 
-	public function new(options: EventChannelOptions, clock: RoomClock) {
+	public function new(options: EventChannelOptions<T>, clock: RoomClock) {
 		this.opts = (options != null) ? options : {};
 		this.clock = clock;
 	}
@@ -65,7 +89,7 @@ class PredictedEventChannel implements PredictSink implements DrivenChild {
 		return (this.clock != null) ? this.clock.serverNow() : RoomClock.getNow();
 	}
 
-	private function keyOf(payload: Dynamic): Dynamic {
+	private function keyOf(payload: T): Dynamic {
 		if (this.opts.uniqueBy != null) { return this.opts.uniqueBy(payload); }
 		if (Std.isOfType(payload, String) || Std.isOfType(payload, Float)) { return payload; }
 		return SINGLETON_KEY;
@@ -79,16 +103,37 @@ class PredictedEventChannel implements PredictSink implements DrivenChild {
 	}
 
 	/** Sim-born prediction (reached via `ctx.predict` — live steps only). */
-	public function predictFromSim(seq: Int, payload: Dynamic, acked: Void -> Int) {
+	public function predictFromSim(seq: Int, payload: T, acked: Void -> Int) {
 		this.add(seq, payload, acked);
 	}
 
-	/** Predict from OUTSIDE the sim (UI-optimistic; wall-clock TTL). */
-	public function predict(payload: Dynamic) {
+	/**
+	 * Predict from OUTSIDE the sim (UI-optimistic; wall-clock TTL).
+	 *
+	 * Backstopped against rollback: reaching this from inside a `step` that is
+	 * being re-simulated would mint a fresh entry on every replay, so it no-ops
+	 * and says so once. `ctx.predict(channel, payload)` is live-only by
+	 * construction and is the form to use inside a step.
+	 */
+	public function predict(payload: T) {
+		if (RollbackController.isReplaying()) {
+			if (!this.warnedReplayPredict) {
+				this.warnedReplayPredict = true;
+				trace("colyseus.predict: PredictedEventChannel" + this.name()
+					+ ".predict() was called during a rollback replay and ignored. "
+					+ "Inside a reconciler step, use ctx.predict(channel, payload).");
+			}
+			return;
+		}
 		this.add(-1, payload, null);
 	}
 
-	private function add(seq: Int, payload: Dynamic, acked: Void -> Int) {
+	/** ` "hit"` when labelled, empty otherwise — for warning text. */
+	private function name(): String {
+		return (this.opts.label != null) ? ' "' + this.opts.label + '"' : "";
+	}
+
+	private function add(seq: Int, payload: T, acked: Void -> Int) {
 		var key = this.keyOf(payload);
 		if (this.entryAt(key) != -1) { return; } // pending dedupe
 		var t = this.now();

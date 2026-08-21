@@ -33,7 +33,7 @@ private class OpaqueWorld {
 }
 
 /** Counts what a step declared through `ctx.predict`. */
-private class CountingSink implements PredictSink {
+private class CountingSink implements PredictSink<Dynamic> {
 	public var seqs: Array<Int> = [];
 	public function new() {}
 	public function predictFromSim(seq: Int, _payload: Dynamic, _acked: Void -> Int): Void {

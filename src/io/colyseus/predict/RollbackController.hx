@@ -7,8 +7,8 @@ import io.colyseus.RoomClock;
  * Minimal shape `StepContext.predict` emits into — implemented by
  * `PredictedEventChannel`.
  */
-interface PredictSink {
-	function predictFromSim(seq: Int, payload: Dynamic, acked: Void -> Int): Void;
+interface PredictSink<T> {
+	function predictFromSim(seq: Int, payload: T, acked: Void -> Int): Void;
 }
 
 /**
@@ -78,7 +78,7 @@ class StepContext {
 	 * event channel — fires only on the LIVE step (silently skipped on every
 	 * rollback replay).
 	 */
-	public function predict(sink: PredictSink, payload: Dynamic) {
+	public function predict<T>(sink: PredictSink<T>, payload: T) {
 		if (!this.isReplay) {
 			sink.predictFromSim(this.tick, payload, this.owner.ackWatermark);
 		}
@@ -115,6 +115,20 @@ typedef RollbackOptions = {
  * false), `refreshRender` (no-op), `markDirty` (no-op).
  */
 class RollbackController {
+	/**
+	 * Is ANY controller re-simulating already-applied inputs right now?
+	 *
+	 * A depth counter, not a flag: a step that ticks another controller can
+	 * nest a replay inside one. Lets code reached indirectly from a step — an
+	 * event channel's `predict()` — refuse to fire a second time on the way
+	 * through a rollback. `StepContext.isReplay` is the same fact for code that
+	 * holds the ctx; this is for code that doesn't.
+	 */
+	public static function isReplaying(): Bool {
+		return _replayDepth > 0;
+	}
+	private static var _replayDepth: Int = 0;
+
 	/**
 	 * Rendered pose for one key. Overridden by both faces — `Reconciler` keys by
 	 * schema field, `SimReconciler` by "<worldKey>.<field>". Declared here so the
@@ -320,10 +334,12 @@ class RollbackController {
 		var from = (acked > this.replayFrom) ? acked : this.replayFrom;
 		this.stepCtx.isReplay = true;
 		this.catching = true;
+		_replayDepth++;
 		for (seq in (from + 1)...(this.input.sentCount + 1)) {
 			var inp = this.input.at(seq);
 			if (inp != null) { this.runStep(seq, inp); }
 		}
+		_replayDepth--;
 		this.catching = false;
 		this.stepCtx.isReplay = false;
 		this.refreshRender();

@@ -5,6 +5,7 @@ import io.colyseus.predict.Predict;
 import io.colyseus.predict.PredictedEventChannel;
 import io.colyseus.predict.PredictedSpawns;
 import io.colyseus.predict.Reconciler;
+import io.colyseus.predict.RollbackController;
 import io.colyseus.serializer.schema.Callbacks.SchemaCallbacks;
 import io.colyseus.serializer.schema.Decoder;
 import io.colyseus.serializer.schema.InputEncoder;
@@ -15,6 +16,9 @@ import schema.predict.AccelInput;
 import schema.predict.PassiveEnt;
 import schema.predict.ReckonBall;
 import schema.predict.SimPaddle;
+
+/** Payload fixture for the typed event-channel test. */
+typedef HitByFixture = { var who: String; var amount: Int; };
 
 /**
  * Phase 4 — Predict layer.
@@ -342,6 +346,96 @@ class PredictTestCase extends haxe.unit.TestCase {
 
 		assertEquals("P:goal-a|C:goal-a|P:kill-1|P:kill-2|R:kill-2|R:kill-1",
 			log.join("|"));
+	}
+
+	/**
+	 * `channel.predict()` is the UI-born form; reaching it from inside a step
+	 * that is being RE-simulated would mint a fresh entry per replay. The
+	 * reference backstops it, and the warning is the one place `label` earns
+	 * its keep.
+	 */
+	public function testChannelPredictIsIgnoredDuringReplay() {
+		var traced: Array<String> = [];
+		var savedTrace = haxe.Log.trace;
+		haxe.Log.trace = (value: Dynamic, ?_infos: haxe.PosInfos) -> traced.push(Std.string(value));
+
+		var fired = 0;
+		var chan: PredictedEventChannel<String> = new PredictedEventChannel({
+			label: "hit",
+			uniqueBy: (p) -> p,
+			onPredict: (_p) -> fired++,
+		}, new RoomClock());
+
+		chan.predict("a");
+		assertEquals(1, fired);
+
+		// as if a controller were mid-rollback
+		@:privateAccess RollbackController._replayDepth = 1;
+		chan.predict("b");
+		chan.predict("c");
+		@:privateAccess RollbackController._replayDepth = 0;
+		haxe.Log.trace = savedTrace;
+
+		assertEquals(1, fired);
+		assertEquals(1, chan.pendingCount);
+		// warned once, and named the channel
+		assertEquals(1, traced.length);
+		assertTrue(traced[0].indexOf("\"hit\"") > -1);
+
+		// ...and the gate lifts again
+		chan.predict("d");
+		assertEquals(2, fired);
+	}
+
+	/** The replay flag is raised by a real rollback, not just by tests. */
+	public function testIsReplayingTracksTheRollbackWindow() {
+		var truth = new ReconState();
+		var command = new AccelInput();
+		var handle = makeHandle(command);
+		var duringStep: Array<Bool> = [];
+		var me = new Reconciler(truth, {
+			input: handle,
+			fields: ["x"],
+			step: (_ctx, s, cmd) -> {
+				duringStep.push(RollbackController.isReplaying());
+				s.x += cmd.ax;
+			},
+			smoothMs: 0,
+			stepMs: 50,
+		});
+
+		this.now = 0; me.tick(this.now);
+		command.ax = 1; handle.send();
+		command.ax = 1; handle.send();
+		assertEquals("false,false", duringStep.join(","));
+
+		// ack 1 with DIVERGENT truth (a matching one takes the wire-precision
+		// skip and never rolls back) -> input 2 replays, and only that step
+		// sees the flag
+		duringStep = [];
+		truth.x = 5;
+		@:privateAccess handle.ackInput(1);
+		this.now = 50; me.tick(this.now);
+		assertEquals("true", duringStep.join(","));
+		assertFalse(RollbackController.isReplaying());
+	}
+
+	/**
+	 * Payload typing, locked in: annotating the first callback's parameter
+	 * binds T for the whole channel. The compile IS the test — `h.amount` and
+	 * the `predict()` argument below only check against a real `HitBy`.
+	 */
+	public function testChannelPayloadTypeBindsFromTheFirstCallback() {
+		var seen = "";
+		var chan = new PredictedEventChannel({
+			label: "hit",
+			uniqueBy: (h:HitByFixture) -> h.who,
+			onPredict: (h) -> seen = h.who + ":" + h.amount,
+		}, new RoomClock());
+
+		chan.predict({ who: "a", amount: 2 });
+		assertEquals("a:2", seen);
+		assertEquals(1, chan.pendingCount);
 	}
 
 	public function testSpawnsCorrelation() {
