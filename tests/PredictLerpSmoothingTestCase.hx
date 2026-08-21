@@ -16,8 +16,8 @@ private class FakeCallbacks {
 				if (immediate) { handler(Reflect.getProperty(instance, field)); }
 				return () -> { this.listeners.remove(field); };
 			},
-			onAdd: (_collection, _handler) -> () -> {},
-			onRemove: (_collection, _handler) -> () -> {},
+			onAdd: (_parent, _collection, _handler) -> () -> {},
+			onRemove: (_parent, _collection, _handler) -> () -> {},
 		};
 	}
 
@@ -34,10 +34,10 @@ private class FakeCallbacks {
  * speed × smoothMs during motion — frame-rate independently (exact
  * first-order-hold step).
  *
- * The reference's fields-array / constructor-defaults spellings don't exist
- * on this port; the per-field map is the one config surface, so those cases
- * collapse into the trail test. The setDefaults mode-flip case maps to
- * "damped with smoothMs unset uses its own 50 default".
+ * The fields-array and constructor-defaults spellings are covered in
+ * PredictAttachConfigTestCase; here every case uses the per-field map. The
+ * setDefaults mode-flip case maps to "damped with smoothMs unset uses its own
+ * 50 default".
  */
 class PredictLerpSmoothingTestCase extends haxe.unit.TestCase {
 

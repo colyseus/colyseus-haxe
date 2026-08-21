@@ -21,11 +21,15 @@ interface DrivenChild {
 /**
  * The callbacks face `Predict` consumes — engine-level, string-keyed.
  * `Predict.create` adapts the SDK's `SchemaCallbacks<T>`.
+ *
+ * `parent` is the instance owning the collection, or null for one on the root
+ * state. It is a fixed third argument rather than an optional one because neko
+ * Dynamic dispatch needs exact argument counts (see `create`).
  */
 typedef PredictCallbacks = {
 	var listen: (instance: Dynamic, field: String, handler: Dynamic -> Void, immediate: Bool) -> (Void -> Void);
-	var onAdd: (collection: String, handler: (value: Dynamic, key: Dynamic) -> Void) -> (Void -> Void);
-	var onRemove: (collection: String, handler: (value: Dynamic, key: Dynamic) -> Void) -> (Void -> Void);
+	var onAdd: (parent: Dynamic, collection: String, handler: (value: Dynamic, key: Dynamic) -> Void) -> (Void -> Void);
+	var onRemove: (parent: Dynamic, collection: String, handler: (value: Dynamic, key: Dynamic) -> Void) -> (Void -> Void);
 }
 
 /** Per-field smoothing options (defaults mirror the JS reference). */
@@ -51,6 +55,94 @@ typedef PredictFieldOptions = {
 	@:optional var snap: Null<Float>;
 	/** Radian angle — unwrap samples over the shortest arc. */
 	@:optional var angle: Null<Bool>;
+}
+
+/**
+ * The five prediction modes, spelled once. Implicitly a `String`, so it drops
+ * into any `mode` field — `{ mode: Lerp }` and `{ mode: "lerp" }` both compile.
+ * Use it wherever you want the compiler to catch `Lrep`.
+ */
+enum abstract PredictMode(String) to String {
+	var Lerp = "lerp";
+	var Extrapolate = "extrapolate";
+	var Damped = "damped";
+	var Reckon = "reckon";
+	var Raw = "raw";
+}
+
+/**
+ * `PredictMode | PredictFieldOptions` — one field's entry in the per-field map.
+ * Annotate a config `Dynamic<FieldSmoothing>` to have every VALUE typechecked:
+ *
+ * ```haxe
+ * var cfg: Dynamic<FieldSmoothing> = { x: Lerp, yaw: { mode: Damped, angle: true } };
+ * ```
+ */
+abstract FieldSmoothing(Dynamic) from PredictFieldOptions to Dynamic {
+	@:from static inline function ofMode(m: PredictMode): FieldSmoothing {
+		return cast { mode: (m : String) };
+	}
+	// implicit casts don't chain String -> PredictMode -> FieldSmoothing on their own
+	@:from static inline function ofString(s: String): FieldSmoothing {
+		return cast { mode: s };
+	}
+}
+
+/**
+ * The GROUP shape: one config over a list of fields, mirroring the reference's
+ * `ReckonAttachConfig`. Fixed keys, so a plain typedef expresses it exactly —
+ * annotate a literal with it to have the keys checked:
+ *
+ * ```haxe
+ * var cfg: GroupAttachConfig = { mode: Lerp, fields: ["x", "y"], snap: 4 };
+ * ```
+ *
+ * `delay` / `tickInterval` / `maxExtrapolate` are a Haxe superset: the reference
+ * only takes them per-field or from the Predict's defaults.
+ */
+typedef GroupAttachConfig = {
+	var fields: Array<String>;
+	/** Default: the Predict's `mode`. Only "reckon" allocates sim state. */
+	@:optional var mode: PredictMode;
+	/** Required by "reckon" unless the Predict carries a default `step`. */
+	@:optional var step: (scratch: Dynamic, dtSeconds: Float, elapsedMs: Float) -> Void;
+	@:optional var substep: Null<Float>;
+	@:optional var smoothMs: Null<Float>;
+	@:optional var snap: Null<Float>;
+	@:optional var angle: Null<Bool>;
+	@:optional var delay: Null<Float>;
+	@:optional var tickInterval: Null<Float>;
+	@:optional var maxExtrapolate: Null<Float>;
+}
+
+/**
+ * What `attach` / `attachAll` take: `Dynamic<FieldSmoothing> | GroupAttachConfig`.
+ *
+ * `Dynamic` because Haxe cannot put a fixed-key struct and an arbitrary-key
+ * structure behind one typed argument — every `@:from` union poisons the
+ * anonymous literal's inferred type with the other candidate's optional keys.
+ * Keeping it open is what lets both shapes be spelled literally at the call
+ * site, exactly as in the JS reference; annotate the config with
+ * `GroupAttachConfig` or `Dynamic<FieldSmoothing>` to opt into checking.
+ */
+typedef AttachConfig = Dynamic;
+
+/**
+ * Room-wide prediction defaults, seeded on `Predict.get` / `create` and mutable
+ * via `setDefaults`. Every option an attach omits falls back to these.
+ */
+typedef PredictGetOptions = {
+	/** Default mode for attaches that don't name one. Default "lerp". */
+	@:optional var mode: String;
+	@:optional var delay: Null<Float>;
+	@:optional var smoothMs: Null<Float>;
+	@:optional var maxExtrapolate: Null<Float>;
+	@:optional var tickInterval: Null<Float>;
+	@:optional var snap: Null<Float>;
+	@:optional var angle: Null<Bool>;
+	/** Reckon default: inherited by a `{ fields: [...] }` attach that omits `step`. */
+	@:optional var step: (scratch: Dynamic, dtSeconds: Float, elapsedMs: Float) -> Void;
+	@:optional var substep: Null<Float>;
 }
 
 /** Options for a reckon attach. */
@@ -135,6 +227,15 @@ class Predict {
 	private static inline var MAX_STEPS_PER_FRAME = 5;
 	/** smoothMs fallback for damped/extrapolate (lerp's spring defaults 0). */
 	private static inline var DEFAULT_SMOOTH_MS = 50.0;
+	private static inline var DEFAULT_SUBSTEP_MS = 16.0;
+
+	/** Schema field types prediction can smooth. Everything else is dropped from
+	    an attach config: strings/bools carry no curve, refs/collections no value. */
+	private static var NUMERIC_TYPES: Map<String, Bool> = [
+		"number" => true, "int8" => true, "uint8" => true, "int16" => true,
+		"uint16" => true, "int32" => true, "uint32" => true, "int64" => true,
+		"uint64" => true, "float32" => true, "float64" => true, "quantized" => true,
+	];
 
 	private var callbacks: PredictCallbacks;
 	private var clock: RoomClock;
@@ -151,6 +252,26 @@ class Predict {
 	private var stepAcc: Float = 0;
 	private var lastFrameNow: Float = -1;
 
+	// Room-wide defaults every attach falls back to (see PredictGetOptions).
+	// Seeded to the per-mode fallbacks so an options-less Predict behaves
+	// exactly as before. smoothMs stays NULL on purpose: null means "resolve the
+	// mode default at the read site", which is what keeps lerp's output spring
+	// off while damped/extrapolate get DEFAULT_SMOOTH_MS.
+	private var defaultMode: String = "lerp";
+	private var defDelay: Float = 100;
+	private var defSmoothMs: Null<Float> = null;
+	private var defMaxExtrapolate: Float = 200;
+	private var defTickInterval: Float = 0;
+	private var defSnap: Float = 0;
+	private var defAngle: Bool = false;
+	private var reckonStep: (Dynamic, Float, Float) -> Void = null;
+	private var reckonSmoothMs: Null<Float> = null;
+	private var reckonSubstep: Null<Float> = null;
+
+	// "class|configKeys" already warned about matching zero fields — an attachAll
+	// over a 1000-child collection should say it once, not a thousand times.
+	private var warnedEmpty: Map<String, Bool> = new Map();
+
 	/**
 	 * Adapt the SDK's `SchemaCallbacks<T>` (from `Callbacks.get(room)`).
 	 * Typed `Dynamic` because `@:generic` erases the parametric relationship
@@ -162,18 +283,26 @@ class Predict {
 	 * clock — the same two collaborators every time, and no decision the caller
 	 * is better placed to make.
 	 *
+	 * `opts` seeds the room-wide defaults every attach falls back to, so the
+	 * interp buffer (and a shared reckon `step`) is set once:
+	 *
+	 * ```haxe
+	 * var predict = Predict.get(room, { mode: "lerp", delay: 100 });
+	 * predict.attachAll("players", { fields: ["x", "y"] });
+	 * ```
+	 *
 	 * Uses the IMMEDIATE callbacks flavour (`new SchemaCallbacks(decoder)`)
-	 * rather than `Callbacks.get(room)`. The latter defers onto Heaps' MainLoop,
-	 * which never drains on a headless sys target — prediction would then see no
-	 * callbacks at all, and silently, since nothing errors. Prediction is driven
-	 * from the caller's own `tick`, so deferring buys it nothing anyway.
+	 * rather than `Callbacks.get(room)`, which on sys targets defers onto
+	 * `haxe.MainLoop`. Prediction must see a patch in the same tick it lands —
+	 * a deferred `onAdd` would reconcile a frame late, against a state the
+	 * server has already moved past.
 	 */
-	public static function get<T>(room: Room<T>): Predict {
+	public static function get<T>(room: Room<T>, ?opts: PredictGetOptions): Predict {
 		var serializer: SchemaSerializer<T> = cast room.serializer;
-		return create(new SchemaCallbacks<T>(serializer.decoder), room.clock);
+		return create(new SchemaCallbacks<T>(serializer.decoder), room.clock, opts);
 	}
 
-	public static function create(callbacks: Dynamic, clock: RoomClock): Predict {
+	public static function create(callbacks: Dynamic, clock: RoomClock, ?opts: PredictGetOptions): Predict {
 		return new Predict({
 			listen: (instance, field, handler, immediate) -> {
 				var off: Dynamic = callbacks.listen(instance, field,
@@ -181,23 +310,59 @@ class Predict {
 				return () -> { off(); };
 			},
 			// neko Dynamic dispatch needs EXACT argument counts — pass every
-			// optional parameter explicitly
-			onAdd: (collection, handler) -> {
-				var off: Dynamic = callbacks.onAdd(collection,
-					(value: Dynamic, key: Dynamic) -> handler(value, key), null, null);
+			// optional parameter explicitly. Both SchemaCallbacks overloads take
+			// the same count, so the parent/root split is just which one to call.
+			onAdd: (parent, collection, handler) -> {
+				var off: Dynamic = (parent == null)
+					? callbacks.onAdd(collection,
+						(value: Dynamic, key: Dynamic) -> handler(value, key), null, null)
+					: callbacks.onAdd(parent, collection,
+						(value: Dynamic, key: Dynamic) -> handler(value, key), null);
 				return () -> { off(); };
 			},
-			onRemove: (collection, handler) -> {
-				var off: Dynamic = callbacks.onRemove(collection,
-					(value: Dynamic, key: Dynamic) -> handler(value, key), null);
+			onRemove: (parent, collection, handler) -> {
+				var off: Dynamic = (parent == null)
+					? callbacks.onRemove(collection,
+						(value: Dynamic, key: Dynamic) -> handler(value, key), null)
+					: callbacks.onRemove(parent, collection,
+						(value: Dynamic, key: Dynamic) -> handler(value, key));
 				return () -> { off(); };
 			},
-		}, clock);
+		}, clock, opts);
 	}
 
-	public function new(callbacks: PredictCallbacks, clock: RoomClock) {
+	public function new(callbacks: PredictCallbacks, clock: RoomClock, ?opts: PredictGetOptions) {
 		this.callbacks = callbacks;
 		this.clock = clock;
+		if (opts != null) { this.setDefaults(opts); }
+	}
+
+	/** The default mode attaches inherit when they don't name one. */
+	public var mode(get, never): String;
+	private function get_mode(): String { return this.defaultMode; }
+
+	/**
+	 * Change the room-wide defaults. Only the options present are touched.
+	 *
+	 * Takes effect on the NEXT attach: `track` snapshots its resolved options
+	 * into the slot, so already-attached fields keep what they were given (the
+	 * reference behaves the same — an attach allocates its own profile rather
+	 * than pointing at the mutable defaults one).
+	 */
+	public function setDefaults(opts: PredictGetOptions): Void {
+		if (opts == null) { return; }
+		if (opts.mode != null) { this.defaultMode = opts.mode; }
+		if (opts.delay != null) { this.defDelay = numOr(opts.delay, this.defDelay); }
+		if (opts.smoothMs != null) { this.defSmoothMs = numOr(opts.smoothMs, 0); }
+		if (opts.maxExtrapolate != null) { this.defMaxExtrapolate = numOr(opts.maxExtrapolate, this.defMaxExtrapolate); }
+		if (opts.tickInterval != null) { this.defTickInterval = numOr(opts.tickInterval, this.defTickInterval); }
+		if (opts.snap != null) { this.defSnap = numOr(opts.snap, this.defSnap); }
+		if (opts.angle != null) { this.defAngle = opts.angle; }
+		if (opts.step != null) { this.reckonStep = opts.step; }
+		if (opts.substep != null) { this.reckonSubstep = numOr(opts.substep, DEFAULT_SUBSTEP_MS); }
+		// One smoothMs arms every mode, matching the reference: it writes the
+		// same value to both the damped/extrapolate constant and lerp's spring.
+		if (opts.smoothMs != null) { this.reckonSmoothMs = numOr(opts.smoothMs, DEFAULT_SMOOTH_MS); }
 	}
 
 	private static function toNumber(value: Dynamic): Float {
@@ -205,6 +370,17 @@ class Predict {
 		if (Std.isOfType(value, Bool)) { return cast(value, Bool) ? 1 : 0; }
 		if (Std.isOfType(value, Float)) { return cast value; }
 		return 0;
+	}
+
+	/**
+	 * Read a numeric option out of a `Dynamic` config, or fall back.
+	 *
+	 * The cast matters: a config reaches here as `Dynamic`, so `delay: 100`
+	 * written as an Int literal stays an Int at runtime and would land in a
+	 * `Float` field through a dynamic cast.
+	 */
+	private static function numOr(value: Dynamic, fallback: Float): Float {
+		return (value == null) ? fallback : toNumber(value);
 	}
 
 	// --- Attach -----------------------------------------------------------
@@ -232,13 +408,16 @@ class Predict {
 		var slot = new Slot();
 		slot.field = field;
 		slot.instance = instance;
-		slot.mode = (options != null && options.mode != null) ? options.mode : "lerp";
-		slot.delay = (options != null && options.delay != null) ? options.delay : 100;
-		slot.smoothMs = (options != null) ? options.smoothMs : null;
-		slot.maxExtrapolate = (options != null && options.maxExtrapolate != null) ? options.maxExtrapolate : 200;
-		slot.tickInterval = (options != null && options.tickInterval != null) ? options.tickInterval : 0;
-		slot.snap = (options != null && options.snap != null) ? options.snap : 0;
-		slot.angle = (options != null && options.angle != null) ? options.angle : false;
+		// Each option: what the attach said, else the room-wide default. Resolved
+		// ONCE here — a later setDefaults() leaves this slot alone.
+		slot.mode = (options != null && options.mode != null) ? options.mode : this.defaultMode;
+		slot.delay = numOr((options != null) ? options.delay : null, this.defDelay);
+		slot.smoothMs = (options != null && options.smoothMs != null)
+			? numOr(options.smoothMs, 0) : this.defSmoothMs;
+		slot.maxExtrapolate = numOr((options != null) ? options.maxExtrapolate : null, this.defMaxExtrapolate);
+		slot.tickInterval = numOr((options != null) ? options.tickInterval : null, this.defTickInterval);
+		slot.snap = numOr((options != null) ? options.snap : null, this.defSnap);
+		slot.angle = (options != null && options.angle != null) ? options.angle : this.defAngle;
 		var initial = toNumber(Reflect.getProperty(instance, field));
 		slot.v1 = initial;
 		slot.auxV = initial;
@@ -278,10 +457,11 @@ class Predict {
 		sim.instance = instance;
 		sim.scratch = scratch;
 		sim.fields = options.fields;
-		sim.step = options.step;
-		sim.smoothMs = (options.smoothMs != null) ? options.smoothMs : DEFAULT_SMOOTH_MS;
-		sim.substep = (options.substep != null && options.substep > 0) ? options.substep : 16;
-		sim.snap = (options.snap != null) ? options.snap : 0;
+		sim.step = (options.step != null) ? options.step : this.reckonStep;
+		sim.smoothMs = numOr(options.smoothMs, numOr(this.reckonSmoothMs, DEFAULT_SMOOTH_MS));
+		var substep = numOr(options.substep, numOr(this.reckonSubstep, DEFAULT_SUBSTEP_MS));
+		sim.substep = (substep > 0) ? substep : DEFAULT_SUBSTEP_MS;
+		sim.snap = numOr(options.snap, this.defSnap);
 		sim.smoothed = [for (k in 0...n) toNumber(Reflect.getProperty(instance, options.fields[k]))];
 		sim.out = [for (_ in 0...n) 0.0];
 		sim.valueOut = [for (_ in 0...n) 0.0];
@@ -291,10 +471,12 @@ class Predict {
 		sim.copyFields = copyFields;
 		this.simsByRef.set(refId, sim);
 
-		// each reckoned field gets a RECKON slot (sample mirror + fallback)
+		// each reckoned field gets a RECKON slot (sample mirror + fallback).
+		// snap rides along so a group threshold cuts the sample ring too, not
+		// just the sim rebase.
 		var offs: Array<Void -> Void> = [];
 		for (f in options.fields) {
-			offs.push(this.track(instance, f, { mode: "reckon" }));
+			offs.push(this.track(instance, f, { mode: "reckon", snap: sim.snap }));
 		}
 		return () -> {
 			for (off in offs) { off(); }
@@ -338,57 +520,171 @@ class Predict {
 	 * Attach prediction to ONE instance from a declarative config. Returns a
 	 * detacher.
 	 *
-	 * Two shapes, mirroring the reference:
+	 * TWO shapes, discriminated by whether `fields` is an ARRAY — never by
+	 * `mode`, which every shape may carry:
 	 *
 	 * ```haxe
-	 * // per-field smoothing; each field picks its own mode
+	 * // per-field map: arbitrary keys, each field picks its own mode
 	 * predict.attach(boss, { x: "lerp", yaw: { mode: "damped", angle: true } });
 	 *
-	 * // dead reckoning, one step shared with the server across `fields`
+	 * // group: one config over a list of fields
+	 * predict.attach(ghost, { mode: "lerp", fields: ["x", "y"], snap: 4 });
+	 *
+	 * // group, mode "reckon": one step shared with the server (the only mode
+	 * // that allocates sim state)
 	 * predict.attach(bot, { mode: "reckon", fields: ["x", "y"], step: patrol });
 	 * ```
 	 *
-	 * `Dynamic` because the config is a union the type system can't spell here:
-	 * a per-field map whose values are either a mode string or a full
-	 * `PredictFieldOptions`, or the reckon shape.
+	 * Omit `mode` on a group and it takes the Predict's (`Predict.get(room,
+	 * opts)` / `setDefaults`), which itself defaults to "lerp".
 	 *
-	 * Fields the instance's schema doesn't declare are DROPPED, not an error:
-	 * one config can cover a heterogeneous collection, and a field that isn't
-	 * there would otherwise subscribe to nothing (or read garbage from the
-	 * reckon scratch).
+	 * Fields the instance's schema doesn't declare as numeric are DROPPED, not
+	 * an error: one config can cover a heterogeneous collection, and a field
+	 * that isn't there would otherwise subscribe to nothing (or read garbage
+	 * from the reckon scratch). Matching ZERO fields is never useful, so that
+	 * one traces.
+	 *
+	 * @throws String if the resolved mode is "reckon" and no `step` was given
+	 *   here or on the Predict.
 	 */
-	public function attach(instance: Dynamic, config: Dynamic): Void -> Void {
-		if (Reflect.field(config, "mode") == "reckon") {
-			return this.trackStepped(instance, config);
+	public function attach(instance: Dynamic, config: AttachConfig): Void -> Void {
+		var fields: Dynamic = Reflect.field(config, "fields");
+		return Std.isOfType(fields, Array)
+			? this.attachGroup(instance, config, cast fields)
+			: this.attachPerField(instance, config);
+	}
+
+	/** `{ mode, fields, ... }` — one config spread over a list of fields. */
+	private function attachGroup(instance: Dynamic, config: Dynamic, fields: Array<String>): Void -> Void {
+		var mode: String = Reflect.field(config, "mode");
+		if (mode == null) { mode = this.defaultMode; }
+
+		var declared = fields.filter((f) -> this.isNumericField(instance, f));
+		if (declared.length == 0) { this.warnEmptyAttach(instance, fields); }
+
+		if (mode == "reckon") {
+			var step: Dynamic = Reflect.field(config, "step");
+			if (step == null) { step = this.reckonStep; }
+			if (step == null) {
+				throw "Predict.attach(): reckon mode requires a 'step' function. Either pass "
+					+ "`step` in the attach config OR construct the Predict with "
+					+ "`Predict.get(room, { mode: \"reckon\", step: yourStepFn })` so it can be inherited.";
+			}
+			return this.trackStepped(instance, {
+				fields: declared,
+				step: step,
+				smoothMs: Reflect.field(config, "smoothMs"),
+				substep: Reflect.field(config, "substep"),
+				snap: Reflect.field(config, "snap"),
+			});
 		}
+
+		// Every other mode is smoothing-only — no sim state, one slot per field.
+		var opts: PredictFieldOptions = {
+			mode: mode,
+			smoothMs: Reflect.field(config, "smoothMs"),
+			snap: Reflect.field(config, "snap"),
+			angle: Reflect.field(config, "angle"),
+			delay: Reflect.field(config, "delay"),
+			tickInterval: Reflect.field(config, "tickInterval"),
+			maxExtrapolate: Reflect.field(config, "maxExtrapolate"),
+		};
+		var offs: Array<Void -> Void> = [for (f in declared) this.track(instance, f, opts)];
+		return () -> { for (off in offs) off(); };
+	}
+
+	/** `{ x: "lerp", yaw: {...} }` — arbitrary keys, one spec per field. */
+	private function attachPerField(instance: Dynamic, config: Dynamic): Void -> Void {
+		var keys = Reflect.fields(config);
 		var offs: Array<Void -> Void> = [];
-		for (field in Reflect.fields(config)) {
-			if (Reflect.getProperty(instance, field) == null) { continue; }
+		for (field in keys) {
 			var spec: Dynamic = Reflect.field(config, field);
+			if (spec == null) { continue; }
+			if (!this.isNumericField(instance, field)) { continue; }
 			var opts: PredictFieldOptions =
 				Std.isOfType(spec, String) ? { mode: cast spec } : cast spec;
 			offs.push(this.track(instance, field, opts));
 		}
+		if (offs.length == 0) { this.warnEmptyAttach(instance, keys); }
 		return () -> { for (off in offs) off(); };
 	}
 
 	/**
-	 * Attach prediction to every child of a root-level collection: wires
+	 * Does the instance DECLARE this field as a number?
+	 *
+	 * Asking the schema metadata rather than the current value is what lets a
+	 * field that happens to hold null at attach time still be tracked.
+	 */
+	private function isNumericField(instance: Dynamic, field: String): Bool {
+		var schema: Schema = (Std.isOfType(instance, Schema)) ? cast instance : null;
+		// non-schema fixture: no metadata to consult, so take the field as given
+		if (schema == null) { return true; }
+		for (index in schema._indexes.keys()) {
+			if (schema._indexes.get(index) == field) {
+				return NUMERIC_TYPES.exists(schema._types.get(index));
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * An attach that matched nothing. Silence here is what made the config-shape
+	 * bug expensive: `value()` falls back to the raw field, so a dead attach
+	 * still renders a plausible number.
+	 *
+	 * Dropping SOME fields is legitimate (a heterogeneous collection), so only
+	 * the zero case speaks — once per class + config shape.
+	 */
+	private function warnEmptyAttach(instance: Dynamic, keys: Array<String>): Void {
+		var cls = Type.getClassName(Type.getClass(instance));
+		var seen = cls + "|" + keys.join(",");
+		if (this.warnedEmpty.exists(seen)) { return; }
+		this.warnedEmpty.set(seen, true);
+
+		var available: Array<String> = [];
+		var schema: Schema = (Std.isOfType(instance, Schema)) ? cast instance : null;
+		if (schema != null) {
+			for (index in schema._indexes.keys()) {
+				if (NUMERIC_TYPES.exists(schema._types.get(index))) {
+					available.push(schema._indexes.get(index));
+				}
+			}
+		}
+		trace("colyseus.predict: attach matched no fields on " + cls + " — nothing is being "
+			+ "predicted, and value() will fall back to the raw synced value. Config named ["
+			+ keys.join(", ") + "]; numeric fields available: [" + available.join(", ") + "].");
+	}
+
+	/**
+	 * Attach prediction to every child of a collection: wires
 	 * onAdd -> attach(child, config) and onRemove -> detach. Same config shapes
 	 * as `attach`, reckon included — there is no separate reckon flavour.
+	 *
+	 * ```haxe
+	 * predict.attachAll("players", { mode: "lerp", fields: ["x", "y"], snap: 4 });
+	 * predict.attachAll(room.state.arena, "enemies", { x: "lerp", y: "lerp" });
+	 * ```
+	 *
+	 * Pass the parent only for a collection that isn't on the root state —
+	 * the same two spellings `callbacks.onAdd` takes.
 	 */
-	public function attachAll(collection: String, config: Dynamic): Void -> Void {
-		return this.attachEach(collection, (child) -> { this.attach(child, config); });
+	public function attachAll(collectionOrParent: Dynamic, configOrCollection: Dynamic,
+			?config: AttachConfig): Void -> Void {
+		var root = Std.isOfType(collectionOrParent, String);
+		var parent: Dynamic = root ? null : collectionOrParent;
+		var collection: String = root ? collectionOrParent : configOrCollection;
+		var cfg: AttachConfig = root ? configOrCollection : config;
+		return this.attachEach(parent, collection, (child) -> { this.attach(child, cfg); });
 	}
 
 	/** Shared add/remove wiring behind the attach-all path. */
-	private function attachEach(collection: String, attach: Dynamic -> Void): Void -> Void {
+	private function attachEach(parent: Dynamic, collection: String, attach: Dynamic -> Void): Void -> Void {
 		var tracked: Array<Dynamic> = [];
-		var addOff = this.callbacks.onAdd(collection, (child, _key) -> {
+		var addOff = this.callbacks.onAdd(parent, collection, (child, _key) -> {
 			attach(child);
 			tracked.push(child);
 		});
-		var removeOff = this.callbacks.onRemove(collection, (child, _key) -> {
+		var removeOff = this.callbacks.onRemove(parent, collection, (child, _key) -> {
 			tracked.remove(child);
 			this.detach(child);
 		});
@@ -558,7 +854,7 @@ class Predict {
 		var clock = this.clock;
 		var step = reckon ? opts.step : null;
 
-		var addOff = this.callbacks.onAdd(collection, (server, _key) -> {
+		var addOff = this.callbacks.onAdd(null, collection, (server, _key) -> {
 			store.handleAdd(server);
 			if (!reckon || untrack.exists((server : Schema).__refId)) { return; } // decoder re-fire
 			// AFTER handleAdd: the lead is only measured once the entry collapses.
@@ -581,7 +877,7 @@ class Predict {
 			untrack.set((server : Schema).__refId, off);
 		});
 
-		var removeOff = this.callbacks.onRemove(collection, (server, _key) -> {
+		var removeOff = this.callbacks.onRemove(null, collection, (server, _key) -> {
 			if (untrack != null) {
 				var refId = (server : Schema).__refId;
 				var off = untrack.get(refId);
