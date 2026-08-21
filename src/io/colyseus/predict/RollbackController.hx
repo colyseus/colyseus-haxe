@@ -87,7 +87,7 @@ class StepContext {
 
 /** Options shared by every rollback controller. */
 typedef RollbackOptions = {
-	var input: InputHandle;
+	var input: InputHandle<Dynamic>;
 	/** Resolves reckonTime's unstamped fallback (serverNow). */
 	@:optional var clock: RoomClock;
 	/** Error-decay time constant (ms); 0 = hard snap; null = the server's
@@ -166,7 +166,7 @@ class RollbackController {
 
 	private var smoothMs: Float;
 	private var snapThreshold: Float;
-	private var input: InputHandle;
+	private var input: InputHandle<Dynamic>;
 	private var onReconcileHook: Int -> Void;
 	private var warnTolerance: Null<Float>;
 	private var clock: RoomClock;

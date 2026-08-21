@@ -798,7 +798,7 @@ class Predict {
 	 * render-delay early, and shots miss by exactly that much with nothing in the
 	 * logs to say so. An explicit `renderDelay` on `room.input()` still wins.
 	 */
-	private function bindRenderDelay(input: InputHandle): Void {
+	private function bindRenderDelay(input: InputHandle<Dynamic>): Void {
 		if (input == null || input.renderDelay() > 0) { return; }
 		for (perRef in this.slotsByRef) {
 			for (slot in perRef) {

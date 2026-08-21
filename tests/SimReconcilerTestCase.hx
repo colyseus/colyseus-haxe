@@ -65,7 +65,7 @@ class SimReconcilerTestCase extends haxe.unit.TestCase {
 		RoomClock.getNow = this.savedNow;
 	}
 
-	private function makeHandle(command: Schema): InputHandle {
+	private function makeHandle(command: Schema): InputHandle<Dynamic> {
 		var encoder = new InputEncoder(command);
 		var stub = new StubConnection();
 		return @:privateAccess new InputHandle(command, encoder,

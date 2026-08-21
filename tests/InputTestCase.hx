@@ -82,7 +82,7 @@ class InputTestCase extends haxe.unit.TestCase {
         assertEquals(4, enc.seq);
     }
 
-    private function makeHandle(clock: RoomClock, ?mode: String, ?opts: { stampRender: Bool, stampReckon: Bool, ?renderDelay: Float, ?allowRewind: Dynamic -> Bool }): { handle: InputHandle, stub: StubConnection } {
+    private function makeHandle(clock: RoomClock, ?mode: String, ?opts: { stampRender: Bool, stampReckon: Bool, ?renderDelay: Float, ?allowRewind: Dynamic -> Bool }): { handle: InputHandle<Dynamic>, stub: StubConnection } {
         var input = new MoveInput();
         var enc = new InputEncoder(input, mode, 3);
         var stub = new StubConnection();
@@ -379,6 +379,58 @@ class InputTestCase extends haxe.unit.TestCase {
         // TIMED heartbeat patch [15|0x80][u32 sNow=750][u32 inputSeq=0]
         @:privateAccess room.onMessageCallback(getBytes([143, 238, 2, 0, 0, 0, 0, 0, 0]));
         assertEquals(750.0, room.clock.lastServerTime());
+    }
+
+    /**
+     * `room.input({ type: T })` hands back an `InputHandle<T>`, so the central
+     * idiom is a real field access. It used to be typed `Schema`, which made
+     * `input.data.vx` a compile error and put a bare `cast` in every consumer.
+     *
+     * The compile-time half of this test is the test: `jump` is declared `Bool`
+     * on MoveInput, so neither line below type-checks against a `Schema`.
+     */
+    public function testInputHandleIsTypedByItsSchema() {
+        var room = new Room<P0State>("phase0", P0State);
+        room.connection = new StubConnection();
+
+        var input = room.input({ type: MoveInput });
+        input.data.vx = 3;
+        input.data.jump = true;
+        assertEquals(3, (input.data.vx : Int));
+        assertTrue(input.data.jump);
+
+        // at() carries the same type through the replay ring
+        var seq = input.send();
+        var past = input.at(seq);
+        assertEquals(3, (past.vx : Int));
+        assertTrue(past.jump);
+    }
+
+    /**
+     * First call wins, so a later call naming a different type would hand back
+     * a handle whose `data` is not what its type says — nothing downstream can
+     * notice, so it has to say so here.
+     */
+    public function testRoomInputWarnsOnALaterDifferentType() {
+        var traced: Array<String> = [];
+        var savedTrace = haxe.Log.trace;
+        haxe.Log.trace = (value: Dynamic, ?_infos: haxe.PosInfos) -> traced.push(Std.string(value));
+
+        var room = new Room<P0State>("phase0", P0State);
+        room.connection = new StubConnection();
+        var first = room.input({ type: MoveInput });
+
+        // same type, and the no-args fetch: both silent
+        room.input({ type: MoveInput });
+        room.input();
+        assertEquals(0, traced.length);
+
+        var second = room.input({ type: schema.predict.AccelInput });
+        haxe.Log.trace = savedTrace;
+
+        assertTrue(first == cast second);
+        assertEquals(1, traced.length);
+        assertTrue(traced[0].indexOf("already built") > -1);
     }
 
     public function testRoomInputUnreliableModeIsRejected() {
