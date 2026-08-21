@@ -14,6 +14,7 @@ import schema.predict.ReconState;
 import schema.predict.AccelInput;
 import schema.predict.PassiveEnt;
 import schema.predict.ReckonBall;
+import schema.predict.SimPaddle;
 
 /**
  * Phase 4 — Predict layer.
@@ -120,6 +121,38 @@ class PredictTestCase extends haxe.unit.TestCase {
 		assertClose(100, me.lastCorrectionMag);
 		assertClose(-100, me.lastCorrection.get("x"));
 		assertClose(100.3, state.x);
+	}
+
+	/**
+	 * Derived `fields` cover STRINGS too — they ride the mirror verbatim so a
+	 * step can branch on them, they never enter the numeric/pose set, and their
+	 * presence disables the wire-precision reconcile skip (PORTING.md).
+	 */
+	public function testDerivedFieldsIncludeStrings() {
+		var truth = new SimPaddle();
+		truth.x = 1; truth.y = 2; truth.team = "left";
+		var command = new AccelInput();
+		var handle = makeHandle(command);
+		var me = new Reconciler(truth, {
+			input: handle,
+			step: (ctx, s, cmd) -> { s.x += cmd.ax * ctx.dt; },
+			smoothMs: 0,
+			stepMs: 50,
+		});
+		var state: SimPaddle = cast me.state;
+
+		assertEquals("left", state.team);
+		assertFalse(@:privateAccess me.historyOn);
+		assertEquals("x,y", me.boundRegistrations()[0].fields.join(","));
+
+		// re-adopted on every ack, like any other mirrored field
+		this.now = 0; me.tick(this.now);
+		command.ax = 10; handle.send();
+		truth.team = "right";
+		truth.x = 1;
+		@:privateAccess handle.ackInput(1);
+		this.now = 50; me.tick(this.now);
+		assertEquals("right", state.team);
 	}
 
 	public function testReconcilerMemoEpoch() {

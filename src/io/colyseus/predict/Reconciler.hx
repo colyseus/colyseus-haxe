@@ -68,11 +68,13 @@ class Reconciler extends RollbackController {
 		return v;
 	}
 
-	// "string" can't error-correct; ref/array/map are object types;
-	// "quantized" holds the wire-exact float64 (identity quantizer)
+	// ref/array/map are object types; "quantized" holds the wire-exact float64
+	// (identity quantizer). Strings can't error-correct, but they still belong
+	// in the mirror — copied verbatim, kept out of `numericFields`, and they
+	// disable the wire-precision reconcile skip via `scalarOnly` below.
 	private static function isScalarType(fieldType: String): Bool {
 		return switch (fieldType) {
-			case "ref" | "array" | "map" | "string": false;
+			case "ref" | "array" | "map": false;
 			default: true;
 		}
 	}

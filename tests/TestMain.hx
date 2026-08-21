@@ -14,6 +14,7 @@ class TestMain {
     r.add(new PredictTestCase());
     r.add(new PredictLerpSmoothingTestCase());
     r.add(new PredictAttachConfigTestCase());
+    r.add(new SimReconcilerTestCase());
     // r.add(new AuthTestCase());
 
     var success = r.run();

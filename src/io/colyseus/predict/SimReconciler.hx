@@ -158,10 +158,18 @@ class SimReconciler<W, I> extends RollbackController {
 		bound.push(b);
 	}
 
+	/**
+	 * ref/array/map are object types: not scalars, and not rollback-able this
+	 * way. A string IS — it rides the mirror verbatim, seeded here and
+	 * re-adopted on every ack, and `isNumeric` keeps it out of the pose set on
+	 * its own. Excluding it left `world.paddle.team` at the class default
+	 * forever while the decoded instance said "left", so a step that branched
+	 * on it silently simulated the wrong thing.
+	 */
 	static function isScalarType(fieldType: Dynamic): Bool {
 		if (!Std.isOfType(fieldType, String)) { return false; }
 		var t: String = cast fieldType;
-		return t != "ref" && t != "array" && t != "map" && t != "string";
+		return t != "ref" && t != "array" && t != "map";
 	}
 
 	static inline function isNumeric(v: Dynamic): Bool {
