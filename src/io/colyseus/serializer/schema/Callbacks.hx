@@ -44,7 +44,7 @@ class SchemaCallbacks<T> {
     #if sys
     private var _pendingChanges:Array<Array<DataChange>> = [];
     private var _mutex = new sys.thread.Mutex();
-    private var _mainLoopRegistered:Bool = false;
+    private var _mainLoopEvent:haxe.MainLoop.MainEvent = null;
     #end
 
     public function new (decoder: Decoder<T>) {
@@ -56,6 +56,14 @@ class SchemaCallbacks<T> {
      * Enable thread-safe callback processing via haxe.MainLoop.
      * On sys targets, callbacks from the websocket thread are queued
      * and fired on the main thread. Call this after Callbacks.get(room).
+     *
+     * The drain runs whenever the main thread's event loop is progressed —
+     * which a host engine does per frame (Heaps calls `events.progress()`,
+     * and `sys.thread.EventLoop` ticks `haxe.MainLoop` from there), and which
+     * the runtime does on its own once `main()` returns.
+     *
+     * Idempotent. Call `disableMainLoopProcessing()` to go back to firing
+     * callbacks inline on the decoding thread.
      */
     public function enableMainLoopProcessing() {
         #if sys
@@ -64,10 +72,27 @@ class SchemaCallbacks<T> {
             _pendingChanges.push(changes);
             _mutex.release();
         };
-        if (!_mainLoopRegistered) {
-            _mainLoopRegistered = true;
-            haxe.MainLoop.add(() -> processPendingChanges());
+        if (_mainLoopEvent == null) {
+            _mainLoopEvent = haxe.MainLoop.add(() -> processPendingChanges());
+            // a blocking event keeps the process alive forever — the host owns
+            // the loop's lifetime, not us
+            _mainLoopEvent.isBlocking = false;
         }
+        #end
+    }
+
+    /**
+     * Undo `enableMainLoopProcessing()`: unregister the drain and go back to
+     * firing callbacks inline, on whichever thread decodes. Anything still
+     * queued is flushed first, so no change is dropped.
+     */
+    public function disableMainLoopProcessing() {
+        #if sys
+        if (_mainLoopEvent == null) { return; }
+        _mainLoopEvent.stop();
+        _mainLoopEvent = null;
+        processPendingChanges();
+        this.decoder.triggerChanges = (changes: Array<DataChange>) -> this.triggerChanges(changes);
         #end
     }
 
