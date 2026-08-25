@@ -28,6 +28,10 @@ abstract EventHandler<T:Function>(Array<T>) {
 // `once` registers a wrapper that unsubscribes BEFORE calling, so a listener
 // that throws still doesn't fire twice, and re-entrant dispatch can't either.
 //
+// It is @:generic so the wrapper closure is built with the CONCRETE parameter
+// type: hl erases a method type param to dyn, and a (dyn)->void wrapper stored
+// in an Array<Int->Void> segfaults when dispatch calls it with a raw int.
+//
 
 class EventHandlerDispatcher0 {
   public static inline function dispatch(e:EventHandler<Void->Void>) {
@@ -52,7 +56,7 @@ class EventHandlerDispatcher1 {
   }
 
   /** Listen for the NEXT dispatch only; the listener removes itself. */
-  public static function once<T>(e:EventHandler<T->Void>, fn:T->Void) {
+  @:generic public static function once<T>(e:EventHandler<T->Void>, fn:T->Void) {
     var wrapper:T->Void = null;
     wrapper = function(arg:T) { e -= wrapper; fn(arg); };
     e += wrapper;
@@ -67,7 +71,7 @@ class EventHandlerDispatcher2 {
   }
 
   /** Listen for the NEXT dispatch only; the listener removes itself. */
-  public static function once<T1,T2>(e:EventHandler<T1->T2->Void>, fn:T1->T2->Void) {
+  @:generic public static function once<T1,T2>(e:EventHandler<T1->T2->Void>, fn:T1->T2->Void) {
     var wrapper:T1->T2->Void = null;
     wrapper = function(a1:T1, a2:T2) { e -= wrapper; fn(a1, a2); };
     e += wrapper;
