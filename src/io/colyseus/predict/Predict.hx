@@ -538,6 +538,12 @@ class Predict {
 	 * predict.attach(bot, { mode: "reckon", fields: ["x", "y"], step: patrol });
 	 * ```
 	 *
+	 * ANNOTATE an inline reckon `step` — `(s: Dynamic, dt: Float, elapsed:
+	 * Float)`. The config is untyped, so an inferred `dt` binds to Int against
+	 * the Dynamic scratch and a sub-second substep truncates to 0 on cpp/hl,
+	 * freezing the sim. Annotating the config `GroupAttachConfig` does the same
+	 * job.
+	 *
 	 * Omit `mode` on a group and it takes the Predict's (`Predict.get(room,
 	 * opts)` / `setDefaults`), which itself defaults to "lerp".
 	 *

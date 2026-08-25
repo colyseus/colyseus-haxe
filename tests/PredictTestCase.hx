@@ -281,7 +281,10 @@ class PredictTestCase extends haxe.unit.TestCase {
 		predict.attach(ball, {
 			mode: "reckon",
 			fields: ["x"],
-			step: (s, dt, _elapsed) -> { s.x += s.vx * dt; },
+			// dt: Float is load-bearing — `attach` takes an untyped config, so an
+			// inferred dt binds to Int against the Dynamic `s.vx` and a 0.01s
+			// substep truncates to 0 on cpp/hl.
+			step: (s: Dynamic, dt: Float, _elapsed: Float) -> { s.x += s.vx * dt; },
 			smoothMs: 0,   // raw projection
 			substep: 10,
 		});
