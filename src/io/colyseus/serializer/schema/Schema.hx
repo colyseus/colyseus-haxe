@@ -77,6 +77,10 @@ class Decorator {
           case EConst(CString(exp)):
             exprs.push(macro $p{["this", "_childTypes"]}.set($v{index}, $v{exp}));
             // exprs.push(macro $p{["this", "_childPrimitiveTypes"]}.set($v{index}, $v{exp}));
+
+          case EObjectDecl(_):
+            // options object — e.g. @:type("quantized", {min: 0., max: 1., bits: 16, mode: 0})
+            exprs.push(macro $p{["this", "_childTypes"]}.set($v{index}, ${f.meta.params[1]}));
           default:
         }
       }
@@ -157,6 +161,8 @@ enum abstract OPERATION(Int) from Int
 
   // ArraySchema operations
   var REVERSE = 15;
+  var MOVE = 32;
+  var MOVE_AND_ADD = 160;
   var DELETE_BY_REFID = 33;
   var ADD_BY_REFID = 129;
 }

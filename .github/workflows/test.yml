@@ -43,10 +43,13 @@ jobs:
       - name: Build HashLink from source (hl)
         if: matrix.target == 'hl'
         run: |
-          sudo apt-get install -y libpng-dev libturbojpeg-dev libvorbis-dev libopenal-dev libsdl2-dev libmbedtls-dev libuv1-dev
-          git clone --depth 1 https://github.com/HaxeFoundation/hashlink.git /tmp/hashlink
+          sudo apt-get install -y libpng-dev libturbojpeg-dev libvorbis-dev libmbedtls-dev libuv1-dev
+          # pinned to the tag matching haxelib's hashlink 1.15.0
+          git clone --depth 1 --branch 1.15 https://github.com/HaxeFoundation/hashlink.git /tmp/hashlink
           cd /tmp/hashlink
-          make
+          # only what the HL/C tests link -- plain `make` also builds sdl.hdll,
+          # which upstream now wants SDL3 for (not packaged on ubuntu-latest)
+          make libhl fmt ssl uv hl
           sudo make install
 
       - name: Compile and run tests (hl)

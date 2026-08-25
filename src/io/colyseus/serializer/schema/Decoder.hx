@@ -14,18 +14,50 @@ import haxe.io.Bytes;
 
 typedef DecodedValue = { value : Dynamic, previousValue : Dynamic };
 
-@:generic
+// resync bookkeeping: identities visited per collection refId (map string
+// keys + array indexes kept in separate domains — no Dynamic-keyed sets).
+typedef ResyncVisited = { keys: Map<String, Bool>, indexes: Map<Int, Bool> };
+
 class Decoder<T> {
 	public var state:T;
 	public var context:TypeContext = new TypeContext();
 	public var refs:ReferenceTracker = new ReferenceTracker();
 	public var triggerChanges:(Array<DataChange>) -> Void = (_:Array<DataChange>) -> {};
 
+	// non-null only while decodeResync() is in progress — its non-nullness
+	// IS the resync-mode flag (see PORTING_RESYNC.md in @colyseus/schema)
+	public var resyncVisited: Map<Int, ResyncVisited> = null;
+	public var resyncDamaged: Bool = false;
+
 	private var allChanges:Array<DataChange>;
 
 	public function new(state:T) {
 		this.state = state;
 		this.refs.add(0, state);
+	}
+
+	/**
+	 * Full-snapshot reconciliation ("resync") decode.
+	 *
+	 * Behaves exactly like `decode()`, plus: every collection entry the
+	 * payload does NOT mention is removed through the regular DELETE path —
+	 * `onRemove` callbacks fire with the real previous value and released
+	 * refs are garbage-collected. Use it to apply a rejoin/reconnect full
+	 * state over an existing decoded tree.
+	 *
+	 * ONLY valid for full-snapshot payloads (`encodeAll` output). Calling it
+	 * on an incremental patch would prune everything the patch doesn't touch.
+	 */
+	public function decodeResync(bytes:Bytes, it:It = null) {
+		resyncVisited = new Map();
+		resyncDamaged = false;
+		try {
+			decode(bytes, it);
+			resyncVisited = null;
+		} catch (e:Dynamic) {
+			resyncVisited = null; // no try/finally in Haxe — reset on both paths
+			throw e;
+		}
 	}
 
 	public function decode(bytes:Bytes, it:It = null) {
@@ -49,13 +81,16 @@ class Decoder<T> {
 					(ref : IArraySchema).__onDecodeEnd();
 				}
 
-				ref = refs.get(refId);
+				var nextRef:Dynamic = refs.get(refId);
 
 				//
 				// Trying to access a reference that haven't been decoded yet.
 				//
-				if (ref == null) {
-					throw("refId not found: " + refId);
+				if (nextRef == null) {
+					trace("WARNING: @colyseus/schema refId not found: " + refId);
+					skipCurrentStructure(bytes, it, totalBytes);
+				} else {
+					ref = nextRef;
 				}
 
 				continue;
@@ -76,22 +111,7 @@ class Decoder<T> {
 
             if (isSchemaDefinitionMismatch) {
 				trace("WARNING: @colyseus/schema definition mismatch?");
-				//
-				// keep skipping next bytes until reaches a known structure
-				// by local decoder.
-				//
-				var nextIterator:It = {offset: it.offset};
-
-				while (it.offset < totalBytes) {
-					if (bytes.get(it.offset) == SPEC.SWITCH_TO_STRUCTURE) {
-						nextIterator.offset = it.offset + 1;
-						if (refs.has(Decode.number(bytes, nextIterator))) {
-							break;
-						}
-					}
-
-					it.offset++;
-				}
+				skipCurrentStructure(bytes, it, totalBytes);
 				continue;
 			}
 		}
@@ -100,9 +120,136 @@ class Decoder<T> {
 			(ref : IArraySchema).__onDecodeEnd();
 		}
 
+		// resync mode: prune everything the snapshot didn't visit. Runs
+		// before triggerChanges (DELETE changes fire onRemove with the real
+		// previousValue) and before GC (refs.remove feeds deletedRefs).
+		if (resyncVisited != null) { resyncSweep(); }
+
 		this.triggerChanges(allChanges);
 
 		refs.garbageCollection();
+	}
+
+	//
+	// keep skipping next bytes until reaches a known structure
+	// by local decoder.
+	//
+	private function skipCurrentStructure(bytes:Bytes, it:It, totalBytes:Int) {
+		// a skipped range can swallow other structures' ops — resync
+		// visited data is no longer trustworthy
+		if (resyncVisited != null) { resyncDamaged = true; }
+
+		var nextIterator:It = {offset: it.offset};
+
+		while (it.offset < totalBytes) {
+			if (bytes.get(it.offset) == SPEC.SWITCH_TO_STRUCTURE) {
+				nextIterator.offset = it.offset + 1;
+				if (refs.has(Decode.number(bytes, nextIterator))) {
+					break;
+				}
+			}
+
+			it.offset++;
+		}
+	}
+
+	// ─── resync bookkeeping (guarded by `resyncVisited != null` at call sites) ───
+
+	private function resyncVisitedFor(refId:Int):ResyncVisited {
+		var set = resyncVisited.get(refId);
+		if (set == null) {
+			set = { keys: new Map(), indexes: new Map() };
+			resyncVisited.set(refId, set);
+		}
+		return set;
+	}
+
+	/**
+	 * Release a replaced occupant: full-sync emits plain ADD (never
+	 * DELETE_AND_ADD), so an entry whose instance changed while this client
+	 * was off the wire would otherwise leak its previous ref. Resync-only —
+	 * a live patch's plain ADD can be a positional rewrite where the
+	 * occupant moved and is still alive.
+	 */
+	private function resyncReleaseReplaced(ref:IRef, operation:Int, identity:Dynamic, previousValue:Dynamic, value:Dynamic) {
+		if (previousValue != null && operation == OPERATION.ADD && previousValue != value
+			&& Std.isOfType(previousValue, IRef) && (previousValue : IRef).__refId > 0) {
+			refs.remove((previousValue : IRef).__refId);
+			allChanges.push({
+				refId: ref.__refId,
+				op: cast OPERATION.DELETE,
+				field: null,
+				dynamicIndex: identity,
+				value: null,
+				previousValue: previousValue
+			});
+		}
+	}
+
+	private function resyncSweep() {
+		if (resyncDamaged) {
+			trace("WARNING: @colyseus/schema: resync sweep skipped — parts of the payload could not be decoded. Stale entries may persist until the next resync.");
+			return;
+		}
+		sweepSchema(cast this.state, new Map<Int, Bool>());
+	}
+
+	private function sweepSchema(ref:Schema, seen:Map<Int, Bool>) {
+		if (seen.exists(ref.__refId)) { return; }
+		seen.set(ref.__refId, true);
+
+		for (fieldIndex in ref._indexes.keys()) {
+			var t = ref._types.get(fieldIndex);
+			if (t != "ref" && t != "array" && t != "map") { continue; }
+
+			var value:Dynamic = ref.getByIndex(fieldIndex);
+			if (value == null) { continue; }
+
+			if (t == "ref") {
+				sweepSchema(cast value, seen);
+			} else {
+				sweepCollection(cast value, seen);
+			}
+		}
+	}
+
+	private function sweepCollection(coll:ISchemaCollection, seen:Map<Int, Bool>) {
+		if (seen.exists(coll.__refId)) { return; }
+		seen.set(coll.__refId, true);
+
+		// null = the collection never appeared in the payload at all — it is
+		// not part of full-sync (@transient, view-invisible) and must be left
+		// alone. An empty visited set means "present with zero entries".
+		var visited = resyncVisited.get(coll.__refId);
+		if (visited == null) { return; }
+
+		var prune = function(value:Dynamic, identity:Dynamic) {
+			allChanges.push({
+				refId: coll.__refId,
+				op: cast OPERATION.DELETE,
+				field: null,
+				dynamicIndex: identity,
+				value: null,
+				previousValue: value
+			});
+			if (Std.isOfType(value, IRef) && (value : IRef).__refId > 0) {
+				refs.remove((value : IRef).__refId);
+			}
+		};
+		// recurse so nested collections of retained entries sweep too;
+		// swept subtrees are left to the GC's transitive walk instead
+		// (sweeping them directly would double-decrement shared children)
+		var keep = function(value:Dynamic) {
+			if (Std.isOfType(value, Schema)) { sweepSchema(cast value, seen); }
+		};
+
+		if (Std.isOfType(coll, IMapSchema)) {
+			var map:IMapSchema = cast coll;
+			map.__resyncPrune(visited.keys, prune, keep);
+		} else if (Std.isOfType(coll, IArraySchema)) {
+			var arr:IArraySchema = cast coll;
+			arr.__resyncPrune(visited.indexes, prune, keep);
+		}
 	}
 
 	public function decodeSchema(bytes:Bytes, it:It, ref:Schema):Bool {
@@ -169,6 +316,13 @@ class Decoder<T> {
 
 		var r = decodeValue(bytes, it, ref, fieldIndex, fieldType, childType, operation);
 
+		// resync bookkeeping — record even when the value is unchanged
+		// (the change list can't serve as the record: its pushes are gated)
+		if (resyncVisited != null) {
+			resyncVisitedFor(ref.__refId).keys.set(dynamicIndex, true);
+			resyncReleaseReplaced(ref, operation, dynamicIndex, r.previousValue, r.value);
+		}
+
 		if (r.value != null) {
 			ref.setByIndex(fieldIndex, dynamicIndex, cast r.value);
 		}
@@ -203,7 +357,17 @@ class Decoder<T> {
 		} else if (operation == OPERATION.DELETE_BY_REFID) {
 			var refId = Decode.number(bytes, it);
 			var item = refs.get(refId);
+
+			// stale DELETE — refId unknown to this decoder (mid-tick joiner)
+			if (item == null) { return true; }
+
+			// ref-count decrement — must run even when the item is absent from
+			// THIS array (view churn); this branch never reaches decodeValue()
+			refs.remove(refId);
+
 			index = ref.indexOf(item);
+			if (index == -1) { return true; }
+
 			ref.deleteByIndex(index);
 			allChanges.push({
 				refId: ref.__refId,
@@ -244,8 +408,17 @@ class Decoder<T> {
 
         var r = decodeValue(bytes, it, ref, index, fieldType, childType, operation);
 
+		// resync bookkeeping — identity is the resolved client-side index
+		// (ADD_BY_REFID resolves above, so visited indexes may be sparse)
+		if (resyncVisited != null) {
+			resyncVisitedFor(ref.__refId).indexes.set(index, true);
+			resyncReleaseReplaced(ref, operation, index, r.previousValue, r.value);
+		}
+
 		if (r.value != null && r.value != r.previousValue) {
-			ref.setByIndex(index, cast r.value, operation);
+			// resync snapshot ADDs are positional overwrites, not inserts
+			var writeOp:Int = (resyncVisited != null && operation == OPERATION.ADD) ? cast OPERATION.REPLACE : operation;
+			ref.setByIndex(index, cast r.value, writeOp);
 		}
 
 		if (r.value != r.previousValue) {
@@ -304,11 +477,27 @@ class Decoder<T> {
                 ));
             }
 
+		} else if (fieldType == "quantized") {
+			// childType is the @:type options object; descriptor() caches resolution on it
+			var desc = Quantize.descriptor(childType);
+			var q: Float = (desc.bits == 8)
+				? Decode.uint8(bytes, it)
+				: (desc.bits == 16)
+					? Decode.uint16(bytes, it)
+					: Decode.uint32(bytes, it);
+			value = Quantize.dequantize(desc, q);
+
 		} else if (childType == null) {
 			value = Decode.decodePrimitiveType(fieldType, bytes, it);
 
 		} else {
 			var refId = Decode.number(bytes, it);
+
+			// resync bookkeeping: mark the collection present in the payload —
+			// even with zero entries — so the sweep knows it participated
+			if (resyncVisited != null && !resyncVisited.exists(refId)) {
+				resyncVisited.set(refId, { keys: new Map(), indexes: new Map() });
+			}
 
 			//
 			// FIXME: Type.getClass(previousValue)

@@ -4,9 +4,9 @@
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
   "description": "Colyseus Multiplayer SDK",
-  "version": "0.17.13",
+  "version": "0.18.0",
   "classPath": "src/",
-  "releasenote": "Fix Content-Length for UTF-8 request bodies on native targets (#79)",
+  "releasenote": "0.18 preview: client-side prediction (Predict/reconciler/sim, predicted events and spawns), typed input via room.input(), and room.clock for server-time reads.",
   "contributors": ["endel"],
   "dependencies": {
     "colyseus-websocket": "1.0.15",

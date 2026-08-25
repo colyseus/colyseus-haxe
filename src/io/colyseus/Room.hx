@@ -11,6 +11,15 @@ import io.colyseus.serializer.FossilDeltaSerializer;
 import io.colyseus.serializer.schema.Schema.It;
 import io.colyseus.serializer.schema.Schema.SPEC;
 import io.colyseus.serializer.schema.encoding.Decode;
+import io.colyseus.serializer.schema.encoding.Encode;
+
+import io.colyseus.Protocol.ProtocolMasks;
+import io.colyseus.Protocol.ProtocolModifier;
+import io.colyseus.Protocol.ResponseStatus;
+import io.colyseus.Protocol.HandshakeSection;
+import io.colyseus.Protocol.InputFlags;
+import io.colyseus.InputHandle;
+import io.colyseus.serializer.schema.InputEncoder;
 
 using io.colyseus.Protocol.CloseCode;
 using io.colyseus.events.EventHandler;
@@ -21,6 +30,13 @@ import org.msgpack.MsgPack;
 
 typedef EnqueuedMessage = {
     data: Bytes
+};
+
+typedef PendingRequest = {
+    /** Called once with the decoded reply outcome: (ok, payload, faulted). */
+    var onReply: (Bool, Dynamic, Bool) -> Void;
+    /** Called when the connection closes before a reply arrives. */
+    @:optional var onClose: (String) -> Void;
 };
 
 typedef ReconnectionOptions = {
@@ -44,6 +60,12 @@ typedef ReconnectionOptions = {
     var enqueuedMessages: Array<EnqueuedMessage>;
     /** Whether the room is currently reconnecting. */
     var isReconnecting: Bool;
+    /**
+     * Computes the delay (ms) before a retry, from (attempt, initial delay).
+     * Defaults to exponential backoff; the result is still clamped to
+     * [minDelay, maxDelay]. Replace to customize the retry curve.
+     */
+    var backoff: (Int, Int) -> Float;
 };
 
 class Room<T> {
@@ -71,9 +93,29 @@ class Room<T> {
 
     private var tmpStateClass: Class<T>;
 
+    /**
+     * Server-time + RTT estimator, driven by the TIMED prefix servers emit
+     * when the room called `defineInput()`. Always present; without TIMED
+     * samples it reports `serverNow() == now()` and zeros.
+     */
+    public var clock: RoomClock = new RoomClock();
+
+    // input layer — populated from the JOIN_ROOM handshake sections
+    private var inputHandle: InputHandle<Dynamic> = null;
+    private var inputStampRender: Bool = false;
+    private var inputStampReckon: Bool = false;
+    private var inputTickRate: Null<Int> = null;
+    private var inputPatchRate: Null<Int> = null;
+    private var inputSubSteps: Null<Int> = null;
+
     // ping-related
     private var lastPingTime: Float = 0;
     private var pingCallback: Null<Float->Void> = null;
+
+    // request/response (ROOM_REQUEST / ROOM_RESPONSE) correlation state
+    public static var defaultRequestTimeout: Int = 10000;
+    private var pendingRequests = new Map<Int, PendingRequest>();
+    private var nextRequestId: Int = 0;
 
     // reconnection logic
     public var reconnection: ReconnectionOptions = {
@@ -86,7 +128,8 @@ class Room<T> {
         minUptime: 5000,
         maxEnqueuedMessages: 10,
         enqueuedMessages: [],
-        isReconnecting: false
+        isReconnecting: false,
+        backoff: Room.exponentialBackoff
     };
     private var joinedAtTime: Float = 0;
 
@@ -107,6 +150,9 @@ class Room<T> {
         }
 
 		this.connection.onClose = function(e:Dynamic) {
+            // in-flight requests can't be answered on a closed socket
+            this.rejectAllPendingRequests("connection closed before a response was received.");
+
             if (this.joinedAtTime == 0) {
                 trace("Room connection was closed unexpectedly (" + e.code + "): " + e.reason);
                 this.onError.dispatch(e.code, e.reason);
@@ -148,27 +194,20 @@ class Room<T> {
         }
     }
 
-    public function send(type: Dynamic, ?message: Dynamic) {
-        var bytesToSend = new BytesOutput();
-        bytesToSend.writeByte(Protocol.ROOM_DATA);
-
+    /** Writes a message type (short string as fixstr, or numeric code). */
+    private function writeMessageType(out: BytesOutput, type: Dynamic) {
         if (Std.isOfType(type, String)) {
             var encodedType = Bytes.ofString(type);
-            bytesToSend.writeByte(encodedType.length | 0xa0);
-            bytesToSend.writeBytes(encodedType, 0, encodedType.length);
+            out.writeByte(encodedType.length | 0xa0);
+            out.writeBytes(encodedType, 0, encodedType.length);
 
         } else {
-            bytesToSend.writeByte(type);
+            out.writeByte(type);
         }
+    }
 
-        if (message != null) {
-            var encodedMessage = MsgPack.encode(message);
-            bytesToSend.writeBytes(encodedMessage, 0, encodedMessage.length);
-        }
-
-        var data = bytesToSend.getBytes();
-
-        // If connection is not open, buffer the message
+    /** Transmits `data`, or buffers it while the connection is not open. */
+    private function sendOrEnqueue(data: Bytes) {
         if (!this.connection._isOpen) {
             this.enqueueMessage(data);
         } else {
@@ -176,29 +215,99 @@ class Room<T> {
         }
     }
 
+    public function send(type: Dynamic, ?message: Dynamic) {
+        var bytesToSend = new BytesOutput();
+        bytesToSend.writeByte(Protocol.ROOM_DATA);
+        this.writeMessageType(bytesToSend, type);
+
+        if (message != null) {
+            var encodedMessage = MsgPack.encode(message);
+            bytesToSend.writeBytes(encodedMessage, 0, encodedMessage.length);
+        }
+
+        this.sendOrEnqueue(bytesToSend.getBytes());
+    }
+
     public function sendBytes(type: Dynamic, ?bytes: Dynamic) {
         var bytesToSend = new BytesOutput();
         bytesToSend.writeByte(Protocol.ROOM_DATA_BYTES);
-
-        if (Std.isOfType(type, String)) {
-            var encodedType = Bytes.ofString(type);
-            bytesToSend.writeByte(encodedType.length | 0xa0);
-            bytesToSend.writeBytes(encodedType, 0, encodedType.length);
-
-        } else {
-            bytesToSend.writeByte(type);
-        }
-
+        this.writeMessageType(bytesToSend, type);
         bytesToSend.writeBytes(bytes, 0, bytes.length);
 
-        var data = bytesToSend.getBytes();
+        this.sendOrEnqueue(bytesToSend.getBytes());
+    }
 
-        // If connection is not open, buffer the message
-        if (!this.connection._isOpen) {
-            this.enqueueMessage(data);
-        } else {
-            this.connection.send(data);
+    /**
+     * Send a message and await the server's reply — the value the server
+     * returns from its matching `onMessage(type, ...)` handler.
+     *
+     * The callback receives `(response, error)`; exactly one is non-null.
+     * `error` is set when the handler rejects (the authored reason) or
+     * throws (`{name, message, code?}`), when the connection closes first,
+     * or when no reply arrives within `timeoutMs`
+     * (default: `Room.defaultRequestTimeout`).
+     */
+    public function request(type: Dynamic, ?payload: Dynamic, callback: (Dynamic, Dynamic) -> Void, ?timeoutMs: Int) {
+        if (this.connection == null || !this.connection._isOpen) {
+            callback(null, 'cannot send request "$type": connection is not open.');
+            return;
         }
+
+        // the timer lives in this closure — the pending registry stays
+        // unaware of timeouts; the reply callback and onClose both clear it
+        var timer: Timer = null;
+        var stopTimer = () -> { if (timer != null) { timer.stop(); timer = null; } };
+
+        var requestId = this.sendRequest(type, payload,
+            (ok, replyPayload, _) -> {
+                stopTimer();
+                if (ok) { callback(replyPayload, null); }
+                else { callback(null, replyPayload); }
+            },
+            (reason) -> {
+                stopTimer();
+                callback(null, reason);
+            });
+
+        var ms = (timeoutMs != null) ? timeoutMs : defaultRequestTimeout;
+        timer = Timer.delay(() -> {
+            this.pendingRequests.remove(requestId);
+            callback(null, 'request "$type" timed out after ${ms}ms.');
+        }, ms);
+    }
+
+    /**
+     * Low-level round-trip primitive: registers `onReply` (called once with
+     * the decoded outcome when the server replies) and transmits a
+     * ROOM_REQUEST frame. `request()` wraps it with a timeout. Returns the
+     * request id.
+     */
+    private function sendRequest(type: Dynamic, payload: Dynamic, onReply: (Bool, Dynamic, Bool) -> Void, ?onClose: (String) -> Void): Int {
+        var requestId = this.nextRequestId;
+        this.nextRequestId = (this.nextRequestId + 1) & 0x7FFFFFFF; // keep positive
+
+        var bytesToSend = new BytesOutput();
+        bytesToSend.writeByte(Protocol.ROOM_REQUEST);
+        Encode.uint(bytesToSend, requestId);
+        this.writeMessageType(bytesToSend, type);
+
+        if (payload != null) {
+            var encodedPayload = MsgPack.encode(payload);
+            bytesToSend.writeBytes(encodedPayload, 0, encodedPayload.length);
+        }
+
+        // reliable + offline: buffer so it flushes on (re)connect
+        this.sendOrEnqueue(bytesToSend.getBytes());
+
+        this.pendingRequests.set(requestId, { onReply: onReply, onClose: onClose });
+        return requestId;
+    }
+
+    private function rejectAllPendingRequests(reason: String) {
+        for (entry in this.pendingRequests) {
+            if (entry.onClose != null) { entry.onClose(reason); }
+        }
+        this.pendingRequests.clear();
     }
 
     public function ping(callback: Float->Void) {
@@ -213,6 +322,63 @@ class Room<T> {
         var bytes = new BytesOutput();
         bytes.writeByte(Protocol.PING);
         this.connection.send(bytes.getBytes());
+    }
+
+    /**
+     * Lazily create (and thereafter return) the per-room input handle.
+     *
+     * The handle is TYPED by `options.type`, so the central idiom needs no cast:
+     *
+     * ```haxe
+     * var input = room.input({ type: PaddleInput, mode: "reliable" });
+     * input.data.dx = 1;
+     * input.send();
+     * ```
+     *
+     * `options.type` is REQUIRED on this SDK (Haxe cannot synthesize a class
+     * from the server's input reflection) — pass the class generated by
+     * schema-codegen for the server's `defineInput()` schema. Later calls
+     * return the same handle; their options are ignored (first call wins), so
+     * ask for the handle once and pass it around.
+     */
+    public function input<T:Schema>(?options: InputOptions<T>): InputHandle<T> {
+        if (this.inputHandle != null) {
+            // First call wins, so a later call naming a DIFFERENT type gets a
+            // handle whose `data` is not what its type says. Nothing downstream
+            // can notice; say so here.
+            if (options != null && options.type != null
+                && options.type != Type.getClass(this.inputHandle.data)) {
+                trace("colyseus: room.input() already built a "
+                    + Type.getClassName(Type.getClass(this.inputHandle.data))
+                    + " handle; ignoring the later request for "
+                    + Type.getClassName(options.type)
+                    + ". The returned handle's `data` is the FIRST type.");
+            }
+            return cast this.inputHandle;
+        }
+        if (options == null || options.type == null) {
+            throw "room.input(): no input schema available. Pass `{type: YourInput}` " +
+                "(this SDK cannot synthesize a class from the server's input reflection).";
+        }
+
+        if (options.mode == "unreliable") {
+            throw "room.input(): mode \"unreliable\" is not supported yet — it needs a "
+                + "WebTransport datagram channel, and this SDK connects over WebSocket only. "
+                + "Use mode \"reliable\".";
+        }
+
+        var instance: T = cast Type.createInstance(options.type, []);
+        var encoder = new InputEncoder(instance, options.mode, options.historySize);
+        this.inputHandle = @:privateAccess new InputHandle(instance, encoder, {
+            stampRender: this.inputStampRender,
+            stampReckon: this.inputStampReckon,
+            renderDelay: options.renderDelay,
+            allowRewind: options.allowRewind,
+            tickRate: this.inputTickRate,
+            patchRate: this.inputPatchRate,
+            subSteps: this.inputSubSteps,
+        }, () -> this.connection, () -> this.clock);
+        return cast this.inputHandle;
     }
 
     public function onMessage(type: Dynamic, callback: Dynamic->Void) {
@@ -238,8 +404,23 @@ class Room<T> {
     }
 
     private function onMessageCallback(data: Bytes) {
-        var code = data.get(0);
         var it:It = {offset: 1};
+
+        // Strip modifier bits (bits 5..7) so the dispatch below stays
+        // modifier-agnostic; consume any modifier-attached prefix bytes here.
+        var rawByte = data.get(0);
+        var code = rawByte & ProtocolMasks.CODE;
+
+        if ((rawByte & ProtocolModifier.TIMED) != 0) {
+            // [uint32 sNow][uint32 inputSeq] — server time (ms since room
+            // start) + last PROCESSED input seq. The input ack goes to the
+            // handle (it owns the round-trip); its RTT sample + sNow feed
+            // the time-only clock.
+            var sNow: Float = Decode.uint32(data, it);
+            var inputSeq: Float = Decode.uint32(data, it);
+            var rttSample: Float = (this.inputHandle != null) ? this.inputHandle.ackInput(Std.int(inputSeq)) : -1;
+            this.clock.sample(sNow, rttSample);
+        }
 
         if (code == Protocol.JOIN_ROOM) {
             var reconnectionToken = data.getString(it.offset + 1, data.get(it.offset));
@@ -261,9 +442,44 @@ class Room<T> {
                 }
             }
 
-            // Apply handshake on first join (no need to do this on reconnect)
-            if (data.length > it.offset && this.serializer != null) {
-                this.serializer.handshake(data, it.offset);
+            // State reflection is length-prefixed: the schema handshake must
+            // not read past it into the trailing tagged-section bytes. A
+            // zero length means reconnect (the serializer already has state).
+            var stateReflectionLen: Int = Decode.number(data, it);
+            if (stateReflectionLen > 0 && this.serializer != null) {
+                this.serializer.handshake(data.sub(0, it.offset + stateReflectionLen), it.offset);
+            }
+            it.offset += stateReflectionLen;
+
+            // Trailing tagged sections: [tag byte][length varint][payload].
+            // Unknown tags are skipped via length (forward-compatible).
+            while (it.offset < data.length) {
+                var tag = data.get(it.offset++);
+                var sectionLen: Int = Decode.number(data, it);
+                var sectionEnd = it.offset + sectionLen;
+
+                if (tag == HandshakeSection.INPUT_REFLECTION) {
+                    // The server called defineInput(). This SDK cannot
+                    // synthesize a class from the reflection payload — pass
+                    // the schema class to `room.input({type: ...})` instead.
+                    // The payload is skipped; its presence is the signal.
+
+                } else if (tag == HandshakeSection.INPUT_OPTIONS) {
+                    // [flags u8][varints in bit order]
+                    var flags = data.get(it.offset++);
+                    this.inputStampRender = (flags & InputFlags.RENDER_TIME) != 0;
+                    this.inputStampReckon = (flags & InputFlags.RECKON_TIME) != 0;
+                    if ((flags & InputFlags.FIXED_TIMESTEP) != 0) { this.inputTickRate = Std.int(Decode.number(data, it)); }
+                    if ((flags & InputFlags.PATCH_RATE) != 0) { this.inputPatchRate = Std.int(Decode.number(data, it)); }
+                    if ((flags & InputFlags.SUB_STEPS) != 0) { this.inputSubSteps = Std.int(Decode.number(data, it)); }
+                }
+
+                it.offset = sectionEnd;
+            }
+
+            // hand the snapshot cadence to the clock once the loop has it
+            if (this.inputPatchRate != null) {
+                this.clock.setPatchInterval(this.inputPatchRate);
             }
 
             if (this.joinedAtTime == 0) {
@@ -305,10 +521,10 @@ class Room<T> {
             this.leave();
 
         } else if (code == Protocol.ROOM_STATE) {
-            this.setState(data.sub(it.offset, data.length - 1));
+            this.setState(data.sub(it.offset, data.length - it.offset));
 
         } else if (code == Protocol.ROOM_STATE_PATCH) {
-            this.patch(data.sub(it.offset, data.length - 1));
+            this.patch(data.sub(it.offset, data.length - it.offset));
 
         } else if (code == Protocol.ROOM_DATA) {
             var type = (SPEC.stringCheck(data, it))
@@ -327,6 +543,22 @@ class Room<T> {
                 : Decode.number(data, it);
 
             this.dispatchMessage(type, data.sub(it.offset, data.length - it.offset));
+
+        } else if (code == Protocol.ROOM_RESPONSE) {
+            // reply to a pending request()
+            var requestId: Int = Decode.number(data, it);
+            var status = data.get(it.offset++);
+            var payload: Dynamic = (data.length > it.offset)
+                ? MsgPack.decode(data.sub(it.offset, data.length - it.offset))
+                : null;
+
+            var entry = this.pendingRequests.get(requestId);
+            // already answered (e.g. timed out) or unknown id — ignore
+            if (entry != null) {
+                this.pendingRequests.remove(requestId);
+                // the ONE place the wire's three statuses collapse to (ok, payload, faulted):
+                entry.onReply(status == ResponseStatus.OK, payload, status == ResponseStatus.ERROR);
+            }
 
         } else if (code == Protocol.PING) {
             if (this.pingCallback != null) {
@@ -395,6 +627,13 @@ class Room<T> {
             this.reconnection.isReconnecting = true;
         }
 
+        // The server allocates a FRESH input buffer for the reconnected client
+        // (its consumed counter restarts at 0) — zero ours so post-reconnect
+        // seqs line up. Observing controllers follow via the handle's `epoch`.
+        if (this.inputHandle != null) {
+            this.inputHandle.reset();
+        }
+
         this.retryReconnection();
     }
 
@@ -413,32 +652,46 @@ class Room<T> {
             this.reconnection.maxDelay,
             Math.max(
                 this.reconnection.minDelay,
-                this.exponentialBackoff(this.reconnection.retryCount, this.reconnection.delay)
+                this.reconnection.backoff(this.reconnection.retryCount, this.reconnection.delay)
             )
         );
 
         trace("[Colyseus reconnection]: ⏳ will retry in " + (delay / 1000) + " seconds...");
 
-        // Wait before attempting reconnection
-        Timer.delay(function() {
-            trace("[Colyseus reconnection]: 🔄 Re-establishing sessionId '" + this.sessionId + "' with roomId '" + this.roomId + "'... (attempt " + this.reconnection.retryCount + " of " + this.reconnection.maxRetries + ")");
-
-            var tokenParts = this.reconnectionToken.split(":");
-            var reconnectToken = tokenParts.length > 1 ? tokenParts[1] : this.reconnectionToken;
-
-            try {
-                this.connection.reconnect({
-                    reconnectionToken: reconnectToken,
-                    skipHandshake: true // we already applied the handshake on first join
-                });
-
-            } catch (e:Dynamic) {
-                this.retryReconnection();
-            }
-        }, Std.int(delay));
+        // Wait before attempting reconnection.
+        #if sys
+        // haxe.Timer schedules on the CURRENT thread's event loop, and this
+        // runs on the ws process thread — which has none, so the callback
+        // would never fire. A dedicated wait thread mirrors the C SDK's
+        // reconnection worker instead.
+        sys.thread.Thread.create(() -> {
+            Sys.sleep(delay / 1000);
+            this.attemptReconnect();
+        });
+        #else
+        Timer.delay(this.attemptReconnect, Std.int(delay));
+        #end
     }
 
-    private function exponentialBackoff(attempt: Int, delay: Int): Float {
+    private function attemptReconnect() {
+        trace("[Colyseus reconnection]: 🔄 Re-establishing sessionId '" + this.sessionId + "' with roomId '" + this.roomId + "'... (attempt " + this.reconnection.retryCount + " of " + this.reconnection.maxRetries + ")");
+
+        var tokenParts = this.reconnectionToken.split(":");
+        var reconnectToken = tokenParts.length > 1 ? tokenParts[1] : this.reconnectionToken;
+
+        try {
+            this.connection.reconnect({
+                reconnectionToken: reconnectToken,
+                skipHandshake: true // we already applied the handshake on first join
+            });
+
+        } catch (e:Dynamic) {
+            this.retryReconnection();
+        }
+    }
+
+    /** Default backoff curve for `reconnection.backoff`. */
+    public static function exponentialBackoff(attempt: Int, delay: Int): Float {
         return Math.floor(Math.pow(2, attempt) * delay);
     }
 

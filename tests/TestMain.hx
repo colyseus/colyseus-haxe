@@ -9,6 +9,13 @@ class TestMain {
     r.add(new StorageTestCase());
 
     r.add(new SchemaSerializerTestCase());
+    r.add(new RoomProtocolTestCase());
+    r.add(new InputTestCase());
+    r.add(new PredictTestCase());
+    r.add(new PredictLerpSmoothingTestCase());
+    r.add(new PredictAttachConfigTestCase());
+    r.add(new SimReconcilerTestCase());
+    r.add(new EventHandlerTestCase());
     // r.add(new AuthTestCase());
 
     var success = r.run();

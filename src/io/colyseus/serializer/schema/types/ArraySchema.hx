@@ -11,6 +11,7 @@ interface IArraySchema extends ISchemaCollection {
     public function indexOf(value: Dynamic): Int;
 
     public function __onDecodeEnd(): Void;
+    public function __resyncPrune(visitedIndexes:Map<Int, Bool>, prune:(Dynamic, Dynamic)->Void, keep:(Dynamic)->Void):Void;
 }
 
 @:keep
@@ -30,8 +31,10 @@ class ArraySchemaImpl<T> implements IRef implements IArraySchema implements Arra
   }
 
   public function setByIndex(index: Int, value: Dynamic, operation: OPERATION): Void {
-    if (index == 0 && operation == OPERATION.ADD && this.items.length > 0) {
-        this.items.insert(0, value);
+    // strict ADD only: MOVE_AND_ADD/DELETE_AND_ADD/ADD_BY_REFID must not insert
+    if (operation == OPERATION.ADD && this.items[index] != null) {
+        // ADD at an occupied index = insert: shift existing items up.
+        this.items.insert(index, value);
 
     } else if (operation == OPERATION.DELETE_AND_MOVE) {
         this.items.splice(index, 1);
@@ -90,6 +93,24 @@ class ArraySchemaImpl<T> implements IRef implements IArraySchema implements Arra
       }
     }
     _deletedIndices.clear();
+  }
+
+  /**
+   * Resync sweep (see Decoder.decodeResync): remove every entry whose index
+   * the snapshot did not visit. `items` is hole-free here (decode-end
+   * compaction already ran; full-sync emits dense ADDs). Visited indexes may
+   * be sparse — ADD_BY_REFID resolves to the current client-side index.
+   */
+  public function __resyncPrune(visitedIndexes:Map<Int, Bool>, prune:(Dynamic, Dynamic)->Void, keep:(Dynamic)->Void):Void {
+    var removed = false;
+    for (i in 0...this.items.length) {
+      var value:Dynamic = this.items[i];
+      if (visitedIndexes.exists(i)) { keep(value); continue; }
+      removed = true;
+      prune(value, i);
+      this.deleteByIndex(i);
+    }
+    if (removed) { this.__onDecodeEnd(); } // compact the holes
   }
 
   public function toString () {

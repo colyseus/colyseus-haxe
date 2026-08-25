@@ -7,6 +7,7 @@ interface IMapSchema extends ISchemaCollection {
 	public function setIndex(index:Int, dynamicIndex:Dynamic):Void;
 	public function getIndex(index:Int):Dynamic;
 	public function setByIndex(index:Int, dynamicIndex:Dynamic, value:Dynamic):Void;
+	public function __resyncPrune(visitedKeys:Map<String, Bool>, prune:(Dynamic, Dynamic)->Void, keep:(Dynamic)->Void):Void;
 }
 
 class OrderedMapIterator<K,V> {
@@ -88,6 +89,9 @@ class MapSchema<T> implements IMapSchema {
 
   public function deleteByIndex(fieldIndex: Int): Void {
     var index = this.indexes.get(fieldIndex);
+    // stale wire index (e.g. a late DELETE for an entry the resync sweep
+    // already removed) — silent no-op; neko's StringMap throws on null keys
+    if (index == null) { return; }
     this.items.remove(index);
     this.indexes.remove(fieldIndex);
   }
@@ -102,6 +106,31 @@ class MapSchema<T> implements IMapSchema {
 
     this.items.clear();
     this.indexes.clear();
+  }
+
+  /**
+   * Resync sweep (see Decoder.decodeResync): remove every entry whose KEY
+   * the snapshot did not visit — maps prune by string key, NOT wire index
+   * (the decoder-side `indexes` journal never evicts stale index→key
+   * mappings on re-indexing). Also scrubs ALL index→key rows of swept keys.
+   */
+  public function __resyncPrune(visitedKeys:Map<String, Bool>, prune:(Dynamic, Dynamic)->Void, keep:(Dynamic)->Void):Void {
+    var deletedKeys:Array<String> = [];
+    for (key in this.items._keys.copy()) { // copy — no mutation during iteration
+      var value = this.items.get(key);
+      if (visitedKeys.exists(key)) { keep(value); continue; }
+      deletedKeys.push(key);
+      prune(value, key);
+    }
+    for (key in deletedKeys) {
+      this.items.remove(key);
+
+      var staleIndexes:Array<Int> = [];
+      for (i => k in this.indexes) {
+        if (k == key) { staleIndexes.push(i); }
+      }
+      for (i in staleIndexes) { this.indexes.remove(i); }
+    }
   }
 
   public function clone():MapSchema<T> {

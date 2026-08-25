@@ -4,7 +4,6 @@ import io.colyseus.serializer.schema.Decoder;
 import io.colyseus.serializer.schema.Reflection;
 import haxe.io.Bytes;
 
-@:generic
 class SchemaSerializer<T> implements Serializer {
 	public var decoder:Decoder<T>;
 
@@ -13,7 +12,13 @@ class SchemaSerializer<T> implements Serializer {
 	}
 
 	public function setState(data:Bytes) {
-		this.decoder.decode(data);
+		if (this.decoder.refs.count() > 1) {
+			// rejoin over live state: reconcile ghosts (deletions that
+			// happened while off the wire) instead of decoding additively
+			this.decoder.decodeResync(data);
+		} else {
+			this.decoder.decode(data);
+		}
 	}
 
 	public function getState():T {
