@@ -2,6 +2,11 @@
 
 All notable changes to the Colyseus Haxe SDK are documented in this file.
 
+## Unreleased
+
+- `t.quantized()` / `t.angle()` input fields now hold the value that goes on the wire once the input is sent, instead of the raw value you assigned. Prediction replayed from the un-snapped value, so every step mispredicted — it looked like a movement bug rather than a rounding one.
+- The first input packet after connecting (or after `reset()`) now carries every field, not just the ones you changed. A field your input schema declares with a non-zero default never moved, so it was never sent, and the server kept its own zero for it.
+
 ## 0.17.13
 
 - Fix matchmaking HTTP requests failing on native targets (cpp/iOS/Android) when the JSON body contains non-ASCII characters. The `Content-Length` header was set from `String.length` (character count), while tink_http writes the body as UTF-8 bytes — so multi-byte bodies were truncated by the server, causing "Unterminated string in JSON" 400 errors. The header is now computed from the UTF-8 byte length ([#79](https://github.com/colyseus/colyseus-haxe/issues/79)) — thanks @hansagames for the report and the fix!

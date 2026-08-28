@@ -8,6 +8,8 @@ import io.colyseus.serializer.schema.InputEncoder;
 
 import schema.phase0.P0State;
 import schema.input.MoveInput;
+import schema.input.QuantizedInput;
+import io.colyseus.serializer.schema.Quantize;
 
 /** Clock stub with scripted readings for stamp framing tests. */
 class StubClock extends RoomClock {
@@ -61,6 +63,52 @@ class InputTestCase extends haxe.unit.TestCase {
         // reset → full snapshot of populated fields
         enc.reset();
         assertBytes([128, 202, 0, 0, 32, 64, 129, 254, 130, 0, 131, 7], enc.encode());
+    }
+
+    /** The first encode is a full snapshot, not a diff (see InputEncoder class doc). */
+    public function testInputEncoderFirstPacketIsFullSnapshot() {
+        var input = new MoveInput();
+        var enc = new InputEncoder(input);
+
+        input.vx = 1.5;
+
+        // all four fields, including the three never touched
+        assertBytes([128, 202, 0, 0, 192, 63, 129, 0, 130, 0, 131, 0], enc.encode());
+
+        // ... and only then does it diff
+        assertBytes([], enc.encode());
+        input.vy = 2;
+        assertBytes([129, 2], enc.encode());
+    }
+
+    /** Quantized fields hold the wire value after encode (see InputEncoder.produceDelta). */
+    public function testInputEncoderSnapsQuantized() {
+        var input = new QuantizedInput();
+        var enc = new InputEncoder(input);
+
+        // off the fixture's own annotations, so retuning it can't desync the test
+        var yawDesc = Quantize.descriptor(input._childTypes.get(0));
+        var pitchDesc = Quantize.descriptor(input._childTypes.get(1));
+
+        input.yaw = 1.2345678;
+        input.pitch = -0.4321;
+
+        // opening snapshot: yaw + pitch (op + uint16 each) and the plain uint8 slot
+        assertEquals(8, enc.encode().length);
+
+        // read back exactly what the server will decode
+        assertEquals(Quantize.snap(yawDesc, 1.2345678), input.yaw);
+        assertEquals(Quantize.snap(pitchDesc, -0.4321), input.pitch);
+        assertFalse(input.yaw == 1.2345678); // it really did move
+
+        // a nudge inside the same bucket is not a change, so nothing is sent
+        var yawStep = yawDesc.range / yawDesc.span;
+        input.yaw = input.yaw + yawStep * 0.1;
+        assertBytes([], enc.encode());
+
+        // a whole step away is
+        input.yaw = Quantize.snap(yawDesc, input.yaw + yawStep);
+        assertEquals(3, enc.encode().length); // op byte + a raw uint16
     }
 
     public function testInputEncoderUnreliable() {
@@ -129,7 +177,7 @@ class InputTestCase extends haxe.unit.TestCase {
         r.handle.send();
 
         // [19|0x80][varint Δreckon][uint16 renderDelta=90][delta body]
-        assertBytes([147, 205, 232, 3, 90, 0, 128, 202, 0, 0, 192, 63], r.stub.sent[0]);
+        assertBytes([147, 205, 232, 3, 90, 0, 128, 202, 0, 0, 192, 63, 129, 0, 130, 0, 131, 0], r.stub.sent[0]);
         assertBytes([147, 17, 90, 0, 128, 2], r.stub.sent[1]);
         assertBytes([147, 16, 90, 0], r.stub.sent[2]);
 
@@ -152,7 +200,7 @@ class InputTestCase extends haxe.unit.TestCase {
         input.vx = 2;
         r.handle.send();     // Δ = 50
 
-        assertBytes([147, 205, 142, 3, 128, 202, 0, 0, 192, 63], r.stub.sent[0]);
+        assertBytes([147, 205, 142, 3, 128, 202, 0, 0, 192, 63, 129, 0, 130, 0, 131, 0], r.stub.sent[0]);
         assertBytes([147, 50, 128, 2], r.stub.sent[1]);
         assertEquals(0.0, r.handle.reckonTimeAt(1)); // reckon ring off
     }
@@ -167,7 +215,7 @@ class InputTestCase extends haxe.unit.TestCase {
 
         input.vx = 1;
         r.handle.send();
-        assertBytes([147, 0, 0, 0, 128, 1], r.stub.sent[0]);
+        assertBytes([147, 0, 0, 0, 128, 1, 129, 0, 130, 0, 131, 0], r.stub.sent[0]);
     }
 
     public function testHandleAllowRewindGate() {
@@ -190,10 +238,10 @@ class InputTestCase extends haxe.unit.TestCase {
         r.handle.send();                       // stamped, Δ=200
 
         // NB: the JS fixture is [19, 128, 1, 130, 0] — its setter-based dirty
-        // tracking re-emits `jump = false` (assigned to its default). This
-        // port diffs values, so the redundant field is omitted; the server
-        // decodes both to identical state (see InputEncoder class doc).
-        assertBytes([19, 128, 1], r.stub.sent[0]);
+        // tracking re-emits `jump = false` (assigned to its default). sent[0] is
+        // this port's opening snapshot, so it carries all four fields instead;
+        // the server decodes both to identical state (see InputEncoder class doc).
+        assertBytes([19, 128, 1, 129, 0, 130, 0, 131, 0], r.stub.sent[0]);
         assertBytes([147, 205, 76, 4, 130, 1], r.stub.sent[1]);
         assertBytes([19, 130, 0], r.stub.sent[2]);
         assertBytes([147, 204, 200, 130, 1], r.stub.sent[3]);
@@ -211,9 +259,10 @@ class InputTestCase extends haxe.unit.TestCase {
         assertEquals(2, r.handle.send());
         assertEquals(2, r.handle.sentCount);
 
-        // [20][baseSeq][len][slot]… — unreliable is never stamped
-        assertBytes([20, 1, 6, 128, 202, 0, 0, 192, 63], r.stub.sent[0]);
-        assertBytes([20, 1, 6, 128, 202, 0, 0, 192, 63, 6, 128, 202, 0, 0, 32, 64], r.stub.sent[1]);
+        // [20][baseSeq][len][slot]… — unreliable is never stamped.
+        // Slot 0 is the opening snapshot, and rides the ring until it ages out.
+        assertBytes([20, 1, 12, 128, 202, 0, 0, 192, 63, 129, 0, 130, 0, 131, 0], r.stub.sent[0]);
+        assertBytes([20, 1, 12, 128, 202, 0, 0, 192, 63, 129, 0, 130, 0, 131, 0, 6, 128, 202, 0, 0, 32, 64], r.stub.sent[1]);
     }
 
     public function testHandleAckRtt() {
