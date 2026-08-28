@@ -2,7 +2,7 @@
 
 All notable changes to the Colyseus Haxe SDK are documented in this file.
 
-## Unreleased
+## 0.18.1
 
 - `t.quantized()` / `t.angle()` input fields now hold the value that goes on the wire once the input is sent, instead of the raw value you assigned. Prediction replayed from the un-snapped value, so every step mispredicted — it looked like a movement bug rather than a rounding one.
 - The first input packet after connecting (or after `reset()`) now carries every field, not just the ones you changed. A field your input schema declares with a non-zero default never moved, so it was never sent, and the server kept its own zero for it.

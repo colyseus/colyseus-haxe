@@ -4,9 +4,9 @@
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
   "description": "Colyseus Multiplayer SDK",
-  "version": "0.18.0",
+  "version": "0.18.1",
   "classPath": "src/",
-  "releasenote": "0.18 preview: client-side prediction (Predict/reconciler/sim, predicted events and spawns), typed input via room.input(), and room.clock for server-time reads.",
+  "releasenote": "Input fixes: `t.quantized()` / `t.angle()` fields now hold the wire value after send (prediction replayed from the raw value and mispredicted every step), and the first input packet carries every field so a non-zero schema default reaches the server.",
   "contributors": ["endel"],
   "dependencies": {
     "colyseus-websocket": "1.0.15",
