@@ -10,9 +10,16 @@ import io.colyseus.serializer.schema.encoding.Encode;
  *
  * Delta tracking differs from the JS reference by design: the reference uses
  * setter-populated ChangeTrees; this port diffs the instance against the
- * last-sent snapshot. Benign divergence: re-assigning an identical value
- * emits nothing (the JS reference would re-emit the field) — the server
- * decodes to the same state either way.
+ * last-sent snapshot, so re-assigning an identical value emits nothing where
+ * the reference would re-emit the field.
+ *
+ * A field the client never assigns is therefore never sent, and the server
+ * seeds an unreceived field with its own type ZERO — so a schema declaring a
+ * non-zero default (`dt = 0.016`, or a quantized range excluding 0) would
+ * silently disagree with the server until the value first moves. The first
+ * `encode()` after construction or `reset()` emits a full snapshot to close
+ * that. In unreliable mode the snapshot rides the ring, so it is re-sent
+ * `historySize` times before it ages out.
  *
  * - `"reliable"` mode: one delta per `encode()` — only changed fields, empty
  *   when nothing changed. Bytes decode through the standard schema Decoder.
@@ -41,9 +48,14 @@ class InputEncoder {
 	// field indexes in wire order, resolved once at construction
 	private var _fieldIndexes: Array<Int>;
 
-	// last-sent snapshot per field index, seeded from construction defaults
-	// (matching the JS reference: only explicit assignments are dirty).
-	// null → snapshot mode: next encode emits every populated field (reset()).
+	// parallel to _fieldIndexes, resolved once: the declared type, and the
+	// quantize descriptor for the fields that have one (null otherwise, which
+	// is also the "this field is lossy on the wire" test in produceDelta)
+	private var _fieldTypes: Array<String>;
+	private var _fieldDescs: Array<Dynamic>;
+
+	// last-sent snapshot per field index.
+	// null → snapshot mode: the next encode emits every populated field.
 	private var _baseline: Map<Int, Dynamic> = null;
 
 	// unreliable ring (oldest→newest via head/count arithmetic)
@@ -73,16 +85,21 @@ class InputEncoder {
 		}
 		this._fieldIndexes.sort((a, b) -> a - b);
 
+		this._fieldTypes = [];
+		this._fieldDescs = [];
+		for (index in this._fieldIndexes) {
+			var fieldType = instance._types.get(index);
+			this._fieldTypes.push(fieldType);
+			this._fieldDescs.push((fieldType == "quantized")
+				? Quantize.descriptor(instance._childTypes.get(index))
+				: null);
+		}
+
 		if (this.mode == "unreliable") {
 			this._slots = [];
 		}
 
-		// diff against construction defaults from the start — an unassigned
-		// field is not dirty (the JS ChangeTree behaves the same way)
-		this._baseline = new Map();
-		for (index in this._fieldIndexes) {
-			this._baseline.set(index, instance.getByIndex(index));
-		}
+		// _baseline stays null, so the first encode() is a full snapshot (class doc)
 	}
 
 	/** Encode the bound instance's delta (see class doc for the shape per mode). */
@@ -120,21 +137,36 @@ class InputEncoder {
 		var snapshot = (this._baseline == null); // post-reset
 		if (snapshot) { this._baseline = new Map(); }
 
-		for (index in this._fieldIndexes) {
+		for (i in 0...this._fieldIndexes.length) {
+			var index = this._fieldIndexes[i];
+			var desc = this._fieldDescs[i];
+			var previous: Dynamic = snapshot ? null : this._baseline.get(index);
 			var current: Dynamic = this.instance.getByIndex(index);
+
+			// Quantization is lossy and the server only ever sees dequant(q), so
+			// the instance has to hold that value too: the reconciler replays from
+			// a COPY of it, and replaying the raw value mispredicts every step —
+			// which presents as a movement bug rather than a wire one. A value
+			// that has not moved is already on the lattice (the baseline holds the
+			// snapped one), so only a fresh write needs the round trip.
+			if (desc != null && current != null && current != previous) {
+				current = Quantize.snap(desc, current);
+				this.instance.setByIndex(index, current);
+			}
+
 			var changed = snapshot
-				? (current != null)                       // snapshot: every populated field
-				: (current != this._baseline.get(index)); // delta: diff vs last sent
+				? (current != null)      // snapshot: every populated field
+				: (current != previous); // delta: diff vs last sent
 			if (!changed) { continue; }
 
 			out.writeByte(0x80 | index); // ADD|fieldIndex — the schema field op
-			this.encodeValue(out, this.instance._types.get(index), index, current);
+			this.encodeValue(out, this._fieldTypes[i], desc, current);
 			this._baseline.set(index, current);
 		}
 		return out.getBytes();
 	}
 
-	private function encodeValue(out: BytesOutput, fieldType: String, index: Int, value: Dynamic) {
+	private function encodeValue(out: BytesOutput, fieldType: String, desc: Dynamic, value: Dynamic) {
 		switch (fieldType) {
 			case "number": Encode.number(out, value);
 			case "string": Encode.string(out, value);
@@ -150,7 +182,6 @@ class InputEncoder {
 			case "float32": Encode.float32(out, value);
 			case "float64": Encode.float64(out, value);
 			case "quantized":
-				var desc = Quantize.descriptor(this.instance._childTypes.get(index));
 				var q = Quantize.quantize(desc, value);
 				if (desc.bits == 8) { Encode.uint8(out, Std.int(q)); }
 				else if (desc.bits == 16) { Encode.uint16(out, Std.int(q)); }
