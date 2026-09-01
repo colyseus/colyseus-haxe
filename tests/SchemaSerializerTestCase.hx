@@ -1052,27 +1052,27 @@ clamp8_0_10, 0.123456789, 3, 0.11764705882352941
 clamp8_0_10, NaN, 0, 0
 clamp8_0_10, Infinity, 255, 10
 clamp8_0_10, -Infinity, 0, 0
-clamp16_pitch, 0, 32768, 0.00002288853284504455
-clamp16_pitch, 1, 54613, 1.000022888532845
-clamp16_pitch, 10, 65535, 1.5
-clamp16_pitch, 0.0196078431372549, 33196, 0.01961547264820318
-clamp16_pitch, 5.5, 65535, 1.5
+clamp16_pitch, 0, 32767, 0
+clamp16_pitch, 1, 54612, 1.000015259254738
+clamp16_pitch, 10, 65534, 1.5
+clamp16_pitch, 0.0196078431372549, 33195, 0.019592883083590307
+clamp16_pitch, 5.5, 65534, 1.5
 clamp16_pitch, -1.5, 0, -1.5
-clamp16_pitch, 1.5, 65535, 1.5
-clamp16_pitch, 0.3, 39321, 0.2999999999999998
+clamp16_pitch, 1.5, 65534, 1.5
+clamp16_pitch, 0.3, 39320, 0.29998168889431454
 clamp16_pitch, -99, 0, -1.5
-clamp16_pitch, 99, 65535, 1.5
-clamp16_pitch, 3.141592653589793, 65535, 1.5
-clamp16_pitch, 6.283185307179586, 65535, 1.5
-clamp16_pitch, 7.283185307179586, 65535, 1.5
-clamp16_pitch, -1, 10923, -0.999977111467155
-clamp16_pitch, 360, 65535, 1.5
-clamp16_pitch, 720.5, 65535, 1.5
-clamp16_pitch, 1000000, 65535, 1.5
+clamp16_pitch, 99, 65534, 1.5
+clamp16_pitch, 3.141592653589793, 65534, 1.5
+clamp16_pitch, 6.283185307179586, 65534, 1.5
+clamp16_pitch, 7.283185307179586, 65534, 1.5
+clamp16_pitch, -1, 10922, -1.000015259254738
+clamp16_pitch, 360, 65534, 1.5
+clamp16_pitch, 720.5, 65534, 1.5
+clamp16_pitch, 1000000, 65534, 1.5
 clamp16_pitch, -1000000, 0, -1.5
-clamp16_pitch, 0.123456789, 35464, 0.12343785763332571
+clamp16_pitch, 0.123456789, 35464, 0.12346263008514669
 clamp16_pitch, NaN, 0, -1.5
-clamp16_pitch, Infinity, 65535, 1.5
+clamp16_pitch, Infinity, 65534, 1.5
 clamp16_pitch, -Infinity, 0, -1.5
 clamp32_unit, 0, 0, 0
 clamp32_unit, 1, 4294967295, 1
@@ -1201,6 +1201,28 @@ wrap32_angle, -Infinity, 0, 0";
         assertEquals(132, rows);
     }
 
+    public function testQuantizeSymmetricRangeCarriesExactZero() {
+        // 2^bits-1 intervals is odd, so on [-m, m] zero sits on a step boundary
+        // and half-up rounding lifts it to +1 quantum: a released input axis or
+        // a resting velocity never read back as 0. An even span puts min, 0 and
+        // max all on steps.
+        var cases: Array<Array<Float>> = [[-1, 1, 8], [-150, 150, 16], [-1.55, 1.55, 16], [-1, 1, 32]];
+        for (c in cases) {
+            var min = c[0], max = c[1], bits = Std.int(c[2]);
+            var desc = Quantize.resolve(min, max, bits, false);
+            assertEquals(Math.pow(2, bits) - 2, (desc.span : Float));
+            assertEquals(0.0, Quantize.snap(desc, 0));
+            assertEquals(min, Quantize.snap(desc, min));
+            assertEquals(max, Quantize.snap(desc, max));
+        }
+
+        // only symmetric clamped ranges give up a code
+        assertEquals(255.0, (Quantize.resolve(0, 1, 8, false).span : Float));
+        var wrap = Quantize.resolve(-1, 1, 8, true);
+        assertEquals(256.0, (wrap.span : Float));
+        assertEquals(0.0, Quantize.snap(wrap, 0));
+    }
+
     public function testQuantizedState() {
         // wire-decode of quantized fields via @:type("quantized", {...});
         // fixtures generated + self-verified by schema-5.0
@@ -1208,10 +1230,10 @@ wrap32_angle, -Infinity, 0, 0";
         var state = new QState();
         var decoder = new Decoder(state);
 
-        decoder.decode(getBytes([128, 238, 50, 129, 187, 130, 55, 221, 154, 31, 131, 1, 132, 2, 133, 5, 134, 4, 135, 161, 113, 255, 1, 128, 0, 1, 128, 1, 202, 0, 0, 32, 64, 128, 2, 3, 255, 2, 128, 0, 161, 97, 161, 120, 255, 5, 128, 7, 255, 4, 128, 0, 6, 128, 1, 7, 255, 6, 128, 1, 255, 7, 128, 2]));
+        decoder.decode(getBytes([128, 238, 50, 129, 186, 130, 55, 221, 154, 31, 131, 1, 132, 2, 133, 5, 134, 4, 135, 161, 113, 255, 1, 128, 0, 1, 128, 1, 202, 0, 0, 32, 64, 128, 2, 3, 255, 2, 128, 0, 161, 97, 161, 120, 255, 5, 128, 7, 255, 4, 128, 0, 6, 128, 1, 7, 255, 6, 128, 1, 255, 7, 128, 2]));
 
         assertEquals(1.2500025945283118, state.yaw);
-        assertEquals(0.6999999999999997, state.pitch);
+        assertEquals(0.6968503937007875, state.pitch);
         assertEquals(0.12345678897655028, state.precise);
         assertEquals("q", state.label);
         assertEquals(3, state.nums.length);

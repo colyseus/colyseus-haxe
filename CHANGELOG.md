@@ -2,6 +2,10 @@
 
 All notable changes to the Colyseus Haxe SDK are documented in this file.
 
+## 0.18.2
+
+- `t.quantized()` fields on a range symmetric about zero (`min: -1, max: 1`) now decode an exact `0`. A released input axis or a resting velocity arrived as one quantum above zero, so a `== 0` check never fired and anything integrating the value drifted. Requires a server on @colyseus/schema 5.0.27 — the wire mapping for these fields changed.
+
 ## 0.18.1
 
 - `t.quantized()` / `t.angle()` input fields now hold the value that goes on the wire once the input is sent, instead of the raw value you assigned. Prediction replayed from the un-snapped value, so every step mispredicted — it looked like a movement bug rather than a rounding one.
