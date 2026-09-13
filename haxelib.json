@@ -4,9 +4,9 @@
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
   "description": "Colyseus Multiplayer SDK",
-  "version": "0.18.2",
+  "version": "0.18.3",
   "classPath": "src/",
-  "releasenote": "`t.quantized()` fields on a range symmetric about zero now decode an exact 0; a released input axis or resting velocity used to sit one quantum above it. Requires a server on @colyseus/schema 5.0.27.",
+  "releasenote": "Native targets now run room and matchmaking callbacks on the thread that joined, through its event loop, like JS — a program waiting in its own blocking loop must call `sys.thread.Thread.current().events.progress()`. `Callbacks.get(room)` fires right after each patch, `listen()` reports a primitive field's current value, and `for (k => v in map)` iterates in insertion order.",
   "contributors": ["endel"],
   "dependencies": {
     "colyseus-websocket": "1.0.15",

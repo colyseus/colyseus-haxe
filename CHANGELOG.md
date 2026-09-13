@@ -2,7 +2,7 @@
 
 All notable changes to the Colyseus Haxe SDK are documented in this file.
 
-## Unreleased
+## 0.18.3
 
 - `callbacks.listen(instance, "field", cb)` now calls `cb` right away with the field's current value for primitive fields too, as the TypeScript SDK does; it only did so for schema-typed fields, so a value already set before you registered was never reported until it changed. Pass `false` as the last argument to opt out.
 - **Breaking for native programs that wait in a blocking loop:** room and matchmaking callbacks now run on the thread that joined, through its event loop, like on JS — such a loop must call `sys.thread.Thread.current().events.progress()` or the join never completes. They used to fire on the socket's own thread, racing your game loop's reads of the same state, and failing outright for `haxe.Timer` ("Event loop is not available"). Engines that progress the main thread's event loop each frame (Heaps, Lime, anything using `haxe.EntryPoint`) need no change.
