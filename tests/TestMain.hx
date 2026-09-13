@@ -17,6 +17,9 @@ class TestMain {
     r.add(new SimReconcilerTestCase());
     r.add(new EventHandlerTestCase());
     r.add(new MapSchemaTestCase());
+    #if (target.threaded && !cppia && haxe_ver >= 4.2)
+    r.add(new ConnectionThreadingTestCase());
+    #end
     // r.add(new AuthTestCase());
 
     var success = r.run();

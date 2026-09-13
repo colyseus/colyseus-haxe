@@ -5,6 +5,9 @@ All notable changes to the Colyseus Haxe SDK are documented in this file.
 ## Unreleased
 
 - `callbacks.listen(instance, "field", cb)` now calls `cb` right away with the field's current value for primitive fields too, as the TypeScript SDK does; it only did so for schema-typed fields, so a value already set before you registered was never reported until it changed. Pass `false` as the last argument to opt out.
+- **Breaking for native programs that wait in a blocking loop:** room and matchmaking callbacks now run on the thread that joined, through its event loop, like on JS — such a loop must call `sys.thread.Thread.current().events.progress()` or the join never completes. They used to fire on the socket's own thread, racing your game loop's reads of the same state, and failing outright for `haxe.Timer` ("Event loop is not available"). Engines that progress the main thread's event loop each frame (Heaps, Lime, anything using `haxe.EntryPoint`) need no change.
+- A headless native program can now simply return from `main()` after joining: an open room keeps the program running. It used to exit before the join finished unless it ran its own loop.
+- `Callbacks.get(room)` callbacks now fire right after each patch is decoded, instead of on a later turn of the main loop. `SchemaCallbacks.enableMainLoopProcessing()` and `disableMainLoopProcessing()` are gone: room callbacks already run on the thread that joined.
 - `for (key => value in mapSchema)` now iterates in insertion order, like `for (value in mapSchema)` and JS's `Map`, and no longer copies every key on each loop on HashLink.
 
 ## 0.18.2

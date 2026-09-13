@@ -37,6 +37,11 @@ class HTTP {
     }
 
     public function request(method: Method, segments: String, ?options: HttpOptions, callback: (HttpException,Dynamic)->Void) {
+        // the reply runs on the caller's thread, whose event loop stays open
+        // until it lands — a headless program can return from main() mid-join
+        var owner = new OwnerLoop();
+        owner.hold();
+
         var headers = new Array<HeaderField>();
         var body: String = "";
 
@@ -71,7 +76,7 @@ class HTTP {
 			method: method,
 			headers: headers,
 			body: body,
-		}).all().handle(function(o) switch o {
+		}).all().handle(o -> owner.release(() -> switch o {
 			case Success(res):
                 var response = haxe.Json.parse(res.body);
                 if (response.error) {
@@ -103,7 +108,7 @@ class HTTP {
                 }
 
                 callback(new HttpException(e.code, message), null);
-		});
+		}));
     }
 
     public function buildHttpEndpoint(segments: String, ?protocol: String = "http") {

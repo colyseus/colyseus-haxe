@@ -444,63 +444,6 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
         assertEquals(13, onItemChange);
     }
 
-    #if sys
-    public function testMainLoopProcessingIsNonBlocking() {
-        // Regression: enableMainLoopProcessing() used to register a *blocking*
-        // MainEvent, so any headless consumer of Callbacks.get(room) hung
-        // forever after main() returned. hasEvents() is the exact predicate
-        // EntryPoint/EventLoop consult to decide whether to keep running.
-        var hadBlockingEvents = haxe.MainLoop.hasEvents();
-
-        var state = new CallbacksState();
-        var decoder = new Decoder<CallbacksState>(state);
-        var callbacks = new SchemaCallbacks<CallbacksState>(decoder);
-        callbacks.enableMainLoopProcessing();
-
-        assertEquals(hadBlockingEvents, haxe.MainLoop.hasEvents());
-
-        var fired = 0;
-        callbacks.listen("container", (container, previousValue) -> fired++);
-
-        // deferred: the decoding thread must not run user callbacks
-        decoder.decode(getBytes([ 128, 1, 255, 1, 128, 2, 255, 2 ]));
-        assertEquals(0, fired);
-
-        // ...and the host loop drains it — this is what Heaps' per-frame
-        // events.progress() reaches, via sys.thread.EventLoop
-        @:privateAccess haxe.MainLoop.tick();
-        assertEquals(1, fired);
-
-        callbacks.disableMainLoopProcessing();
-        assertEquals(hadBlockingEvents, haxe.MainLoop.hasEvents());
-    }
-
-    public function testDisableMainLoopProcessingFlushesAndRestoresInline() {
-        var state = new CallbacksState();
-        var decoder = new Decoder<CallbacksState>(state);
-        var callbacks = new SchemaCallbacks<CallbacksState>(decoder);
-        callbacks.enableMainLoopProcessing();
-
-        var fired = 0;
-        callbacks.listen("container", (container, previousValue) -> fired++);
-
-        decoder.decode(getBytes([ 128, 1, 255, 1, 128, 2, 255, 2 ]));
-        assertEquals(0, fired);
-
-        // queued changes are flushed rather than dropped
-        callbacks.disableMainLoopProcessing();
-        assertEquals(1, fired);
-
-        // and callbacks fire inline again
-        decoder.decode(getBytes([ 128, 22, 255, 22, 128, 23, 255, 23 ]));
-        assertEquals(2, fired);
-
-        // the drain is gone: ticking must not re-fire anything
-        @:privateAccess haxe.MainLoop.tick();
-        assertEquals(2, fired);
-    }
-    #end
-
     public function testOnChangeVoidCallbackOnPrimitiveCollections() {
         // Test that onChange(collection, () -> ...) fires for primitive collections.
         // Regression test for: onChange with Void->Void was silently dropped on

@@ -23,6 +23,16 @@ typedef ReconnectOptions = {
 	?skipHandshake:Bool
 };
 
+/**
+ * On native targets the socket is read on a thread of its own, but every
+ * event it produces (open, message, close, error) is replayed on the thread
+ * that created the connection, through that thread's event loop — so room and
+ * schema callbacks run on your game thread, exactly as on JS. Engines that
+ * progress the main thread's event loop each frame (Heaps, Lime, anything
+ * running `haxe.EntryPoint`) need nothing else. An open socket also keeps
+ * that loop alive, so a headless program can simply return from `main()`.
+ * A host that drives its own loop calls `sys.thread.Thread.current().events.progress()`.
+ */
 @:keep
 class Connection {
 	public var reconnectionEnabled:Bool = false;
@@ -37,6 +47,9 @@ class Connection {
 	private var ws:WebSocket;
 	private var parsedUrl:Url;
 
+	/** Where this connection's events run: the thread that created it, reconnects included. */
+	public final owner = new OwnerLoop();
+
 	// callbacks
 	public dynamic function onOpen():Void {}
 
@@ -46,8 +59,6 @@ class Connection {
 
 	public dynamic function onError(message:String):Void {}
 
-	private static var isRunnerInitialized:Bool = false;
-
 	public function new(url:String) {
 		this.parsedUrl = Url.parse(url);
 		this.createWebSocket(url);
@@ -56,37 +67,41 @@ class Connection {
 	private function createWebSocket(url:String) {
 		this.ws = WebSocket.create(url);
 		this.ws.onopen = function() {
-			this.onOpen();
+			owner.run(() -> this.onOpen());
 		}
 
 		this.ws.onmessageBytes = function(bytes) {
-			this.onMessage(bytes);
+			owner.run(() -> this.onMessage(bytes));
 		}
 
 		this.ws.onclose = function(?e:Dynamic) {
-			if (this.forceCloseCode != null) {
-				e = { code: this.forceCloseCode };
-				this.forceCloseCode = null;
-			}
-            this.onClose(e);
+			owner.run(() -> {
+				if (this.forceCloseCode != null) {
+					e = { code: this.forceCloseCode };
+					this.forceCloseCode = null;
+				}
+				this.onClose(e);
+			});
 		}
 
 		this.ws.onerror = function(message) {
-			this.onError(message);
+			owner.run(() -> this.onError(message));
 		}
 
 		#if sys
+		var ws = this.ws;
+		owner.hold(); // an open socket keeps the owner's event loop running
 		Thread.create(function() {
 			while (true) {
-				this.ws.process();
+				ws.process();
 
-				if (this.ws.readyState == ReadyState.Closed) {
-					// trace("WebSocket connection has been closed, stopping the thread!");
+				if (ws.readyState == ReadyState.Closed) {
 					break;
 				}
 
 				Sys.sleep(.01);
 			}
+			owner.release(() -> {});
 		});
 		#end
 	}

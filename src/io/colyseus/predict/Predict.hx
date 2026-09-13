@@ -3,8 +3,7 @@ package io.colyseus.predict;
 import io.colyseus.Room;
 import io.colyseus.InputHandle;
 import io.colyseus.RoomClock;
-import io.colyseus.serializer.SchemaSerializer;
-import io.colyseus.serializer.schema.Callbacks.SchemaCallbacks;
+import io.colyseus.serializer.schema.Callbacks;
 import io.colyseus.predict.Reconciler;
 import io.colyseus.predict.PredictedEventChannel;
 import io.colyseus.predict.PredictedSpawns;
@@ -285,16 +284,9 @@ class Predict {
 	 * var predict = Predict.get(room, { mode: "lerp", delay: 100 });
 	 * predict.attachAll("players", { fields: ["x", "y"] });
 	 * ```
-	 *
-	 * Uses the IMMEDIATE callbacks flavour (`new SchemaCallbacks(decoder)`)
-	 * rather than `Callbacks.get(room)`, which on sys targets defers onto
-	 * `haxe.MainLoop`. Prediction must see a patch in the same tick it lands —
-	 * a deferred `onAdd` would reconcile a frame late, against a state the
-	 * server has already moved past.
 	 */
 	public static function get<T>(room: Room<T>, ?opts: PredictGetOptions): Predict {
-		var serializer: SchemaSerializer<T> = cast room.serializer;
-		return create(new SchemaCallbacks<T>(serializer.decoder), room.clock, opts);
+		return create(Callbacks.get(room), room.clock, opts);
 	}
 
 	/**

@@ -658,19 +658,19 @@ class Room<T> {
 
         trace("[Colyseus reconnection]: ⏳ will retry in " + (delay / 1000) + " seconds...");
 
-        // Wait before attempting reconnection.
+        // Wait before attempting reconnection: a timer on the owner's event
+        // loop, where room events run. An owner without one gets its events on
+        // the socket thread, which has no loop for a timer — wait on a thread.
         #if sys
-        // haxe.Timer schedules on the CURRENT thread's event loop, and this
-        // runs on the ws process thread — which has none, so the callback
-        // would never fire. A dedicated wait thread mirrors the C SDK's
-        // reconnection worker instead.
-        sys.thread.Thread.create(() -> {
-            Sys.sleep(delay / 1000);
-            this.attemptReconnect();
-        });
-        #else
-        Timer.delay(this.attemptReconnect, Std.int(delay));
+        if (!this.connection.owner.active) {
+            sys.thread.Thread.create(() -> {
+                Sys.sleep(delay / 1000);
+                this.attemptReconnect();
+            });
+            return;
+        }
         #end
+        Timer.delay(this.attemptReconnect, Std.int(delay));
     }
 
     private function attemptReconnect() {
