@@ -5,6 +5,7 @@ All notable changes to the Colyseus Haxe SDK are documented in this file.
 ## Unreleased
 
 - `callbacks.listen(instance, "field", cb)` now calls `cb` right away with the field's current value for primitive fields too, as the TypeScript SDK does; it only did so for schema-typed fields, so a value already set before you registered was never reported until it changed. Pass `false` as the last argument to opt out.
+- `for (key => value in mapSchema)` now iterates in insertion order, like `for (value in mapSchema)` and JS's `Map`, and no longer copies every key on each loop on HashLink.
 
 ## 0.18.2
 

@@ -18,6 +18,17 @@ class OrderedMapIterator<K,V> {
     public function next() : V { return map.get(map._keys[index++]); }
 }
 
+class OrderedMapKeyValueIterator<K,V> {
+    var map : OrderedMap<K,V>;
+    var index : Int = 0;
+    public inline function new(omap:OrderedMap<K,V>) { map = omap; }
+    public inline function hasNext() : Bool { return index < map._keys.length; }
+    public inline function next() : {key:K, value:V} {
+        var key = map._keys[index++];
+        return {key: key, value: map.get(key)};
+    }
+}
+
 // class OrderedMap<K, V> implements IMap<K, V> {
 @:keep
 class OrderedMap<K, V> {
@@ -49,7 +60,8 @@ class OrderedMap<K, V> {
     }
 
     public function iterator() return new OrderedMapIterator<K,V>(this);
-    public function keyValueIterator() return this.map.keyValueIterator();
+    // insertion order, like iterator() and JS Map (the backing Map iterates in hash order)
+    public function keyValueIterator() return new OrderedMapKeyValueIterator<K,V>(this);
     public function remove(key: K) return map.remove(key) && _keys.remove(key);
     public function exists(key: K) return map.exists(key);
     public function get(key: K) return map.get(key);
@@ -97,7 +109,7 @@ class MapSchema<T> implements IMapSchema {
   }
 
   public var length(get, null): Int;
-  function get_length() { return Lambda.count(this.items._keys); }
+  function get_length() { return this.items._keys.length; }
 
   public function new() {}
 

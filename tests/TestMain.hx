@@ -16,6 +16,7 @@ class TestMain {
     r.add(new PredictAttachConfigTestCase());
     r.add(new SimReconcilerTestCase());
     r.add(new EventHandlerTestCase());
+    r.add(new MapSchemaTestCase());
     // r.add(new AuthTestCase());
 
     var success = r.run();
