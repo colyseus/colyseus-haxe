@@ -2,6 +2,10 @@
 
 All notable changes to the Colyseus Haxe SDK are documented in this file.
 
+## Unreleased
+
+- `callbacks.listen(instance, "field", cb)` now calls `cb` right away with the field's current value for primitive fields too, as the TypeScript SDK does; it only did so for schema-typed fields, so a value already set before you registered was never reported until it changed. Pass `false` as the last argument to opt out.
+
 ## 0.18.2
 
 - `t.quantized()` fields on a range symmetric about zero (`min: -1, max: 1`) now decode an exact `0`. A released input axis or a resting velocity arrived as one quantum above zero, so a `== 0` check never fired and anything integrating the value drifted. Requires a server on @colyseus/schema 5.0.27 — the wire mapping for these fields changed.

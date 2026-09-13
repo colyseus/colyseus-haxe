@@ -130,15 +130,12 @@ class SchemaCallbacks<T> {
             callback = cast callbackOrImmediate;
         }
 
+        // Like the TS SDK: any current value fires once on registration —
+        // primitives included; a ref only once it's attached (refId assigned).
         var existing = Reflect.getProperty(instance, fieldName);
-        if (
-            existing != null && Std.isOfType(existing, IRef) &&
-            immediate == true && !this.isTriggering
-        ) {
-            var existingRef:IRef = cast existing;
-            if (existingRef.__refId != 0) {
-                callback(existing, null);
-            }
+        if (existing != null && immediate == true && !this.isTriggering
+            && (!Std.isOfType(existing, IRef) || (cast existing : IRef).__refId != 0)) {
+            callback(existing, null);
         }
 
 		return addCallback2(instance.__refId, fieldName, callback);
