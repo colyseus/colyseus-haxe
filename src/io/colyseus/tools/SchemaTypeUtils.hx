@@ -38,6 +38,7 @@ class SchemaTypeUtils {
 								case null: continue;
 								case typeInfo: {
 									name: f.name,
+									ownerModule: cl.module,
 									schemaTypeInfo: typeInfo,
 									haxeType: f.type
 								};
@@ -116,7 +117,8 @@ class SchemaTypeUtils {
 
 	public static function resolveSchemaType(
 		subTypeName:String,
-		haxeType:Null<Type>
+		haxeType:Null<Type>,
+		ownerModule:String
 	):Null<Type> {
 		var elemType = getCollectionElementType(haxeType);
 		return elemType ??
@@ -124,7 +126,9 @@ class SchemaTypeUtils {
 				TPath({pack: [], name: subTypeName}),
 				pos()
 			)
-			catch (_:Dynamic) null;
+			catch (_:Dynamic)
+				try Context.getType(ownerModule + "." + subTypeName)
+				catch (_:Dynamic) null;
 	}
 
 	public static function getInnerSchemaType(sf:SchemaFieldInfo):Null<Type> {
@@ -136,7 +140,8 @@ class SchemaTypeUtils {
 				if (isSchemaRefSubType(sf.schemaTypeInfo.subType)):
 				resolveSchemaType(
 					sf.schemaTypeInfo.subType,
-					sf.haxeType
+					sf.haxeType,
+					sf.ownerModule
 				);
 
 			case _: null;
@@ -245,7 +250,8 @@ class SchemaTypeUtils {
 				if (isRef) {
 					var innerSchemaType = resolveSchemaType(
 						sf.schemaTypeInfo.subType,
-						sf.haxeType
+						sf.haxeType,
+						sf.ownerModule
 					);
 					if (innerSchemaType == null) return null;
 
@@ -491,6 +497,7 @@ class SchemaTypeUtils {
 
 typedef SchemaFieldInfo = {
 	name:String,
+	ownerModule:String,
 	schemaTypeInfo:SchemaTypeInfo,
 	haxeType:Type
 }

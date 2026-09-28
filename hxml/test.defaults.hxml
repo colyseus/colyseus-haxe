@@ -7,3 +7,4 @@
 -lib tink_http
 # use deprecated haxe.unit.TestCase
 -lib hx3compat
+-lib tink_state

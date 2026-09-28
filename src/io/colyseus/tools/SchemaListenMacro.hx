@@ -107,7 +107,9 @@ class SchemaListenMacro {
 					);
 
 				case FArraySchema(inner):
-					var targetField = SchemaTypeUtils.fieldExpr(ctx.target, sf.name);
+					var targetField = SchemaTypeUtils.fieldExpr(macro __ownerTarget, sf.name);
+					var sourceField = SchemaTypeUtils.fieldExpr(macro __ownerSource, sf.name);
+					var ownerTarget = ctx.target;
 					var rawCT = inner.toComplex();
 					var structExpr = buildStructFactoryExpr(inner);
 					var traceRebuild = indent + sf.name + " (array<schema>) rebuild";
@@ -115,6 +117,8 @@ class SchemaListenMacro {
 					var traceRemove = indent + sf.name + " (array<schema>) remove[";
 
 					result.push(macro {
+						var __ownerSource = $sourceExpr;
+						var __ownerTarget = $ownerTarget;
 						// factory: raw -> fresh target instance
 						function __make(__raw:$rawCT) {
 							return $structExpr;
@@ -141,12 +145,12 @@ class SchemaListenMacro {
 						}
 
 						// ---- schema rebuild ----
-						$cbExpr.listen($sourceExpr, $v{sf.name}, function(_, _) {
+						$cbExpr.listen(__ownerSource, $v{sf.name}, function(_, _) {
 							$targetField.clear();
 							__rebuild();
 
 							// ---- additions ----
-							$cbExpr.onAdd($sourceExpr, $v{sf.name}, function(__item, __index) {
+							$cbExpr.onAdd(__ownerSource, $v{sf.name}, function(__item, __index) {
 								#if debug_macro
 								trace($v{traceAdd} + Std.string(__index) + "]");
 								#end
@@ -161,7 +165,7 @@ class SchemaListenMacro {
 							});
 
 							// listen for removals
-							$cbExpr.onRemove($sourceExpr, $v{sf.name}, function(__item, __index) {
+							$cbExpr.onRemove(__ownerSource, $v{sf.name}, function(__item, __index) {
 								#if debug_macro
 								trace($v{traceRemove} + Std.string(__index) + "]");
 								#end
@@ -172,7 +176,9 @@ class SchemaListenMacro {
 					});
 
 				case FMapSchema(inner):
-					var targetField = SchemaTypeUtils.fieldExpr(ctx.target, sf.name);
+					var targetField = SchemaTypeUtils.fieldExpr(macro __ownerTarget, sf.name);
+					var sourceField = SchemaTypeUtils.fieldExpr(macro __ownerSource, sf.name);
+					var ownerTarget = ctx.target;
 					var rawCT = inner.toComplex();
 					var structExpr = buildStructFactoryExpr(inner);
 					var traceRebuild = indent + sf.name + " (map<schema>) rebuild";
@@ -182,6 +188,8 @@ class SchemaListenMacro {
 					//SchemaTypeUtils.writeExprToFile("DT", structExpr);
 
 					result.push(macro {
+						var __ownerSource = $sourceExpr;
+						var __ownerTarget = $ownerTarget;
 						// factory: raw -> fresh target instance
 						function __make(__raw:$rawCT) {
 							return $structExpr;
@@ -207,12 +215,12 @@ class SchemaListenMacro {
 						__rebuild();
 
 						// ---- schema rebuild ----
-						$cbExpr.listen($sourceExpr, $v{sf.name}, function(_, _) {
+						$cbExpr.listen(__ownerSource, $v{sf.name}, function(_, _) {
 							$targetField.clear();
 							__rebuild();
 
 							// ---- additions ----
-							$cbExpr.onAdd($sourceExpr, $v{sf.name}, function(__item, __k) {
+							$cbExpr.onAdd(__ownerSource, $v{sf.name}, function(__item, __k) {
 								#if debug_macro
 								trace($v{traceAdd} + __k + "]");
 								#end
@@ -227,7 +235,7 @@ class SchemaListenMacro {
 							});
 
 							// ---- removals ----
-							$cbExpr.onRemove($sourceExpr, $v{sf.name}, function(_, __k) {
+							$cbExpr.onRemove(__ownerSource, $v{sf.name}, function(_, __k) {
 								#if debug_macro
 								trace($v{traceRemove} + __k + "]");
 								#end
