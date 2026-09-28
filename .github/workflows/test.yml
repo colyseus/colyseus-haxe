@@ -25,6 +25,7 @@ jobs:
       - name: Install dependencies
         run: |
           haxelib install hx3compat --quiet
+          haxelib install tink_state --quiet
           haxelib install tink_url --quiet
           haxelib install tink_http --quiet
           haxelib install colyseus-websocket --quiet

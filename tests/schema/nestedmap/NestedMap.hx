@@ -14,6 +14,11 @@ class NestedChild extends Schema {
 }
 
 class NestedRow extends Schema {
+	@:type("map", NestedCell)
+	public var cells:MapSchema<NestedCell> = new MapSchema();
+}
+
+class NestedCell extends Schema {
 	@:type("number")
 	public var value:Int;
 }
