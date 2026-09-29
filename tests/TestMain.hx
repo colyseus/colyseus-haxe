@@ -19,6 +19,7 @@ class TestMain {
     r.add(new MapSchemaTestCase());
     r.add(new SchemaTypeUtilsTestCase());
     r.add(new SchemaListenMacroTestCase());
+    r.add(new SchemaMacroGeneratorTestCase());
     #if (target.threaded && !cppia && haxe_ver >= 4.2)
     r.add(new ConnectionThreadingTestCase());
     #end
