@@ -8,3 +8,4 @@
 # use deprecated haxe.unit.TestCase
 -lib hx3compat
 -lib tink_state
+-lib tink_json
