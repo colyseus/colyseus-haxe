@@ -39,11 +39,13 @@ It is intended for developers building real-time applications who want fully rea
 
 ## Getting Started
 
-1. Add the tooling package to your Haxe project.
-2. Use `ObservableSchemaMacro` to generate reactive schema classes.
-3. Use `SchemaListenMacro` to synchronize schema instances with reactive state.
-4. Refer to the individual READMEs for detailed usage examples.
-5. **Note** that even though observables can be used as is, their full reactive potential can be unlocked with [coconut.data](https://github.com/MVCoconut/coconut.data) Models. 
+1. Install `tink_state` from git — the haxelib release (0.11.1) doesn't compile against tink_core 2:
+   `haxelib git tink_state https://github.com/haxetink/tink_state.git 1.0.0-beta.3`
+2. Add the tooling package to your Haxe project.
+3. Use `ObservableSchemaMacro` to generate reactive schema classes.
+4. Use `SchemaListenMacro` to synchronize schema instances with reactive state.
+5. Refer to the individual READMEs for detailed usage examples.
+6. **Note** that even though observables can be used as is, their full reactive potential can be unlocked with [coconut.data](https://github.com/MVCoconut/coconut.data) Models. 
 
 ---
 

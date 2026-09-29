@@ -25,6 +25,7 @@ jobs:
       - name: Install dependencies
         run: |
           haxelib install hx3compat --quiet
+          # 1.0.0-beta.3 -- haxelib's 0.11.1 doesn't compile against tink_core 2
           haxelib git tink_state https://github.com/haxetink/tink_state.git b01eb8bd47f7264420604b5f8816dde69e5dec55 --quiet
           haxelib install tink_url --quiet
           haxelib install tink_http --quiet
