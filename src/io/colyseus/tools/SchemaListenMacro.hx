@@ -95,6 +95,7 @@ class SchemaListenMacro {
 					);
 				case FRef(inner):
 					var targetField = SchemaTypeUtils.fieldExpr(ctx.target, sf.name);
+					var sourceType = inner.toComplex();
 					var emptyChild = SchemaTypeUtils.buildEmptyStructExpr(inner);
 					#if debug_macro
 					result.push(macro trace($v{indent + sf.name + " (ref) ->"}));
@@ -102,7 +103,7 @@ class SchemaListenMacro {
 					result.push(macro {
 						var __childLinks:Array<CallbackLink> = [];
 						$linksExpr.push(() -> { for (__link in __childLinks) __link.cancel(); });
-						$linksExpr.push($cbExpr.listen($sourceExpr, $v{sf.name}, (__child, _) -> {
+						$linksExpr.push($cbExpr.listen($sourceExpr, $v{sf.name}, (__child:$sourceType, _) -> {
 							for (__link in __childLinks) __link.cancel();
 							__childLinks = [];
 							$targetField.set($emptyChild);

@@ -159,6 +159,10 @@ class SchemaMacroGeneratorTestCase extends haxe.unit.TestCase {
 		assertEquals(1, obs.items.get("a").leaf.value.value.value);
 		decode(decoder, [255, 3, 128, 2]);
 		assertEquals(2, obs.items.get("a").leaf.value.value.value);
+		decode(decoder, [255, 3, 129, 7]);
+		assertEquals(7, obs.items.get("a").leaf.value.other.value);
+		assertEquals(0, obs.items.get("a").leaf.value.turns.length);
+		assertFalse(obs.items.get("a").leaf.value.scores.exists("a"));
 		decode(decoder, [255, 2, 192, 4, 255, 4, 128, 3]);
 		assertEquals(3, obs.items.get("a").leaf.value.value.value);
 		decode(decoder, [255, 1, 64, 0]);
