@@ -4,9 +4,9 @@
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
   "description": "Colyseus Multiplayer SDK",
-  "version": "0.18.3",
+  "version": "0.18.4",
   "classPath": "src/",
-  "releasenote": "Native targets now run room and matchmaking callbacks on the thread that joined, through its event loop, like JS — a program waiting in its own blocking loop must call `sys.thread.Thread.current().events.progress()`. `Callbacks.get(room)` fires right after each patch, `listen()` reports a primitive field's current value, and `for (k => v in map)` iterates in insertion order.",
+  "releasenote": "Observable schema macros now compile nested schema collections, child schemas from other modules and `MapSchema<Bool>`; a `MapSchema<Serialized<T>>` observable now holds parsed values. Thanks @serjek (#82).",
   "contributors": ["endel"],
   "dependencies": {
     "colyseus-websocket": "1.0.15",

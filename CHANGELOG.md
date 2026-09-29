@@ -2,6 +2,11 @@
 
 All notable changes to the Colyseus Haxe SDK are documented in this file.
 
+## 0.18.4
+
+- `ObservableSchemaMacro` / `SchemaListenMacro` now compile a schema collection nested inside another, a child schema declared in its parent's module or in one your observables class doesn't import, and a `MapSchema<Bool>`. Thanks @serjek! [#82](https://github.com/colyseus/colyseus-haxe/pull/82)
+- An observable `MapSchema<Serialized<T>>` now holds parsed `T` values instead of raw JSON strings, as `ArraySchema<Serialized<T>>` already did.
+
 ## 0.18.3
 
 - `callbacks.listen(instance, "field", cb)` now calls `cb` right away with the field's current value for primitive fields too, as the TypeScript SDK does; it only did so for schema-typed fields, so a value already set before you registered was never reported until it changed. Pass `false` as the last argument to opt out.
