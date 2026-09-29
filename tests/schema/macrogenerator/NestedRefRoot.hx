@@ -1,6 +1,7 @@
 package schema.macrogenerator;
 
 import io.colyseus.serializer.schema.Schema;
+import io.colyseus.serializer.schema.types.ArraySchema;
 import io.colyseus.serializer.schema.types.MapSchema;
 
 class NestedRefRoot extends Schema {
@@ -13,4 +14,7 @@ class NestedRefItem extends Schema {
 
 class NestedRefLeaf extends Schema {
 	@:type("number") public var value:Int;
+	@:type("number") public var other:Int;
+	@:type("array", "number") public var turns:ArraySchema<Int> = new ArraySchema();
+	@:type("map", "number") public var scores:MapSchema<Int> = new MapSchema();
 }
