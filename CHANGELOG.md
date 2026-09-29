@@ -2,6 +2,11 @@
 
 All notable changes to the Colyseus Haxe SDK are documented in this file.
 
+## 0.18.5
+
+- `SchemaListenMacro.listenRef()` observables now fill in when `listen()` is called after the first state has arrived, stay in sync with a collection on the root schema after the first patch, and apply removals from an `ArraySchema` of schemas. Listeners no longer pile up with every root change, and cancelling the returned link now detaches all of them. Thanks @serjek! [#84](https://github.com/colyseus/colyseus-haxe/pull/84)
+- A `ref` field on a schema held in a collection now works with `SchemaListenMacro`; it failed to compile or crashed on the first patch. Thanks @serjek! [#84](https://github.com/colyseus/colyseus-haxe/pull/84), [#85](https://github.com/colyseus/colyseus-haxe/pull/85)
+
 ## 0.18.4
 
 - `ObservableSchemaMacro` / `SchemaListenMacro` now compile a schema collection nested inside another, a child schema declared in its parent's module or in one your observables class doesn't import, and a `MapSchema<Bool>`. Thanks @serjek! [#82](https://github.com/colyseus/colyseus-haxe/pull/82)
