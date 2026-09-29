@@ -29,6 +29,7 @@ jobs:
           haxelib git tink_state https://github.com/haxetink/tink_state.git b01eb8bd47f7264420604b5f8816dde69e5dec55 --quiet
           haxelib install tink_url --quiet
           haxelib install tink_http --quiet
+          haxelib install tink_json --quiet
           haxelib install colyseus-websocket --quiet
           haxelib install hashlink --quiet
           haxelib install hxcpp --quiet
