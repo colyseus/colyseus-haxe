@@ -310,7 +310,7 @@ class SchemaTypeUtils {
 				if (ab.name == "Serialized" && params.length > 0):
 				params[0];
 
-			case TAbstract(_, params):
+			case TAbstract(_, params) | TInst(_.get().kind => KGenericInstance(_, params), _):
 				for (p in params) {
 					var inner = getSerializedInnerType(p);
 					if (inner != null) return inner;
@@ -333,14 +333,10 @@ class SchemaTypeUtils {
 				if (params.length > 0):
 				params[0];
 
-			case TInst(_.get() => cl, _)
-				if (StringTools.contains(cl.name, "_")):
-				switch cl.name.substr(cl.name.lastIndexOf("_") + 1) {
-					case "Int": Context.resolveType(macro:Int, pos());
-					case "Float": Context.resolveType(macro:Float, pos());
-					case "String": Context.resolveType(macro:String, pos());
-					case _: null;
-				};
+			// @:generic MapSchema<T> specializes into a param-less MapSchema_* class
+			case TInst(_.get().kind => KGenericInstance(_, params), _)
+				if (params.length > 0):
+				params[0];
 
 			case _: null;
 		};
