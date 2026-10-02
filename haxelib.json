@@ -4,9 +4,9 @@
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
   "description": "Colyseus Multiplayer SDK",
-  "version": "0.18.5",
+  "version": "0.18.6",
   "classPath": "src/",
-  "releasenote": "`SchemaListenMacro` observables now bind when `listen()` is called after the first state, keep up with root collections and `ArraySchema` removals, stop piling up listeners on every root change, and support a `ref` inside a collection item; cancelling the returned link detaches every listener. Thanks @serjek (#84, #85).",
+  "releasenote": "Join callbacks no longer fire a second time, with an error and a null room, when the room reports an error after joining. Thanks @serjek (#86).",
   "contributors": ["endel"],
   "dependencies": {
     "colyseus-websocket": "1.0.15",

@@ -2,6 +2,10 @@
 
 All notable changes to the Colyseus Haxe SDK are documented in this file.
 
+## 0.18.6
+
+- The callback of `join()`, `joinOrCreate()`, `create()`, `joinById()` and `reconnect()` no longer fires a second time, with an error and a `null` room, when the room reports an error after joining (e.g. its socket drops while a mobile app sleeps). Thanks @serjek! [#86](https://github.com/colyseus/colyseus-haxe/issues/86)
+
 ## 0.18.5
 
 - `SchemaListenMacro.listenRef()` observables now fill in when `listen()` is called after the first state has arrived, stay in sync with a collection on the root schema after the first patch, and apply removals from an `ArraySchema` of schemas. Listeners no longer pile up with every root change, and cancelling the returned link now detaches all of them. Thanks @serjek! [#84](https://github.com/colyseus/colyseus-haxe/pull/84)
