@@ -125,28 +125,30 @@ class Client {
         room.sessionId = response.sessionId;
 
         //
-        // Whichever of these settles the join wins: `once` retires the one that
-        // fired, and it retires its sibling by hand. Declared up front so each
-        // closure can name the other.
-        //
-        // TODO: the SIBLING removal compares function references, which may not
-        // hold on native targets + devMode. The self-removal no longer does.
+        // Whichever of these fires first settles the join and retires both, so
+        // a later room error can't re-invoke `callback`. Registered with `+=`,
+        // not `once`: `once` stores a wrapper, which `-= onError` never finds.
         //
         var onError:(Int, String) -> Void = null;
         var onJoin:() -> Void = null;
 
-        onError = function(code: Int, message: String) {
+        function settle() {
+            room.onError -= onError;
             room.onJoin -= onJoin;
+        }
+
+        onError = function(code: Int, message: String) {
+            settle();
             callback(new HttpException(code, message), null);
         };
 
         onJoin = function() {
-            room.onError -= onError;
+            settle();
             callback(null, room);
         };
 
-        room.onError.once(onError);
-        room.onJoin.once(onJoin);
+        room.onError += onError;
+        room.onJoin += onJoin;
 
         var options = ["sessionId" => room.sessionId];
 
