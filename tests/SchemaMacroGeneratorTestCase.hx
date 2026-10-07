@@ -194,6 +194,49 @@ class SchemaMacroGeneratorTestCase extends haxe.unit.TestCase {
 		assertEquals(0, listenerCount(decoder));
 	}
 
+	// Encoded by @colyseus/schema 5.0.34: list [A] and items {a: A}; both collections
+	// replaced and then reassigned in one patch; one item added to each; list replaced by [C].
+	static final SAME_REF_INITIAL = [129, 1, 130, 2, 131, 3, 132, 4, 133, 5, 255, 2, 128, 0, 161, 97, 7, 255, 3, 128, 0, 6, 255, 6, 128, 1, 129, 161, 65, 255, 7, 128, 1, 129, 161, 65];
+	static final SAME_REF_REASSIGN = [194, 2, 195, 3, 255, 3, 128, 0, 6, 255, 6, 128, 1, 129, 161, 65, 255, 2, 128, 0, 161, 97, 7, 255, 7, 128, 1, 129, 161, 65];
+	static final SAME_REF_ADD = [255, 3, 128, 1, 10, 255, 10, 128, 2, 129, 161, 66, 255, 2, 128, 1, 161, 98, 11, 255, 11, 128, 2, 129, 161, 66];
+	static final SAME_REF_REPLACE_LIST = [195, 12, 255, 12, 128, 0, 13, 255, 13, 128, 3, 129, 161, 67];
+
+	public function testCollectionReassignedWithSameRefIdKeepsItems() {
+		var state = new MacroRoot();
+		var decoder = new Decoder(state);
+		var obs = new MacroRootObservables();
+		var link = obs.listen(new SchemaCallbacks<MacroRoot>(decoder), state);
+		decode(decoder, SAME_REF_INITIAL);
+		var count = listenerCount(decoder);
+		decode(decoder, SAME_REF_REASSIGN);
+		assertEquals("A", names(obs));
+		assertEquals("A", obs.items.get("a").name.value);
+		assertEquals(count, listenerCount(decoder));
+		decode(decoder, SAME_REF_ADD);
+		assertEquals("A,B", names(obs));
+		assertEquals("A", obs.items.get("a").name.value);
+		assertEquals("B", obs.items.get("b").name.value);
+		link.cancel();
+		assertEquals(0, listenerCount(decoder));
+	}
+
+	public function testCallbacksExpressionIsEvaluatedOnce() {
+		var state = new MacroRoot();
+		var decoder = new Decoder(state);
+		var obs = new MacroRootObservables();
+		var link = obs.listenDecoder(decoder, state);
+		decode(decoder, SAME_REF_INITIAL);
+		assertEquals("A", names(obs));
+		decode(decoder, SAME_REF_REPLACE_LIST);
+		assertEquals("C", names(obs));
+		link.cancel();
+		assertEquals(0, listenerCount(decoder));
+	}
+
+	static function names(obs:MacroRootObservables):String {
+		return [for (item in obs.list) item.name.value].join(",");
+	}
+
 	static function decode<T>(decoder:Decoder<T>, data:Array<Int>) {
 		var bytes = Bytes.alloc(data.length);
 		for (i in 0...data.length) bytes.set(i, data[i]);
