@@ -33,13 +33,14 @@ class SchemaListenMacro {
 		var rootType = Context.typeof(rootExpr);
 
 		var exprs = buildListeners({
-			cb: cbExpr,
+			cb: macro __callbacks,
 			source: rootExpr,
 			target: macro this,
 			links: macro __links
 		}, rootType, 0);
 
 		var ret =  macro {
+			var __callbacks = $cbExpr;
 			var __links:Array<CallbackLink> = [];
 			$b{exprs};
 			CallbackLink.fromMany(__links);
@@ -138,7 +139,10 @@ class SchemaListenMacro {
 						}
 
 						// ---- schema rebuild ----
-						$linksExpr.push($cbExpr.listen(__ownerSource, $v{sf.name}, function(_, _) {
+						$linksExpr.push($cbExpr.listen(__ownerSource, $v{sf.name}, function(__collection, __previous) {
+							// The decoder may clone a collection without changing its refId.
+							// Existing listeners still apply; unchanged items have no ADD event.
+							if (__collection != null && __previous != null && __collection.__refId == __previous.__refId) return;
 							for (__link in __collectionLinks) __link.cancel();
 							__collectionLinks = [];
 							for (__links in __itemLinks) for (__link in __links) __link.cancel();
@@ -211,7 +215,10 @@ class SchemaListenMacro {
 						}
 
 						// ---- schema rebuild ----
-						$linksExpr.push($cbExpr.listen(__ownerSource, $v{sf.name}, function(_, _) {
+						$linksExpr.push($cbExpr.listen(__ownerSource, $v{sf.name}, function(__collection, __previous) {
+							// The decoder may clone a collection without changing its refId.
+							// Existing listeners still apply; unchanged items have no ADD event.
+							if (__collection != null && __previous != null && __collection.__refId == __previous.__refId) return;
 							for (__link in __collectionLinks) __link.cancel();
 							__collectionLinks = [];
 							for (__links in __itemLinks) for (__link in __links) __link.cancel();
