@@ -9,7 +9,7 @@ class PrivateCards extends Schema {
 	public var cards:Serialized<Array<Int>>;
 
 	@:type("array", PrivateCardRow)
-	public var rows:ArraySchema<PrivateCardRow>;
+	public var rows:ArraySchema<PrivateCardRow> = new ArraySchema<PrivateCardRow>();
 }
 
 class PrivateCardRow extends Schema {
