@@ -3,6 +3,8 @@ import io.colyseus.serializer.schema.Callbacks.SchemaCallbacks;
 import io.colyseus.serializer.schema.Decoder;
 import schema.nestedmap.NestedMap;
 import schema.nestedmap.NestedMapObservables;
+import schema.privacy.PrivateCards;
+import schema.privacy.PrivateCardsObservables;
 
 class SchemaListenMacroTestCase extends haxe.unit.TestCase {
 	public function testNestedMapListenersWriteIntoTheirOwnRow() {
@@ -22,6 +24,33 @@ class SchemaListenMacroTestCase extends haxe.unit.TestCase {
 		// rows.delete("b"); rows["c"].cells["w"].value = 40
 		decoder.decode(getBytes([255, 2, 64, 1, 255, 12, 128, 40]));
 		assertEquals("a:{q=5,x=1,y=2} c:{w=40}", dump(obs));
+	}
+
+	public function testSerializedFieldsCanBeRevokedAndRestored() {
+		var state = new PrivateCards();
+		var decoder = new Decoder(state);
+		var obs = new PrivateCardsObservables();
+		var link = obs.listen(new SchemaCallbacks<PrivateCards>(decoder), state);
+
+		// schema-5.0: one row whose private serialized cards have not been sent.
+		decoder.decode(getBytes([129, 1, 255, 1, 128, 0, 2]));
+		assertEquals(null, obs.cards.value);
+		assertEquals(null, obs.rows[0].cards.value);
+
+		// Reveal root and nested cards.
+		decoder.decode(getBytes([128, 165, 91, 49, 44, 50, 93, 255, 2, 128, 165, 91, 51, 44, 52, 93]));
+		assertEquals("1,2", obs.cards.value.join(","));
+		assertEquals("3,4", obs.rows[0].cards.value.join(","));
+
+		// View revocation deletes the fields instead of sending JSON "null".
+		decoder.decode(getBytes([64, 255, 2, 64]));
+		assertEquals(null, obs.cards.value);
+		assertEquals(null, obs.rows[0].cards.value);
+
+		decoder.decode(getBytes([128, 165, 91, 53, 44, 54, 93, 255, 2, 128, 165, 91, 55, 44, 56, 93]));
+		assertEquals("5,6", obs.cards.value.join(","));
+		assertEquals("7,8", obs.rows[0].cards.value.join(","));
+		link.cancel();
 	}
 
 	static function dump(obs:NestedMapObservables):String {

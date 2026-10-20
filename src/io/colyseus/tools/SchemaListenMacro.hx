@@ -76,7 +76,7 @@ class SchemaListenMacro {
 			var sourceExpr:Expr = ctx.source;
 			var sourceField = SchemaTypeUtils.fieldExpr(ctx.source, sf.name);
 			var parseIfJsonExpr:Expr->Expr = if (SchemaTypeUtils.getSerializedInnerType(sf.haxeType) != null) {
-				v -> macro tink.Json.parse($v);
+				v -> macro $v == null ? null : tink.Json.parse($v);
 			} else {
 				v -> macro $v;
 			};
@@ -335,7 +335,7 @@ class SchemaListenMacro {
 				case "ref": macro new State(${info.emptyValue});
 				case "string" if (SchemaTypeUtils.getSerializedInnerType(sf.haxeType) != null):
 					var ct = info.stateType;
-					macro new State((tink.Json.parse($rawF):$ct));
+					macro new State(($rawF == null ? null : tink.Json.parse($rawF):$ct));
 				case _: macro new State($rawF);
 			};
 		});
