@@ -4,9 +4,9 @@
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
   "description": "Colyseus Multiplayer SDK",
-  "version": "0.18.6",
+  "version": "0.18.7",
   "classPath": "src/",
-  "releasenote": "Join callbacks no longer fire a second time, with an error and a null room, when the room reports an error after joining. Thanks @serjek (#86).",
+  "releasenote": "`leave()` while the room is reconnecting now stops the reconnection and leaves right away; sends that race a closing socket on sys targets no longer throw or get lost (colyseus/react-tools#15).",
   "contributors": ["endel"],
   "dependencies": {
     "colyseus-websocket": "1.0.15",

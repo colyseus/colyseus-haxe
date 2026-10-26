@@ -44,6 +44,12 @@ class InputTestCase extends haxe.unit.TestCase {
         assertEquals(expected.join(","), actualArr.join(","), pos);
     }
 
+    /** The clock's EMA steps are `a*b + c*d`, which C++ compilers may fuse: the last bits vary by target. */
+    private function assertClose(expected: Float, actual: Float, ?epsilon: Float, ?pos: haxe.PosInfos) {
+        if (epsilon == null) { epsilon = 1e-9; }
+        assertTrue(Math.abs(expected - actual) <= epsilon, pos);
+    }
+
     public function testInputEncoderReliable() {
         var input = new MoveInput();
         var enc = new InputEncoder(input);
@@ -333,15 +339,15 @@ class InputTestCase extends haxe.unit.TestCase {
             for (row in script) {
                 NOW = row[0];
                 clock.sample(row[1], row[2]);
-                assertEquals(row[3], @:privateAccess clock._clockOffset);
+                assertClose(row[3], @:privateAccess clock._clockOffset);
                 assertEquals(row[4], clock.rtt());
-                assertEquals(row[5], clock.smoothedRtt());
-                assertEquals(row[6], clock.jitter());
+                assertClose(row[5], clock.smoothedRtt());
+                assertClose(row[6], clock.jitter());
                 assertEquals(row[7], clock.lastServerTime());
             }
 
             NOW = 1800;
-            assertEquals(1320.8594719999999, clock.serverNow());
+            assertClose(1320.8594719999999, clock.serverNow());
 
             // renderNow — 1e-6 tolerance (exp() ULP variance across libms)
             NOW = 1800;
@@ -390,8 +396,8 @@ class InputTestCase extends haxe.unit.TestCase {
                 var rtt = (i % 2 == 0) ? 200 : 100;
                 clock.sample(tNow - 400, rtt);
                 if (expected.exists(i)) {
-                    assertEquals(expected.get(i)[0], @:privateAccess clock._clockOffset);
-                    assertEquals(expected.get(i)[1], clock.smoothedRtt());
+                    assertClose(expected.get(i)[0], @:privateAccess clock._clockOffset);
+                    assertClose(expected.get(i)[1], clock.smoothedRtt());
                 }
             }
         } catch (e: Dynamic) {

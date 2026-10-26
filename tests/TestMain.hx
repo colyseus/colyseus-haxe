@@ -10,6 +10,7 @@ class TestMain {
 
     r.add(new SchemaSerializerTestCase());
     r.add(new RoomProtocolTestCase());
+    r.add(new RoomReconnectionTestCase());
     r.add(new InputTestCase());
     r.add(new PredictTestCase());
     r.add(new PredictLerpSmoothingTestCase());

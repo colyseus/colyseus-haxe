@@ -60,7 +60,9 @@ jobs:
         run: |
           haxe hxml/test.hl.hxml
           cd tests/bin/hlc_test
-          cc -O2 -o ../hl_test_native -std=c11 \
+          # HL/C writes bytes as ints and reads them back as doubles (FPHelper),
+          # which GCC 15's -O2 miscompiles under strict aliasing: +inf decoded as 0
+          cc -O2 -fno-strict-aliasing -o ../hl_test_native -std=c11 \
             -I /usr/local/include -I . \
             main.c \
             -L /usr/local/lib -lhl -lm -lpthread -luv \
