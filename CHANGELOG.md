@@ -2,6 +2,10 @@
 
 All notable changes to the Colyseus Haxe SDK are documented in this file.
 
+## 0.18.7
+
+- `room.leave()` while the room is reconnecting now stops the reconnection and leaves right away with `CloseCode.CONSENTED`, instead of only once every retry has failed.
+
 ## 0.18.6
 
 - The callback of `join()`, `joinOrCreate()`, `create()`, `joinById()` and `reconnect()` no longer fires a second time, with an error and a `null` room, when the room reports an error after joining (e.g. its socket drops while a mobile app sleeps). Thanks @serjek! [#86](https://github.com/colyseus/colyseus-haxe/issues/86)
