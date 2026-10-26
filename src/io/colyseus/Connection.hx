@@ -85,6 +85,7 @@ class Connection {
 		}
 
 		this.ws.onerror = function(message) {
+			this.errorCount++; // before dispatch: trySend reads it as soon as the send returns
 			owner.run(() -> this.onError(message));
 		}
 
@@ -131,19 +132,25 @@ class Connection {
 		return this.ws.sendBytes(data);
 	}
 
+	/** Errors the ws lib has raised on this connection. */
+	private var errorCount = 0;
+
 	/**
 	 * `send`, unless the socket has closed: returns whether `data` was sent.
 	 * On native targets the socket thread can close the socket between an
-	 * `_isOpen` check and the send, and the ws lib then throws.
+	 * `_isOpen` check and the send, and the ws lib then throws. A socket the
+	 * peer has reset reads as open until the socket thread notices; writing
+	 * to it fails without a throw, and the ws lib raises `onerror` instead.
 	 */
 	public function trySend(data:Bytes):Bool {
+		var errors = this.errorCount;
 		try {
 			this.send(data);
 		} catch (e:Dynamic) {
 			if (this._isOpen) throw e; // not the close race
 			return false;
 		}
-		return true;
+		return this.errorCount == errors;
 	}
 
 	/**

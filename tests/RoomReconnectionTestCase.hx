@@ -1,4 +1,5 @@
 import haxe.io.Bytes;
+import haxe.net.WebSocket;
 import haxe.net.WebSocket.ReadyState;
 
 import RoomProtocolTestCase.StubConnection;
@@ -75,6 +76,27 @@ private class FakeConnection extends StubConnection {
         attemptOpens();
         onMessage(joinFrame);
     }
+}
+
+/**
+ * A ws lib socket for a real `Connection`. Once `reset`, its peer has reset it
+ * but the socket thread hasn't noticed: like WebSocketGeneric, a write then
+ * fails without throwing, and is reported through `onerror` only.
+ */
+private class ResetWebSocket extends WebSocket {
+    public var reset = false;
+    var state = ReadyState.Open;
+
+    public function new() { super(); }
+
+    override function get_readyState(): ReadyState { return state; }
+
+    override public function sendBytes(message: Bytes) {
+        if (state != ReadyState.Open) { throw "websocket not open"; }
+        if (reset) { onerror("std@socket_send"); }
+    }
+
+    override public function close() { state = ReadyState.Closed; }
 }
 
 /**
@@ -346,6 +368,25 @@ class RoomReconnectionTestCase extends haxe.unit.TestCase {
         conn.closesBeforeNextSend = true;
         room.ping((_) -> {});
         assertEquals(ReadyState.Closed, conn.readyState);
+    }
+
+    /** Sent after the peer reset the socket, before the socket thread noticed: queued for the reconnect. */
+    public function testSendWhoseWriteFailsIsQueued() {
+        var ws = new ResetWebSocket();
+        var create = WebSocket.create;
+        WebSocket.create = (url, ?protocols, ?origin, ?debug) -> ws;
+        var conn = new Connection("ws://127.0.0.1:9");
+        WebSocket.create = create;
+
+        var room = new Room<P0State>("reconnect", P0State);
+        room.connect(conn);
+        conn.onMessage(getBytes(JOIN_FRAME));
+
+        ws.reset = true;
+        room.send("move", 1);
+        ws.close(); // lets the socket thread go
+
+        assertEquals(1, room.reconnection.enqueuedMessages.length);
     }
 
     /** The socket thread can close the socket after raising JOIN_ROOM. */
