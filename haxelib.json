@@ -9,7 +9,7 @@
   "releasenote": "`leave()` while the room is reconnecting now stops the reconnection and leaves right away; sends that race a closing socket on sys targets no longer throw or get lost (colyseus/react-tools#15).",
   "contributors": ["endel"],
   "dependencies": {
-    "colyseus-websocket": "1.0.15",
+    "colyseus-websocket": "1.0.16",
     "tink_url": "0.5.0",
     "tink_http": "0.10.0"
   }
