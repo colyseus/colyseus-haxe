@@ -17,6 +17,11 @@ abstract EventHandler<T:Function>(Array<T>) {
   @:op(a -= b) inline function remove(fn:T) {
     this.remove(fn);
   }
+
+  /** Remove every listener. A dispatch already running still calls them all. */
+  public inline function removeAll() {
+    this.resize(0);
+  }
 }
 
 //

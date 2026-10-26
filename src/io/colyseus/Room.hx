@@ -450,11 +450,13 @@ class Room<T> {
             this.serializer.teardown();
         }
 
-        // this.onJoin.removeAll();
-        // this.onStateChange.removeAll();
-        // this.onMessage.removeAll();
-        // this.onError.removeAll();
-        // this.onLeave.removeAll();
+        this.onJoin.removeAll();
+        this.onStateChange.removeAll();
+        this.onError.removeAll();
+        this.onLeave.removeAll();
+        this.onDrop.removeAll();
+        this.onReconnect.removeAll();
+        this.onMessageHandlers.clear();
     }
 
     private function onMessageCallback(data: Bytes) {

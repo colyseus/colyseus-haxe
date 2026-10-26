@@ -284,6 +284,26 @@ class RoomReconnectionTestCase extends haxe.unit.TestCase {
         assertEquals(0, conn.closes);
     }
 
+    /** A room that has left lets go of its listeners, and of whatever they hold. */
+    public function testLeavingReleasesTheRoomsListeners() {
+        join();
+        room.onMessage("weather", (_) -> {});
+
+        conn.remoteClose(4321);
+        assertEquals("4321", leaves.join(",")); // still delivered to the listeners being released
+
+        var remaining = @:privateAccess [
+            room.onJoin.handlers.length,
+            room.onStateChange.handlers.length,
+            room.onError.handlers.length,
+            room.onLeave.handlers.length,
+            room.onDrop.handlers.length,
+            room.onReconnect.handlers.length,
+            [for (_ in room.onMessageHandlers) 1].length,
+        ];
+        assertEquals("0,0,0,0,0,0,0", remaining.join(","));
+    }
+
     public function testRunningOutOfRetriesLeavesOnce() {
         join();
         room.reconnection.maxRetries = 1;
