@@ -2,6 +2,10 @@
 
 All notable changes to the Colyseus Haxe SDK are documented in this file.
 
+## 0.18.8
+
+- Requires colyseus-websocket 1.0.16. On sys targets (cpp, hl, neko), closing a socket twice no longer throws, and a socket closed during its handshake no longer reports itself open. [colyseus/colyseus-websocket-hx#20](https://github.com/colyseus/colyseus-websocket-hx/pull/20)
+
 ## 0.18.7
 
 - `room.leave()` while the room is reconnecting now stops the reconnection and leaves right away with `CloseCode.CONSENTED`, instead of only once every retry has failed. [colyseus/react-tools#15](https://github.com/colyseus/react-tools/issues/15)

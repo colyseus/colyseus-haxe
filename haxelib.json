@@ -4,9 +4,9 @@
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
   "description": "Colyseus Multiplayer SDK",
-  "version": "0.18.7",
+  "version": "0.18.8",
   "classPath": "src/",
-  "releasenote": "`leave()` while the room is reconnecting now stops the reconnection and leaves right away; sends that race a closing socket on sys targets no longer throw or get lost (colyseus/react-tools#15).",
+  "releasenote": "Requires colyseus-websocket 1.0.16: on sys targets a second close no longer throws, and a socket closed during its handshake no longer reports itself open.",
   "contributors": ["endel"],
   "dependencies": {
     "colyseus-websocket": "1.0.16",
