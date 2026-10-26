@@ -21,6 +21,9 @@ private class FakeConnection extends StubConnection {
     /** close() throws, like neko's socket on a second close. */
     public var closeThrows = false;
 
+    /** The socket thread closes the socket after the room's open check, before its send; the close event follows. */
+    public var closesBeforeNextSend = false;
+
     override function createWebSocket(url: String) {}
 
     override function get__isOpen(): Bool {
@@ -28,6 +31,10 @@ private class FakeConnection extends StubConnection {
     }
 
     override public function send(data: Bytes) {
+        if (closesBeforeNextSend) {
+            closesBeforeNextSend = false;
+            readyState = ReadyState.Closed;
+        }
         if (readyState != ReadyState.Open) { throw "websocket not open"; }
         sent.push(data);
     }
@@ -302,6 +309,56 @@ class RoomReconnectionTestCase extends haxe.unit.TestCase {
             [for (_ in room.onMessageHandlers) 1].length,
         ];
         assertEquals("0,0,0,0,0,0,0", remaining.join(","));
+    }
+
+    public function testLeaveWhoseSendLosesTheRaceToACloseWaitsForIt() {
+        join();
+        conn.closesBeforeNextSend = true;
+        room.leave();
+        assertEquals(0, leaves.length);
+
+        conn.onClose({ code: CloseCode.ABNORMAL_CLOSURE });
+        assertEquals('${CloseCode.CONSENTED}', leaves.join(","));
+        assertEquals(0, drops);
+    }
+
+    public function testSendLosingTheRaceToACloseIsQueued() {
+        join();
+        conn.closesBeforeNextSend = true;
+        room.send("move", 1);
+        assertEquals(1, room.reconnection.enqueuedMessages.length);
+    }
+
+    /** Not queued: its close rejects it, so replaying it after a reconnect would run a request reported as failed. */
+    public function testRequestLosingTheRaceToACloseIsRejectedByIt() {
+        join();
+        var errors = [];
+        conn.closesBeforeNextSend = true;
+        room.request("echo", null, (_, err) -> errors.push(err));
+        assertEquals(0, room.reconnection.enqueuedMessages.length);
+
+        conn.onClose({ code: CloseCode.ABNORMAL_CLOSURE });
+        assertEquals(1, errors.length);
+    }
+
+    public function testPingLosingTheRaceToACloseIsSkipped() {
+        join();
+        conn.closesBeforeNextSend = true;
+        room.ping((_) -> {});
+        assertEquals(ReadyState.Closed, conn.readyState);
+    }
+
+    /** The socket thread can close the socket after raising JOIN_ROOM. */
+    public function testJoinWhoseAckLosesTheRaceToACloseKeepsTheQueue() {
+        join();
+        conn.drop();
+        room.send("move", 1);
+        fireRetry();
+        conn.attemptOpens();
+
+        conn.closesBeforeNextSend = true;
+        conn.onMessage(getBytes(JOIN_FRAME));
+        assertEquals(1, room.reconnection.enqueuedMessages.length); // for the next join
     }
 
     public function testRunningOutOfRetriesLeavesOnce() {

@@ -132,6 +132,21 @@ class Connection {
 	}
 
 	/**
+	 * `send`, unless the socket has closed: returns whether `data` was sent.
+	 * On native targets the socket thread can close the socket between an
+	 * `_isOpen` check and the send, and the ws lib then throws.
+	 */
+	public function trySend(data:Bytes):Bool {
+		try {
+			this.send(data);
+		} catch (e:Dynamic) {
+			if (this._isOpen) throw e; // not the close race
+			return false;
+		}
+		return true;
+	}
+
+	/**
 	 * The ws lib cannot send a close code, so a LOCAL close would reach
 	 * onClose without one and the room would read it as a plain leave. A drop
 	 * test needs its own kill classified as reconnectable: stash the code and

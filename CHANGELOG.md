@@ -6,6 +6,7 @@ All notable changes to the Colyseus Haxe SDK are documented in this file.
 
 - `room.leave()` while the room is reconnecting now stops the reconnection and leaves right away with `CloseCode.CONSENTED`, instead of only once every retry has failed.
 - A room that has left now releases its listeners, and whatever they hold.
+- sys targets (cpp, hl, neko): sending while the socket closes no longer throws out of `leave()`, `send()` or `ping()`.
 
 ## 0.18.6
 

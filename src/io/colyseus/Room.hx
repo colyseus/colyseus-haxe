@@ -232,7 +232,7 @@ class Room<T> {
             } else if (this.connection._isOpen) {
                 var bytes = new BytesOutput();
                 bytes.writeByte(Protocol.LEAVE_ROOM);
-                this.connection.send(bytes.getBytes());
+                this.connection.trySend(bytes.getBytes()); // lost to a close: that close ends the room
             }
             // otherwise a close is already on its way: the close handler ends the room with its code
         }
@@ -262,10 +262,8 @@ class Room<T> {
 
     /** Transmits `data`, or buffers it while the connection is not open. */
     private function sendOrEnqueue(data: Bytes) {
-        if (!this.connection._isOpen) {
+        if (!this.connection._isOpen || !this.connection.trySend(data)) {
             this.enqueueMessage(data);
-        } else {
-            this.connection.send(data);
         }
     }
 
@@ -350,8 +348,14 @@ class Room<T> {
             bytesToSend.writeBytes(encodedPayload, 0, encodedPayload.length);
         }
 
-        // reliable + offline: buffer so it flushes on (re)connect
-        this.sendOrEnqueue(bytesToSend.getBytes());
+        var data = bytesToSend.getBytes();
+        if (!this.connection._isOpen) {
+            // reliable + offline: buffer so it flushes on (re)connect
+            this.enqueueMessage(data);
+        } else {
+            // a send that loses the race to a close isn't buffered: that close rejects the request
+            this.connection.trySend(data);
+        }
 
         this.pendingRequests.set(requestId, { onReply: onReply, onClose: onClose });
         return requestId;
@@ -375,7 +379,7 @@ class Room<T> {
 
         var bytes = new BytesOutput();
         bytes.writeByte(Protocol.PING);
-        this.connection.send(bytes.getBytes());
+        this.connection.trySend(bytes.getBytes());
     }
 
     /**
@@ -563,15 +567,13 @@ class Room<T> {
             // acknowledge JOIN_ROOM
             var bytes = new BytesOutput();
             bytes.writeByte(Protocol.JOIN_ROOM);
-            this.connection.send(bytes.getBytes());
-
-            // Send any enqueued messages that were buffered while disconnected
-            if (this.reconnection.enqueuedMessages.length > 0) {
-                for (message in this.reconnection.enqueuedMessages) {
-                    this.connection.send(message.data);
+            if (this.connection.trySend(bytes.getBytes())) {
+                // Send any enqueued messages that were buffered while disconnected;
+                // if the socket closes meanwhile, the rest wait for the next join
+                var queue = this.reconnection.enqueuedMessages;
+                while (queue.length > 0 && this.connection.trySend(queue[0].data)) {
+                    queue.shift();
                 }
-                // Clear the buffer after sending
-                this.reconnection.enqueuedMessages = [];
             }
 
         } else if (code == Protocol.ERROR) {
