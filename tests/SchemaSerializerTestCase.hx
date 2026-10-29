@@ -708,6 +708,143 @@ class SchemaSerializerTestCase extends haxe.unit.TestCase {
     }
 
     //
+    // remove + insert in the same patch (schema-5.0 PR #247). A DELETE leaves
+    // a hole until the ref finishes decoding, so a later ADD at an occupied
+    // index inserts relative to the pre-compaction layout.
+    //
+
+    public function testArraySchemaRemoveInsertUnshiftShift() {
+        // [Item(1), Item(2)] -> unshift(shift())
+        var state = new ArraySchemaInsertOps();
+        var decoder = new Decoder(state);
+        decoder.decode(getBytes([128, 1, 129, 2, 130, 3, 255, 2, 128, 0, 4, 128, 1, 5, 255, 4, 128, 1, 255, 5, 128, 2]));
+        decoder.decode(getBytes([255, 2, 33, 4, 128, 1, 4, 255, 4, 128, 1]));
+
+        assertEquals(0, state.numbers.length);
+        assertEquals(2, state.items.length);
+        assertEquals(1., state.items.items[0].value);
+        assertEquals(2., state.items.items[1].value);
+        assertEquals(6, decoder.refs.count());
+    }
+
+    public function testArraySchemaRemoveInsertUnshiftPop() {
+        // [Item(1), Item(2), Item(3)] -> unshift(pop())
+        var state = new ArraySchemaInsertOps();
+        var decoder = new Decoder(state);
+        decoder.decode(getBytes([128, 1, 129, 2, 130, 3, 255, 2, 128, 0, 4, 128, 1, 5, 128, 2, 6, 255, 4, 128, 1, 255, 5, 128, 2, 255, 6, 128, 3]));
+        decoder.decode(getBytes([255, 2, 128, 0, 6, 64, 3, 255, 6, 128, 3]));
+
+        assertEquals(0, state.numbers.length);
+        assertEquals(3, state.items.length);
+        assertEquals(3., state.items.items[0].value);
+        assertEquals(1., state.items.items[1].value);
+        assertEquals(2., state.items.items[2].value);
+        assertEquals(7, decoder.refs.count());
+    }
+
+    public function testArraySchemaRemoveInsertSpliceReinsert() {
+        // [Item(1), Item(2), Item(3)] -> splice(2, 1); splice(0, 0, removed)
+        var state = new ArraySchemaInsertOps();
+        var decoder = new Decoder(state);
+        decoder.decode(getBytes([128, 1, 129, 2, 130, 3, 255, 2, 128, 0, 4, 128, 1, 5, 128, 2, 6, 255, 4, 128, 1, 255, 5, 128, 2, 255, 6, 128, 3]));
+        decoder.decode(getBytes([255, 2, 128, 0, 6, 64, 3, 255, 6, 128, 3]));
+
+        assertEquals(0, state.numbers.length);
+        assertEquals(3, state.items.length);
+        assertEquals(3., state.items.items[0].value);
+        assertEquals(1., state.items.items[1].value);
+        assertEquals(2., state.items.items[2].value);
+        assertEquals(7, decoder.refs.count());
+    }
+
+    public function testArraySchemaRemoveInsertNumbersUnshiftShift() {
+        // [1, 2] -> unshift(3); unshift(4); shift()
+        var state = new ArraySchemaInsertOps();
+        var decoder = new Decoder(state);
+        decoder.decode(getBytes([128, 1, 129, 2, 130, 3, 255, 1, 128, 0, 1, 128, 1, 2]));
+        decoder.decode(getBytes([255, 1, 128, 0, 3]));
+
+        assertEquals(3, state.numbers.length);
+        assertEquals(3., state.numbers.items[0]);
+        assertEquals(1., state.numbers.items[1]);
+        assertEquals(2., state.numbers.items[2]);
+        assertEquals(0, state.items.length);
+        assertEquals(4, decoder.refs.count());
+    }
+
+    public function testArraySchemaRemoveInsertNumbersSpliceAppend() {
+        // [1, 2] -> splice(0, 1); splice(1, 0, 3)
+        var state = new ArraySchemaInsertOps();
+        var decoder = new Decoder(state);
+        decoder.decode(getBytes([128, 1, 129, 2, 130, 3, 255, 1, 128, 0, 1, 128, 1, 2]));
+        decoder.decode(getBytes([255, 1, 64, 0, 128, 2, 3]));
+
+        assertEquals(2, state.numbers.length);
+        assertEquals(2., state.numbers.items[0]);
+        assertEquals(3., state.numbers.items[1]);
+        assertEquals(0, state.items.length);
+        assertEquals(4, decoder.refs.count());
+    }
+
+    public function testArraySchemaRemoveInsertReplaceThenPop() {
+        // [Item(1), Item(2)] -> splice(1, 1, Item(3)); pop()
+        var state = new ArraySchemaInsertOps();
+        var decoder = new Decoder(state);
+        decoder.decode(getBytes([128, 1, 129, 2, 130, 3, 255, 2, 128, 0, 4, 128, 1, 5, 255, 4, 128, 1, 255, 5, 128, 2]));
+        decoder.decode(getBytes([255, 2, 33, 5]));
+
+        assertEquals(0, state.numbers.length);
+        assertEquals(1, state.items.length);
+        assertEquals(1., state.items.items[0].value);
+        assertEquals(5, decoder.refs.count());
+    }
+
+    public function testArraySchemaRemoveInsertReplaceInsertDelete() {
+        // [Item(1), Item(2), Item(3)] -> splice(1, 1, Item(4)); unshift(Item(5)); splice(2, 1)
+        var state = new ArraySchemaInsertOps();
+        var decoder = new Decoder(state);
+        decoder.decode(getBytes([128, 1, 129, 2, 130, 3, 255, 2, 128, 0, 4, 128, 1, 5, 128, 2, 6, 255, 4, 128, 1, 255, 5, 128, 2, 255, 6, 128, 3]));
+        decoder.decode(getBytes([255, 2, 128, 0, 8, 33, 5, 255, 8, 128, 5]));
+
+        assertEquals(0, state.numbers.length);
+        assertEquals(3, state.items.length);
+        assertEquals(5., state.items.items[0].value);
+        assertEquals(1., state.items.items[1].value);
+        assertEquals(3., state.items.items[2].value);
+        assertEquals(7, decoder.refs.count());
+    }
+
+    public function testArraySchemaRemoveInsertDuplicatePop() {
+        // [shared, Item(2), shared] -> pop(); unshift(Item(3))
+        var state = new ArraySchemaInsertOps();
+        var decoder = new Decoder(state);
+        decoder.decode(getBytes([128, 1, 129, 2, 130, 3, 255, 2, 128, 0, 4, 128, 1, 5, 128, 2, 4, 255, 4, 128, 1, 255, 5, 128, 2]));
+        decoder.decode(getBytes([255, 2, 128, 0, 6, 64, 3, 255, 6, 128, 3]));
+
+        assertEquals(0, state.numbers.length);
+        assertEquals(3, state.items.length);
+        assertEquals(3., state.items.items[0].value);
+        assertEquals(1., state.items.items[1].value);
+        assertEquals(2., state.items.items[2].value);
+        assertEquals(7, decoder.refs.count());
+    }
+
+    public function testArraySchemaRemoveInsertShiftUnshiftMore() {
+        // [Item(1), Item(2)] -> shift(); unshift(Item(3), Item(4))
+        var state = new ArraySchemaInsertOps();
+        var decoder = new Decoder(state);
+        decoder.decode(getBytes([128, 1, 129, 2, 130, 3, 255, 2, 128, 0, 4, 128, 1, 5, 255, 4, 128, 1, 255, 5, 128, 2]));
+        decoder.decode(getBytes([255, 2, 33, 4, 128, 1, 6, 128, 2, 7, 255, 6, 128, 3, 255, 7, 128, 4]));
+
+        assertEquals(0, state.numbers.length);
+        assertEquals(3, state.items.length);
+        assertEquals(3., state.items.items[0].value);
+        assertEquals(4., state.items.items[1].value);
+        assertEquals(2., state.items.items[2].value);
+        assertEquals(7, decoder.refs.count());
+    }
+
+    //
     // decodeResync fixtures below generated by schema-5.0
     // test-external/generate-resync-fixtures.ts (self-verified against the
     // 5.0 JS Decoder). Contract: PORTING_RESYNC.md / test/ResyncSweep.test.ts.
