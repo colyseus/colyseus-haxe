@@ -6,6 +6,9 @@ using io.colyseus.error.HttpException;
 using tink.http.Method;
 using tink.http.Header;
 
+import tink.http.Fetch.FetchOptions;
+import tink.http.Fetch.FetchResponse;
+
 typedef HttpOptions = {
     ?headers: Map<String, String>,
     ?body: Dynamic
@@ -72,7 +75,7 @@ class HTTP {
         // trace("Headers => " + headers);
         // trace("Body => " + body);
 
-		tink.http.Client.fetch(this.buildHttpEndpoint(segments), {
+		this.fetch(this.buildHttpEndpoint(segments), {
 			method: method,
 			headers: headers,
 			body: body,
@@ -87,28 +90,35 @@ class HTTP {
                         code = cast response.code;
                     }
 
-                    callback(new HttpException(code, message), null);
+                    callback(new HttpException(code, message, response), null);
 
                 } else {
                     callback(null, response);
                 }
 
+			// tink fails every status >= 400, with the body as `e.data`
 			case Failure(e):
                 var message = e.message;
+                var data: Dynamic = null;
 
                 if (Std.isOfType(e.data, String)) {
                     try {
-						var response = haxe.Json.parse(e.data);
-						if (response.error != null) {
-							message = cast response.error;
+						data = haxe.Json.parse(e.data);
+						if (data.error != null) {
+							message = cast data.error;
 						}
                     } catch (e: Dynamic) {
                         // ignore
                     }
                 }
 
-                callback(new HttpException(e.code, message), null);
+                callback(new HttpException(e.code, message, data), null);
 		}));
+    }
+
+    // tests stub the network here
+    private function fetch(url: tink.Url, options: FetchOptions): FetchResponse {
+        return tink.http.Client.fetch(url, options);
     }
 
     public function buildHttpEndpoint(segments: String, ?protocol: String = "http") {

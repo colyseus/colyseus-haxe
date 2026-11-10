@@ -169,6 +169,11 @@ class Client {
     ) {
         this.http.post("matchmake/" + method + "/" + roomName, { body: cast options, }, function(err, response) {
             if (err != null) {
+                // the body has the ErrorCode; the status may be a standard one (colyseus#999)
+                var code: Dynamic = (err.data != null) ? Reflect.field(err.data, "code") : null;
+                if (Std.isOfType(code, Int)) {
+                    err.code = code;
+                }
                 return callback(err, null);
 
             } else {
