@@ -58,7 +58,13 @@ haxe hxml/test.js.hxml
 
 > Error#500: Chunked encoding is not supported and the content-length header is required.
 
-Make sure your HTTP responses from the server-side don't respond with `Transfer-Encoding: chunked` header. Include the `Content-Length: xxx` header to avoid _"chunked"_ responses.
+On native targets (C++, HashLink, Neko), the released tink_http (0.10.0) can't read chunked HTTP responses, and Colyseus sends failed matchmaking requests chunked. So a failed join reports this 500 instead of the server's error code and message. tink_http has fixed this, but the fix isn't on haxelib yet. Until it is, install tink_http from git:
+
+```
+haxelib git tink_http https://github.com/haxetink/tink_http 8b2c13f73564129f406d57c7507bcef4e6743ba4
+```
+
+Your own HTTP routes avoid it by sending a `Content-Length` header.
 
 ## Dependencies
 
