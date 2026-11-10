@@ -2,6 +2,10 @@
 
 All notable changes to the Colyseus Haxe SDK are documented in this file.
 
+## 0.18.9
+
+- `HttpException.code` for a failed join is now the server's `ErrorCode` even when the server sends standard HTTP statuses (`matchMaker.controller.standardHttpStatus` in `@colyseus/core` 0.18.28), and a custom code like `ServerError(4000, …)` now reaches it too, where it used to be 500. On native targets (C++, HashLink, Neko), a failed join still reports 500 until tink_http releases its chunked-response fix. Until then, install it with `haxelib git tink_http https://github.com/haxetink/tink_http 8b2c13f`. [#999](https://github.com/colyseus/colyseus/issues/999)
+
 ## 0.18.8
 
 - Requires colyseus-websocket 1.0.16. On sys targets (cpp, hl, neko), closing a socket twice no longer throws, and a socket closed during its handshake no longer reports itself open. [colyseus/colyseus-websocket-hx#20](https://github.com/colyseus/colyseus-websocket-hx/pull/20)

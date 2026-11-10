@@ -4,9 +4,9 @@
   "license": "MIT",
   "tags": ["multiplayer", "networking", "websockets", "netcode"],
   "description": "Colyseus Multiplayer SDK",
-  "version": "0.18.8",
+  "version": "0.18.9",
   "classPath": "src/",
-  "releasenote": "Requires colyseus-websocket 1.0.16: on sys targets a second close no longer throws, and a socket closed during its handshake no longer reports itself open.",
+  "releasenote": "`HttpException.code` for a failed join is now the server's `ErrorCode` even when the server sends standard HTTP statuses, and carries custom codes like `ServerError(4000)` (colyseus/colyseus#999).",
   "contributors": ["endel"],
   "dependencies": {
     "colyseus-websocket": "1.0.16",
